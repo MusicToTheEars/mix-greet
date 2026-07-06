@@ -73,14 +73,44 @@ h1 .l2{display:block;color:var(--ink);font-size:clamp(37px,9vw,108px);margin-top
   padding:8px 14px;font-size:12px;letter-spacing:.2em;font-weight:500}
 
 /* ---- LED meter divider (signature) ---- */
-.meter{display:flex;gap:6px;margin:clamp(52px,8vw,84px) 0}
-.meter i{flex:1;height:26px;background:var(--green)}
-.meter i:nth-child(n+17){background:var(--amber)}
-.meter i:nth-child(n+23){background:var(--red);animation:peak 3.4s infinite}
-.meter i:nth-child(24){animation-delay:.25s}
-.meter i:nth-child(25){animation-delay:.5s}
-.meter i:nth-child(26){animation-delay:.7s}
-@keyframes peak{0%,64%,100%{opacity:1}70%,78%{opacity:.25}}
+.meter{display:flex;gap:5px;margin:clamp(52px,8vw,84px) 0;background:#101014;padding:9px 10px;border-radius:8px;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.65),inset 0 -1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.25)}
+.meter i{flex:1;height:22px;border-radius:3px;background:linear-gradient(180deg,#63E296 0%,#37C871 48%,#219554 100%);box-shadow:0 0 9px rgba(55,200,113,.6),inset 0 1px 0 rgba(255,255,255,.45),inset 0 -2px 3px rgba(0,0,0,.35)}
+.meter i:nth-child(n+17){background:linear-gradient(180deg,#FFD45E 0%,#FFB300 48%,#C98500 100%);box-shadow:0 0 9px rgba(255,179,0,.55),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.35)}
+.meter i:nth-child(n+20){background:linear-gradient(180deg,#2C2410,#1D170A);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}
+.meter i:nth-child(n+23){background:linear-gradient(180deg,#2E1214,#1E0C0E);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}
+.meter i:nth-child(11){animation:led11 1.8s steps(1,end) infinite}
+.meter i:nth-child(12){animation:led12 1.8s steps(1,end) infinite}
+.meter i:nth-child(13){animation:led13 1.8s steps(1,end) infinite}
+.meter i:nth-child(14){animation:led14 1.8s steps(1,end) infinite}
+.meter i:nth-child(15){animation:led15 1.8s steps(1,end) infinite}
+.meter i:nth-child(16){animation:led16 1.8s steps(1,end) infinite}
+.meter i:nth-child(17){animation:led17 1.8s steps(1,end) infinite}
+.meter i:nth-child(18){animation:led18 1.8s steps(1,end) infinite}
+.meter i:nth-child(19){animation:led19 1.8s steps(1,end) infinite}
+.meter i:nth-child(20){animation:led20 1.8s steps(1,end) infinite}
+.meter i:nth-child(21){animation:led21 1.8s steps(1,end) infinite}
+.meter i:nth-child(22){animation:led22 1.8s steps(1,end) infinite}
+.meter i:nth-child(23){animation:led23 1.8s steps(1,end) infinite}
+.meter i:nth-child(24){animation:led24 1.8s steps(1,end) infinite}
+.meter i:nth-child(25){animation:led25 1.8s steps(1,end) infinite}
+.meter i:nth-child(26){animation:led26 1.8s steps(1,end) infinite}
+@keyframes led11{0%,60%,100%{background:linear-gradient(180deg,#63E296 0%,#37C871 48%,#219554 100%);box-shadow:0 0 9px rgba(55,200,113,.6),inset 0 1px 0 rgba(255,255,255,.45),inset 0 -2px 3px rgba(0,0,0,.35)}56%{background:linear-gradient(180deg,#15291E,#0E1C14);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led12{0%,60%,100%{background:linear-gradient(180deg,#63E296 0%,#37C871 48%,#219554 100%);box-shadow:0 0 9px rgba(55,200,113,.6),inset 0 1px 0 rgba(255,255,255,.45),inset 0 -2px 3px rgba(0,0,0,.35)}56%{background:linear-gradient(180deg,#15291E,#0E1C14);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led13{0%,32%,60%,100%{background:linear-gradient(180deg,#63E296 0%,#37C871 48%,#219554 100%);box-shadow:0 0 9px rgba(55,200,113,.6),inset 0 1px 0 rgba(255,255,255,.45),inset 0 -2px 3px rgba(0,0,0,.35)}28%,56%{background:linear-gradient(180deg,#15291E,#0E1C14);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led14{0%,32%,60%,96%,100%{background:linear-gradient(180deg,#63E296 0%,#37C871 48%,#219554 100%);box-shadow:0 0 9px rgba(55,200,113,.6),inset 0 1px 0 rgba(255,255,255,.45),inset 0 -2px 3px rgba(0,0,0,.35)}28%,56%,92%{background:linear-gradient(180deg,#15291E,#0E1C14);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led15{0%,32%,60%,72%,96%,100%{background:linear-gradient(180deg,#63E296 0%,#37C871 48%,#219554 100%);box-shadow:0 0 9px rgba(55,200,113,.6),inset 0 1px 0 rgba(255,255,255,.45),inset 0 -2px 3px rgba(0,0,0,.35)}28%,56%,68%,92%{background:linear-gradient(180deg,#15291E,#0E1C14);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led16{0%,12%,32%,60%,72%,88%,96%,100%{background:linear-gradient(180deg,#63E296 0%,#37C871 48%,#219554 100%);box-shadow:0 0 9px rgba(55,200,113,.6),inset 0 1px 0 rgba(255,255,255,.45),inset 0 -2px 3px rgba(0,0,0,.35)}8%,28%,56%,68%,84%,92%{background:linear-gradient(180deg,#15291E,#0E1C14);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led17{0%,12%,32%,48%,60%,72%,88%,96%,100%{background:linear-gradient(180deg,#FFD45E 0%,#FFB300 48%,#C98500 100%);box-shadow:0 0 9px rgba(255,179,0,.55),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.35)}8%,24%,44%,56%,68%,84%,92%{background:linear-gradient(180deg,#2C2410,#1D170A);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led18{4%,12%,32%,48%,60%,72%,80%,88%,96%{background:linear-gradient(180deg,#FFD45E 0%,#FFB300 48%,#C98500 100%);box-shadow:0 0 9px rgba(255,179,0,.55),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.35)}0%,8%,24%,44%,56%,68%,76%,84%,92%,100%{background:linear-gradient(180deg,#2C2410,#1D170A);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led19{4%,12%,32%,48%,60%,72%,80%,88%{background:linear-gradient(180deg,#FFD45E 0%,#FFB300 48%,#C98500 100%);box-shadow:0 0 9px rgba(255,179,0,.55),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.35)}0%,8%,24%,44%,52%,68%,76%,84%,92%,100%{background:linear-gradient(180deg,#2C2410,#1D170A);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led20{4%,12%,20%,32%,48%,64%,72%,80%,88%{background:linear-gradient(180deg,#FFD45E 0%,#FFB300 48%,#C98500 100%);box-shadow:0 0 9px rgba(255,179,0,.55),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.35)}0%,8%,16%,24%,44%,52%,68%,76%,84%,92%,100%{background:linear-gradient(180deg,#2C2410,#1D170A);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led21{4%,12%,20%,32%,48%,64%,72%,80%{background:linear-gradient(180deg,#FFD45E 0%,#FFB300 48%,#C98500 100%);box-shadow:0 0 9px rgba(255,179,0,.55),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.35)}0%,8%,16%,24%,40%,52%,68%,76%,84%,100%{background:linear-gradient(180deg,#2C2410,#1D170A);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led22{12%,20%,36%,48%,64%,72%,80%{background:linear-gradient(180deg,#FFD45E 0%,#FFB300 48%,#C98500 100%);box-shadow:0 0 9px rgba(255,179,0,.55),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 3px rgba(0,0,0,.35)}0%,16%,24%,40%,52%,68%,76%,84%,100%{background:linear-gradient(180deg,#2C2410,#1D170A);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led23{12%,20%,36%,48%,64%,72%,80%{background:linear-gradient(180deg,#FF6A64 0%,#EC1C24 48%,#A80F16 100%);box-shadow:0 0 10px rgba(236,28,36,.6),inset 0 1px 0 rgba(255,255,255,.4),inset 0 -2px 3px rgba(0,0,0,.35)}0%,16%,24%,40%,52%,68%,76%,84%,100%{background:linear-gradient(180deg,#2E1214,#1E0C0E);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led24{12%,20%,36%,64%,80%{background:linear-gradient(180deg,#FF6A64 0%,#EC1C24 48%,#A80F16 100%);box-shadow:0 0 10px rgba(236,28,36,.6),inset 0 1px 0 rgba(255,255,255,.4),inset 0 -2px 3px rgba(0,0,0,.35)}0%,16%,24%,40%,68%,84%,100%{background:linear-gradient(180deg,#2E1214,#1E0C0E);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led25{20%,36%,64%,80%{background:linear-gradient(180deg,#FF6A64 0%,#EC1C24 48%,#A80F16 100%);box-shadow:0 0 10px rgba(236,28,36,.6),inset 0 1px 0 rgba(255,255,255,.4),inset 0 -2px 3px rgba(0,0,0,.35)}0%,24%,40%,68%,84%,100%{background:linear-gradient(180deg,#2E1214,#1E0C0E);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
+@keyframes led26{20%,36%,80%{background:linear-gradient(180deg,#FF6A64 0%,#EC1C24 48%,#A80F16 100%);box-shadow:0 0 10px rgba(236,28,36,.6),inset 0 1px 0 rgba(255,255,255,.4),inset 0 -2px 3px rgba(0,0,0,.35)}0%,24%,40%,84%,100%{background:linear-gradient(180deg,#2E1214,#1E0C0E);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}}
 
 /* ---- sections ---- */
 section{padding:clamp(8px,2vw,16px) 0}
