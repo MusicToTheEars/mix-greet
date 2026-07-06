@@ -12,7 +12,7 @@ const clean = (v, max = 300) => String(v ?? "").trim().slice(0, max);
 export default async (req) => {
   if (req.method === "OPTIONS") return new Response("", { status: 204, headers: cors });
 
-  const store = getStore("beatlab-events");
+  const store = getStore({ name: "beatlab-events", consistency: "strong" });
 
   if (req.method === "GET") {
     const events = (await store.get("events", { type: "json" })) || [];
