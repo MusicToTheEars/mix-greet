@@ -138,9 +138,17 @@ section{padding:clamp(8px,2vw,16px) 0}
 .suite-label{color:var(--amber);letter-spacing:.28em;font-weight:700;font-size:clamp(12px,1.7vw,15px);
   margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid var(--line)}
 .gallery{display:grid;gap:28px;grid-template-columns:1fr 1fr}
-.gallery .frame{margin-top:0}
-.gallery .frame:nth-child(-n+2){grid-column:1/-1}
+.gallery .frame{margin-top:0;cursor:zoom-in}
+.gallery .frame:hover img{filter:brightness(1.05)}
 @media (max-width:640px){.gallery{grid-template-columns:1fr}}
+
+/* lightbox */
+.lightbox{position:fixed;inset:0;z-index:60;background:rgba(11,11,13,.94);display:flex;align-items:center;justify-content:center;padding:4vmin;cursor:zoom-out}
+.lightbox[hidden]{display:none}
+.lightbox img{max-width:92vw;max-height:86vh;width:auto;height:auto;border:2px solid var(--line);box-shadow:0 12px 60px rgba(0,0,0,.7)}
+.lightbox .lb-cap{position:absolute;left:50%;transform:translateX(-50%);bottom:3vh;background:var(--bg);color:var(--amber);padding:8px 14px;font-size:12px;letter-spacing:.2em;font-weight:500;text-transform:uppercase}
+.lightbox .lb-close{position:absolute;top:16px;right:20px;background:none;border:0;color:var(--ink);font-family:'Plex Mono';font-weight:700;font-size:14px;letter-spacing:.22em;cursor:pointer;padding:10px}
+.lightbox .lb-close:hover,.lightbox .lb-close:focus-visible{color:var(--amber)}
 
 /* events */
 .events-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;margin-top:clamp(28px,4vw,40px)}
@@ -390,6 +398,12 @@ footer .bar{border:0;border-top:4px solid var(--line)}
   </div>
 </footer>
 
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Image preview">
+  <button class="lb-close" type="button" aria-label="Close">CLOSE ✕</button>
+  <img src="" alt="">
+  <span class="lb-cap" hidden></span>
+</div>
+
 <script>
 /* ==== RSVP CONFIG: paste your Canva form URL between the quotes ==== */
 const RSVP_FORM_URL = "https://musictotheears.my.canva.site/mix-and-greet";
@@ -400,6 +414,28 @@ if (RSVP_FORM_URL) {
   });
   document.querySelectorAll('#events .rsvp-link').forEach(a => { a.href = RSVP_FORM_URL; a.target = "_blank"; a.rel = "noopener"; });
 }
+
+/* ==== gallery lightbox ==== */
+const lb = document.getElementById('lightbox');
+const lbImg = lb.querySelector('img');
+const lbCap = lb.querySelector('.lb-cap');
+document.querySelectorAll('.gallery .frame').forEach(f => {
+  const img = f.querySelector('img');
+  if (!img) return;
+  f.addEventListener('click', () => {
+    lbImg.src = img.src;
+    const tag = f.querySelector('.tag');
+    lbImg.alt = tag ? tag.textContent : '';
+    lbCap.textContent = tag ? tag.textContent : '';
+    lbCap.hidden = !tag;
+    lb.hidden = false;
+    document.body.style.overflow = 'hidden';
+    lb.querySelector('.lb-close').focus();
+  });
+});
+function closeLightbox(){ lb.hidden = true; lbImg.src = ''; document.body.style.overflow = ''; }
+lb.addEventListener('click', closeLightbox);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !lb.hidden) closeLightbox(); });
 </script>
 </body>
 </html>
