@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Back Office · Mix &amp; Greet</title>
+<style>
+:root{--bg:#0B0B0D;--panel:#141419;--line:#2A2A32;--ink:#EDEAE3;--muted:#8B8B94;--amber:#FFB300;--red:#EC1C24;--green:#37C871}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;padding:36px 20px 90px}
+.wrap{max-width:880px;margin:0 auto}
+h1{font-size:clamp(18px,3vw,24px);letter-spacing:.18em;text-transform:uppercase;font-weight:700}
+h1 span{color:var(--amber)}
+h2{font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);border-bottom:2px solid var(--line);padding-bottom:12px}
+.sub{color:var(--muted);font-size:12px;letter-spacing:.16em;margin-top:8px;text-transform:uppercase}
+.panel{background:var(--panel);border:2px solid var(--line);padding:clamp(20px,4vw,30px);margin-top:24px}
+label{display:block;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:18px 0 6px}
+input,textarea{width:100%;background:var(--bg);border:2px solid var(--line);color:var(--ink);font:inherit;font-size:14px;padding:10px 12px}
+input:focus,textarea:focus{outline:none;border-color:var(--amber)}
+textarea{min-height:84px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 18px}
+@media(max-width:640px){.row,.row3{grid-template-columns:1fr}}
+.check{display:flex;align-items:center;gap:10px;margin-top:20px;font-size:13px;letter-spacing:.08em}
+.check input{width:18px;height:18px;accent-color:var(--amber)}
+button{font:inherit;font-weight:700;letter-spacing:.2em;text-transform:uppercase;cursor:pointer}
+.btn{margin-top:24px;padding:14px 30px;background:var(--amber);border:2px solid var(--amber);color:var(--bg);font-size:13px}
+.btn:hover{background:transparent;color:var(--amber)}
+.btn:disabled{opacity:.5;cursor:wait}
+.msg{margin-top:14px;font-size:13px;letter-spacing:.06em;line-height:1.6}
+.msg.ok{color:var(--green)}
+.msg.err{color:var(--red)}
+table{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px}
+th{color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:uppercase;text-align:left;padding:12px 8px;border-bottom:2px solid var(--line)}
+td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.muted{color:var(--muted)}
+.del{background:none;border:2px solid var(--line);color:var(--red);padding:6px 12px;font-size:11px}
+.del:hover{border-color:var(--red)}
+.hint{color:var(--muted);font-size:12px;margin-top:14px;line-height:1.7}
+a{color:var(--amber)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Beat Lab <span>·</span> Back Office</h1>
+  <p class="sub">Mix&amp;Greet event manager</p>
+
+  <div class="panel" id="gate">
+    <h2>Team access</h2>
+    <label for="pass">Password</label>
+    <input type="password" id="pass" autocomplete="current-password">
+    <button class="btn" id="enter" type="button">Enter</button>
+    <p class="msg err" id="gate-msg" hidden>Wrong password. Try again.</p>
+  </div>
+
+  <div id="office" hidden>
+    <div class="panel">
+      <h2>Publish a new event</h2>
+      <div class="row">
+        <div><label for="f-title">Event title *</label><input id="f-title" placeholder="Mix &amp; Greet Vol. 2"></div>
+        <div><label for="f-subtitle">Subtitle</label><input id="f-subtitle" placeholder="Beat Lab Session"></div>
+      </div>
+      <div class="row3">
+        <div><label for="f-date">Date *</label><input id="f-date" type="date"></div>
+        <div><label for="f-start">Start time</label><input id="f-start" placeholder="1:00 PM"></div>
+        <div><label for="f-end">End time</label><input id="f-end" placeholder="4:00 PM"></div>
+      </div>
+      <label for="f-location">Location</label>
+      <input id="f-location" value="1933 S. Broadway, Suite 1202, Los Angeles, CA 90007">
+      <label for="f-parking">Parking instructions</label>
+      <input id="f-parking" value="Street meter $1.00+ · private lot $15">
+      <label for="f-notes">Specifics / notes</label>
+      <textarea id="f-notes" placeholder="Anything guests should know: lineup, what to bring, age policy..."></textarea>
+      <label for="f-rsvp">RSVP link (leave empty to show &quot;RSVP Opens Soon&quot;)</label>
+      <input id="f-rsvp" type="url" placeholder="https://...">
+      <div class="check"><input type="checkbox" id="f-invite" checked><label for="f-invite" style="margin:0">Invite only</label></div>
+      <button class="btn" id="publish" type="button">Publish event</button>
+      <p class="msg" id="pub-msg" hidden></p>
+      <p class="hint">Published events appear on the main page immediately, sorted by date with the soonest first. Events automatically disappear from the main page the day after they happen.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Published events</h2>
+      <table>
+        <thead><tr><th>Date</th><th>Event</th><th>RSVP</th><th></th></tr></thead>
+        <tbody id="list"></tbody>
+      </table>
+      <p class="msg" id="list-msg" hidden></p>
+      <p class="hint">The July 11 Mix &amp; Greet Open House is built into the main page and is not listed here. View the live page: <a href="/" target="_blank" rel="noopener">main site</a>.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api/events';
+let PASS = sessionStorage.getItem('blb_pass') || '';
+
+const $ = id => document.getElementById(id);
+
+async function post(body){
+  const r = await fetch(API, {
+    method:'POST',
+    headers:{'content-type':'application/json','x-admin-pass':PASS},
+    body: JSON.stringify(body)
+  });
+  if (r.status === 401) throw new Error('auth');
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'request failed');
+  return r.json();
+}
+
+function showOffice(){
+  $('gate').hidden = true;
+  $('office').hidden = false;
+  loadList();
+}
+
+async function tryEnter(){
+  $('gate-msg').hidden = true;
+  try {
+    await post({action:'verify'});
+    sessionStorage.setItem('blb_pass', PASS);
+    showOffice();
+  } catch(e) {
+    if (e.message === 'auth') $('gate-msg').hidden = false;
+    else { $('gate-msg').textContent = 'Could not reach the events service. Try again in a minute.'; $('gate-msg').hidden = false; }
+  }
+}
+
+$('enter').addEventListener('click', () => { PASS = $('pass').value; tryEnter(); });
+$('pass').addEventListener('keydown', e => { if (e.key === 'Enter') { PASS = $('pass').value; tryEnter(); } });
+
+async function loadList(){
+  const tbody = $('list');
+  tbody.textContent = '';
+  let events = [];
+  try { events = await (await fetch(API)).json(); } catch(_) {}
+  if (!events.length) {
+    $('list-msg').textContent = 'No events published yet.';
+    $('list-msg').className = 'msg';
+    $('list-msg').hidden = false;
+    return;
+  }
+  $('list-msg').hidden = true;
+  events.forEach(ev => {
+    const tr = document.createElement('tr');
+    const past = ev.date < new Date().toISOString().slice(0,10);
+    const cells = [
+      ev.date + (past ? ' (past)' : ''),
+      ev.title + (ev.subtitle ? ' · ' + ev.subtitle : ''),
+      ev.rsvp ? 'live' : 'opens soon'
+    ];
+    cells.forEach((t,i) => {
+      const td = document.createElement('td');
+      td.textContent = t;
+      if (i === 0 && past) td.className = 'muted';
+      tr.appendChild(td);
+    });
+    const td = document.createElement('td');
+    const del = document.createElement('button');
+    del.className = 'del'; del.type = 'button'; del.textContent = 'Delete';
+    del.addEventListener('click', async () => {
+      if (!confirm('Delete "' + ev.title + '"?')) return;
+      try { await post({action:'delete', id: ev.id}); loadList(); } catch(_){ alert('Delete failed.'); }
+    });
+    td.appendChild(del);
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  });
+}
+
+$('publish').addEventListener('click', async () => {
+  const msg = $('pub-msg');
+  msg.hidden = true;
+  const event = {
+    title: $('f-title').value.trim(),
+    subtitle: $('f-subtitle').value.trim(),
+    date: $('f-date').value,
+    start: $('f-start').value.trim(),
+    end: $('f-end').value.trim(),
+    location: $('f-location').value.trim(),
+    parking: $('f-parking').value.trim(),
+    notes: $('f-notes').value.trim(),
+    rsvp: $('f-rsvp').value.trim(),
+    inviteOnly: $('f-invite').checked
+  };
+  if (!event.title || !event.date) {
+    msg.textContent = 'Event title and date are required.';
+    msg.className = 'msg err'; msg.hidden = false;
+    return;
+  }
+  $('publish').disabled = true;
+  try {
+    await post({action:'create', event});
+    msg.textContent = 'Published. The event is live on the main page.';
+    msg.className = 'msg ok'; msg.hidden = false;
+    ['f-title','f-subtitle','f-date','f-start','f-end','f-notes','f-rsvp'].forEach(id => $(id).value = '');
+    loadList();
+  } catch(e) {
+    msg.textContent = e.message === 'auth' ? 'Session expired. Reload and log in again.' : 'Publish failed: ' + e.message;
+    msg.className = 'msg err'; msg.hidden = false;
+  } finally {
+    $('publish').disabled = false;
+  }
+});
+
+if (PASS) tryEnter();
+</script>
+</body>
+</html>

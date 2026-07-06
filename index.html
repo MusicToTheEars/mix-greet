@@ -160,8 +160,7 @@ section{padding:clamp(8px,2vw,16px) 0}
 .event-card .sub2{font-family:'Big Shoulders';font-weight:800;text-transform:uppercase;font-size:clamp(19px,2.4vw,25px);color:#16161A;margin-top:-6px}
 .event-card .facts{list-style:none;padding:0;margin:2px 0 6px;display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.55;color:#3A3A42}
 .event-card .btn{margin-top:auto;padding:13px 26px;font-size:13px}
-.event-card.tba{border-style:dashed;background:transparent}
-.event-card.tba .when,.event-card.tba h3,.event-card.tba .sub2{color:var(--muted-lt)}
+.no-events{grid-column:1/-1;border:2px dashed var(--line-lt);padding:38px 24px;text-align:center;color:var(--muted-lt);font-size:14px;letter-spacing:.08em}
 .event-card .btn.soon{background:transparent;border-color:var(--line-lt);color:var(--muted-lt);pointer-events:none;cursor:default}
 
 /* partners carousel */
@@ -263,7 +262,7 @@ footer .bar{border:0;border-top:4px solid var(--line)}
     <div class="slab"><span class="dot"></span><h2>Upcoming Events</h2></div>
     <div class="events-grid">
 
-      <article class="event-card">
+      <article class="event-card" data-date="2026-07-11" data-static>
         <span class="flag">Invite Only</span>
         <p class="when">Sat · July 11 · 2026 · 1:00 PM – 4:00 PM</p>
         <h3>Mix<span class="amp">&amp;</span>Greet</h3>
@@ -274,26 +273,6 @@ footer .bar{border:0;border-top:4px solid var(--line)}
           <li>Walk the STE 1202 BEAT Lab &amp; STE 1204 Studio in person</li>
         </ul>
         <a class="btn rsvp-link" href="https://musictotheears.my.canva.site/mix-and-greet" target="_blank" rel="noopener">RSVP Now</a>
-      </article>
-
-      <article class="event-card tba">
-        <p class="when">Date · TBA</p>
-        <h3>Next Session</h3>
-        <p class="sub2">Announcement coming soon</p>
-        <ul class="facts">
-          <li>Lineup and details drop here first.</li>
-        </ul>
-        <span class="btn soon" aria-disabled="true">RSVP Opens Soon</span>
-      </article>
-
-      <article class="event-card tba">
-        <p class="when">Date · TBA</p>
-        <h3>Future Event</h3>
-        <p class="sub2">Details to come</p>
-        <ul class="facts">
-          <li>Check back soon or watch the socials.</li>
-        </ul>
-        <span class="btn soon" aria-disabled="true">RSVP Opens Soon</span>
       </article>
 
     </div>
@@ -412,7 +391,7 @@ if (RSVP_FORM_URL) {
   document.querySelectorAll('.rsvp-link').forEach(a => {
     if (a.getAttribute('href') === '#' || a.getAttribute('href') === '#rsvp' && a.closest('#rsvp')) {}
   });
-  document.querySelectorAll('#events .rsvp-link').forEach(a => { a.href = RSVP_FORM_URL; a.target = "_blank"; a.rel = "noopener"; });
+  document.querySelectorAll('#events [data-static] .rsvp-link').forEach(a => { a.href = RSVP_FORM_URL; a.target = "_blank"; a.rel = "noopener"; });
 }
 
 /* ==== gallery lightbox ==== */
@@ -436,6 +415,71 @@ document.querySelectorAll('.gallery .frame').forEach(f => {
 function closeLightbox(){ lb.hidden = true; lbImg.src = ''; document.body.style.overflow = ''; }
 lb.addEventListener('click', closeLightbox);
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !lb.hidden) closeLightbox(); });
+
+/* ==== dynamic events (published from /admin.html) ==== */
+const evGrid = document.querySelector('.events-grid');
+function evEl(tag, cls, text){ const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+function evWhen(e){
+  let s = e.date;
+  try {
+    s = new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', {weekday:'short', month:'long', day:'numeric', year:'numeric'}).toUpperCase().replace(/,/g, ' ·');
+  } catch(_) {}
+  if (e.start) s += ' · ' + e.start + (e.end ? ' – ' + e.end : '');
+  return s;
+}
+function evTitle(t){
+  const h = evEl('h3');
+  String(t).split('&').forEach((part, i) => {
+    if (i) h.appendChild(evEl('span', 'amp', '&'));
+    h.appendChild(document.createTextNode(part));
+  });
+  return h;
+}
+function evCard(e){
+  const card = evEl('article', 'event-card');
+  card.dataset.date = e.date || '';
+  if (e.inviteOnly) card.appendChild(evEl('span', 'flag', 'Invite Only'));
+  card.appendChild(evEl('p', 'when', evWhen(e)));
+  card.appendChild(evTitle(e.title || ''));
+  if (e.subtitle) card.appendChild(evEl('p', 'sub2', e.subtitle));
+  const ul = evEl('ul', 'facts');
+  if (e.location) {
+    const li = evEl('li', null, e.location + ' · ');
+    const a = evEl('a', null, 'Get directions');
+    a.href = 'https://maps.google.com/?q=' + encodeURIComponent(e.location);
+    a.target = '_blank'; a.rel = 'noopener';
+    li.appendChild(a); ul.appendChild(li);
+  }
+  if (e.parking) ul.appendChild(evEl('li', null, 'Parking: ' + e.parking));
+  if (e.notes) ul.appendChild(evEl('li', null, e.notes));
+  if (ul.children.length) card.appendChild(ul);
+  if (e.rsvp) {
+    const a = evEl('a', 'btn rsvp-link', 'RSVP Now');
+    a.href = e.rsvp; a.target = '_blank'; a.rel = 'noopener';
+    card.appendChild(a);
+  } else {
+    card.appendChild(evEl('span', 'btn soon', 'RSVP Opens Soon'));
+  }
+  return card;
+}
+(async function(){
+  if (!evGrid) return;
+  try {
+    const r = await fetch('/api/events');
+    if (r.ok) (await r.json()).forEach(e => { if (e && e.date && e.title) evGrid.appendChild(evCard(e)); });
+  } catch(_) {}
+  const now = new Date();
+  [...evGrid.querySelectorAll('.event-card')].forEach(c => {
+    const d = c.dataset.date;
+    if (d && new Date(d + 'T23:59:59') < now) c.remove();
+  });
+  [...evGrid.querySelectorAll('.event-card')]
+    .sort((a, b) => String(a.dataset.date || '9999').localeCompare(String(b.dataset.date || '9999')))
+    .forEach(c => evGrid.appendChild(c));
+  if (!evGrid.querySelector('.event-card')) {
+    evGrid.appendChild(evEl('p', 'no-events', 'No upcoming events right now. The next session will be announced here soon.'));
+  }
+})();
 </script>
 </body>
 </html>
