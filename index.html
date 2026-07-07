@@ -32,7 +32,7 @@ img{display:block;max-width:100%}
 ::selection{background:var(--brand);color:var(--bg)}
 
 /* ---- top rail ---- */
-header{padding-top:clamp(24px,4vw,44px)}
+header{padding-top:calc(clamp(48px,7vw,80px) + env(safe-area-inset-top,0px))}
 .rail{display:flex;justify-content:space-between;align-items:center;gap:16px}
 .rail img{height:clamp(30px,4vw,40px);width:auto}
 .rail .date{color:var(--ink);letter-spacing:.18em;font-weight:500;font-size:clamp(12px,1.6vw,15px)}
@@ -184,14 +184,19 @@ section{padding:clamp(8px,2vw,16px) 0}
 .video-frame.solid{border:2px solid var(--line)}
 .video-frame .vtag{position:absolute;left:18px;bottom:16px;background:var(--bg);color:var(--amber);
   padding:8px 14px;font-size:12px;letter-spacing:.2em;font-weight:500;z-index:1;pointer-events:none}
+.yt-lite{cursor:pointer}
+.yt-lite img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.yt-lite .yt-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:68px;height:48px;background:var(--red);border-radius:10px}
+.yt-lite .yt-play::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-40%,-50%);border-style:solid;border-width:10px 0 10px 17px;border-color:transparent transparent transparent #FFF}
+.yt-lite:hover .yt-play,.yt-lite:focus-visible .yt-play{background:#FF2A33}
 
 /* footer */
 footer{margin-top:clamp(56px,9vw,90px);padding-bottom:56px}
 footer .bar{border-top-color:var(--line)}
 footer .bar{border:0;border-top:4px solid var(--line)}
 .foot-row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px 24px;padding:24px 0;font-size:13px;letter-spacing:.16em;font-weight:500}
-.foot-row .l{color:var(--muted)}
-.foot-row .r{color:var(--red)}
+.foot-row .l{color:var(--ink)}
+.foot-row .r{color:var(--ink)}
 .copyright{color:#5A5A64;font-size:11px;letter-spacing:.14em;padding-top:20px;text-align:center}
 
 /* ---- light sections ---- */
@@ -356,6 +361,11 @@ footer .bar{border:0;border-top:4px solid var(--line)}
       </video>
       <span class="vtag">BEAT LAB — VIRTUAL TOUR</span>
     </div>
+    <div class="video-frame solid yt-lite" style="margin-top:28px" data-id="cW2KarE7vpk" role="button" tabindex="0" aria-label="Play video: Remixing Education Using Canva">
+      <img src="https://i.ytimg.com/vi/cW2KarE7vpk/maxresdefault.jpg" alt="Remixing Education Using Canva" loading="lazy">
+      <span class="yt-play" aria-hidden="true"></span>
+      <span class="vtag">REMIXING EDUCATION USING CANVA</span>
+    </div>
   </section>
 </main>
 
@@ -474,6 +484,27 @@ function evCard(e){
     evGrid.appendChild(evEl('p', 'no-events', 'No upcoming events right now. The next session will be announced here soon.'));
   }
 })();
+document.querySelectorAll('.yt-lite').forEach(el => {
+  const play = () => {
+    if (el.dataset.loaded) return;
+    el.dataset.loaded = '1';
+    const f = document.createElement('iframe');
+    f.src = 'https://www.youtube-nocookie.com/embed/' + el.dataset.id + '?autoplay=1&rel=0';
+    f.title = el.querySelector('img').alt;
+    f.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    f.referrerPolicy = 'strict-origin-when-cross-origin';
+    f.allowFullscreen = true;
+    el.querySelector('img').remove();
+    el.querySelector('.yt-play').remove();
+    el.appendChild(f);
+    el.removeAttribute('role');
+    el.removeAttribute('tabindex');
+  };
+  el.addEventListener('click', play);
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); }
+  });
+});
 </script>
 </body>
 </html>
