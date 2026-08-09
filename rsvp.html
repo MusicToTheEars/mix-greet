@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>RSVP · Mix &amp; Greet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B0B0D;--panel:#141419;--ink:#EDEAE3;--muted:#8B8B94;
+  --amber:#FFB300;--red:#EC1C24;--line:#2A2A32;--green:#37C871;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:560px;margin:0 auto;padding:48px 20px 80px}
+.masthead{
+  font-family:'Big Shoulders Display',Impact,sans-serif;font-weight:800;
+  font-size:34px;letter-spacing:.02em;text-transform:uppercase;line-height:.9;
+}
+.masthead .amp{color:var(--red)}
+.kicker{
+  margin-top:10px;font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--amber);
+}
+.card{
+  margin-top:28px;background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;overflow:hidden;
+}
+.card .bar{height:4px;background:var(--amber)}
+.card .inner{padding:28px}
+.event-title{
+  font-family:'Big Shoulders Display',Impact,sans-serif;font-weight:800;
+  font-size:26px;text-transform:uppercase;letter-spacing:.02em;margin:0;
+}
+.event-meta{margin:10px 0 0;color:var(--muted);font-size:14px;line-height:1.7}
+.event-meta b{color:var(--ink);font-weight:600}
+form{margin-top:24px;border-top:1px solid var(--line);padding-top:24px}
+label{
+  display:block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);margin:18px 0 7px;
+}
+label:first-child{margin-top:0}
+input,textarea,select{
+  width:100%;padding:12px 14px;background:var(--bg);color:var(--ink);
+  border:1px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;
+}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--amber)}
+textarea{min-height:84px;resize:vertical}
+.row{display:flex;gap:14px}
+.row>div{flex:1;min-width:0}
+.hp{position:absolute;left:-9999px;top:-9999px;height:0;width:0;overflow:hidden}
+button{
+  margin-top:26px;width:100%;padding:15px 26px;border:0;border-radius:8px;
+  background:var(--amber);color:#0B0B0D;font-size:13px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+  transition:background .15s;
+}
+button:hover{background:#FFD45E}
+button:disabled{background:var(--line);color:var(--muted);cursor:default}
+.state{margin-top:28px;text-align:center;padding:36px 20px}
+.state h2{
+  font-family:'Big Shoulders Display',Impact,sans-serif;font-weight:800;
+  font-size:30px;text-transform:uppercase;margin:0 0 10px;
+}
+.state.ok h2{color:var(--green)}
+.state.wait h2{color:var(--amber)}
+.state.err h2{color:var(--red)}
+.state p{color:var(--muted);line-height:1.7;margin:0}
+.error-inline{margin-top:14px;color:var(--red);font-size:14px;display:none}
+.foot{margin-top:32px;text-align:center;color:var(--muted);font-size:12px;letter-spacing:.06em}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">Mix<span class="amp">&amp;</span>Greet</div>
+  <div class="kicker">RSVP · Academix BEAT Lab</div>
+
+  <div class="card">
+    <div class="bar"></div>
+    <div class="inner">
+
+      <div id="loading" class="state"><p>Loading event…</p></div>
+
+      <div id="notfound" class="state err hidden">
+        <h2>Event not found</h2>
+        <p>This RSVP link doesn't match an open event. Check the link, or reach out to the Mix &amp; Greet team.</p>
+      </div>
+
+      <div id="eventBlock" class="hidden">
+        <h1 class="event-title" id="evTitle"></h1>
+        <p class="event-meta" id="evMeta"></p>
+
+        <form id="rsvpForm" novalidate>
+          <label for="f-name">Name</label>
+          <input id="f-name" name="name" autocomplete="name" required maxlength="120">
+
+          <label for="f-email">Email</label>
+          <input id="f-email" name="email" type="email" autocomplete="email" required maxlength="200">
+
+          <div class="row">
+            <div>
+              <label for="f-guests">Party size</label>
+              <select id="f-guests" name="guests">
+                <option value="1" selected>Just me</option>
+                <option value="2">2 people</option>
+                <option value="3">3 people</option>
+                <option value="4">4 people</option>
+                <option value="5">5 people</option>
+              </select>
+            </div>
+            <div>
+              <label for="f-phone">Phone (optional)</label>
+              <input id="f-phone" name="phone" type="tel" autocomplete="tel" maxlength="40">
+            </div>
+          </div>
+
+          <label for="f-notes">Anything we should know? (optional)</label>
+          <textarea id="f-notes" name="notes" maxlength="500"></textarea>
+
+          <div class="hp" aria-hidden="true">
+            <label for="f-website">Website</label>
+            <input id="f-website" name="website" tabindex="-1" autocomplete="off">
+          </div>
+
+          <button id="submitBtn" type="submit">RSVP Now</button>
+          <div class="error-inline" id="formError"></div>
+        </form>
+      </div>
+
+      <div id="confirmed" class="state ok hidden">
+        <h2>You're on the list</h2>
+        <p>Check your inbox: a confirmation with all the details is on its way to <b id="okEmail"></b>.</p>
+      </div>
+
+      <div id="waitlisted" class="state wait hidden">
+        <h2>You're on the waitlist</h2>
+        <p>This event is at capacity. We'll email <b id="waitEmail"></b> the moment a spot opens up.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="foot">Where Creatives Connect</div>
+</div>
+
+<script>
+// Convex HTTP Actions deployment for Mix & Greet (public URL, not a secret).
+const API = 'https://good-labrador-980.convex.site';
+
+const qs = new URLSearchParams(location.search);
+const eventId = qs.get('event') || '';
+const $ = (id) => document.getElementById(id);
+const show = (id) => $(id).classList.remove('hidden');
+const hide = (id) => $(id).classList.add('hidden');
+
+function fmtWhen(ev){
+  let s = '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ev.date || '');
+  if (m) {
+    const d = new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
+    s = d.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric', timeZone:'UTC'});
+  } else {
+    s = ev.date || '';
+  }
+  if (ev.start) s += ' · ' + ev.start + (ev.end ? ' – ' + ev.end : '');
+  return s;
+}
+
+async function load(){
+  if (!eventId) { hide('loading'); show('notfound'); return; }
+  try {
+    const res = await fetch(API + '/api/events');
+    const events = await res.json();
+    const ev = (Array.isArray(events) ? events : []).find(e => e.id === eventId);
+    if (!ev || ev.rsvpMode === 'closed') { hide('loading'); show('notfound'); return; }
+    $('evTitle').textContent = ev.title;
+    const bits = [fmtWhen(ev)];
+    if (ev.location) bits.push(ev.location);
+    $('evMeta').innerHTML = bits.map(b => {
+      const div = document.createElement('div');
+      div.textContent = b;
+      return div.outerHTML;
+    }).join('');
+    hide('loading'); show('eventBlock');
+  } catch (err) {
+    hide('loading'); show('notfound');
+  }
+}
+
+$('rsvpForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errBox = $('formError');
+  errBox.style.display = 'none';
+  const name = $('f-name').value.trim();
+  const email = $('f-email').value.trim();
+  if (!name || !/^\S+@\S+\.\S{2,}$/.test(email)) {
+    errBox.textContent = 'Please enter your name and a valid email.';
+    errBox.style.display = 'block';
+    return;
+  }
+  const btn = $('submitBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const res = await fetch(API + '/api/rsvp', {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({
+        eventId,
+        name,
+        email,
+        guests: Number($('f-guests').value) || 1,
+        phone: $('f-phone').value.trim(),
+        notes: $('f-notes').value.trim(),
+        website: $('f-website').value
+      })
+    });
+    const out = await res.json().catch(() => ({}));
+    if (res.ok && out.ok) {
+      hide('eventBlock');
+      if (out.status === 'waitlist') { $('waitEmail').textContent = email; show('waitlisted'); }
+      else { $('okEmail').textContent = email; show('confirmed'); }
+    } else {
+      errBox.textContent = out.error || 'Something went wrong. Please try again.';
+      errBox.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'RSVP Now';
+    }
+  } catch (err) {
+    errBox.textContent = 'Network error. Please try again.';
+    errBox.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'RSVP Now';
+  }
+});
+
+load();
+</script>
+</body>
+</html>

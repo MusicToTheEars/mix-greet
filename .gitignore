@@ -1,3 +1,15 @@
 # Local Netlify folder
 .netlify
 node_modules/
+
+# Internal planning/spec docs — NOT for the public deploy (Netlify publishes repo root)
+Grilled.md
+PLAN*.md
+openspec/
+.env
+.env.*
+convex/_generated/
+.claude/
+
+# macOS
+.DS_Store

@@ -1,7 +1,17 @@
 {
   "name": "mix-greet",
   "private": true,
+  "scripts": {
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy"
+  },
   "dependencies": {
-    "@netlify/blobs": "^8.1.0"
+    "@convex-dev/resend": "^0.1.0",
+    "@netlify/blobs": "^8.1.0",
+    "convex": "^1.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3"
   }
 }

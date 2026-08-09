@@ -42,6 +42,48 @@ td.muted{color:var(--muted)}
 .hint{color:var(--muted);font-size:12px;margin-top:14px;line-height:1.7}
 a{color:var(--amber)}
 [hidden]{display:none!important}
+
+/* --- editing / archive additions --- */
+.panel.editing{border-color:var(--amber)}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:2px solid var(--line);padding-bottom:12px}
+.head h2{border:none;padding:0}
+.count{font-size:11px;letter-spacing:.16em;color:var(--muted)}
+select{width:100%;background:var(--bg);border:2px solid var(--line);color:var(--ink);font:inherit;font-size:14px;padding:10px 12px}
+select:focus{outline:none;border-color:var(--amber)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.mini{background:none;border:2px solid var(--line);color:var(--muted);padding:6px 12px;font-size:11px}
+.mini:hover{border-color:var(--amber);color:var(--amber)}
+.mini.danger{color:var(--red)}
+.mini.danger:hover{border-color:var(--red);color:var(--red)}
+.mini.go{color:var(--amber);border-color:var(--amber)}
+.mini.go:hover{background:var(--amber);color:var(--bg)}
+.ghost{margin-left:14px;background:none;border:2px solid var(--line);color:var(--muted);padding:14px 22px;font-size:13px}
+.ghost:hover{border-color:var(--red);color:var(--red)}
+.badge{display:inline-block;font-size:10px;letter-spacing:.14em;padding:3px 8px;border:1px solid var(--line);color:var(--muted);margin-left:8px;vertical-align:2px}
+.badge.live{color:var(--green);border-color:var(--green)}
+.badge.soon{color:var(--amber);border-color:var(--amber)}
+.who{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--muted)}
+.who img{width:26px;height:26px;object-fit:cover;border:1px solid var(--line);border-radius:50%}
+.who img.logo{border-radius:0;object-fit:contain;background:var(--bg)}
+
+fieldset{border:2px solid var(--line);padding:0 18px 20px;margin-top:26px}
+legend{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);padding:0 10px}
+.feat{border-top:1px solid var(--line);padding-top:6px;margin-top:18px;position:relative}
+.feat:first-of-type{border-top:none;margin-top:6px}
+.feat .drop{display:flex;align-items:center;gap:14px;margin-top:14px}
+.feat .thumb{width:64px;height:64px;flex:0 0 64px;border:2px solid var(--line);background:var(--bg);object-fit:cover;display:block}
+.feat .thumb.logo{object-fit:contain}
+.feat .thumb.ph{display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:.1em;color:var(--muted);text-align:center;line-height:1.3}
+.feat .drop div{flex:1;min-width:0}
+.feat input[type=file]{font-size:11px;padding:8px;border-style:dashed}
+.feat input[type=file]::file-selector-button{font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--line);border:none;color:var(--ink);padding:6px 12px;margin-right:12px;cursor:pointer}
+.feat .rm{position:absolute;top:8px;right:0;background:none;border:none;color:var(--muted);font-size:11px;letter-spacing:.14em}
+.feat .rm:hover{color:var(--red)}
+.feat .up{font-size:11px;color:var(--muted);margin-top:6px;letter-spacing:.06em}
+.feat .up.err{color:var(--red)}
+.feat .up.ok{color:var(--green)}
+.add{margin-top:20px;background:none;border:2px dashed var(--line);color:var(--muted);padding:12px 20px;font-size:11px;width:100%}
+.add:hover{border-color:var(--amber);color:var(--amber)}
 </style>
 </head>
 <body>
@@ -58,8 +100,8 @@ a{color:var(--amber)}
   </div>
 
   <div id="office" hidden>
-    <div class="panel">
-      <h2>Publish a new event</h2>
+    <div class="panel" id="form-panel">
+      <h2 id="form-title">Publish a new event</h2>
       <div class="row">
         <div><label for="f-title">Event title *</label><input id="f-title" placeholder="Mix &amp; Greet Vol. 2"></div>
         <div><label for="f-subtitle">Subtitle</label><input id="f-subtitle" placeholder="Beat Lab Session"></div>
@@ -78,13 +120,22 @@ a{color:var(--amber)}
       <label for="f-rsvp">RSVP link (leave empty to show &quot;RSVP Opens Soon&quot;)</label>
       <input id="f-rsvp" type="url" placeholder="https://...">
       <div class="check"><input type="checkbox" id="f-invite" checked><label for="f-invite" style="margin:0">Invite only</label></div>
+
+      <fieldset>
+        <legend>Featured artists, speakers &amp; partners</legend>
+        <p class="hint" style="margin-top:14px">Add a headshot for a person or a logo for a company. These appear on the event flyer when someone clicks the event on the main page.</p>
+        <div id="feat-list"></div>
+        <button class="add" id="feat-add" type="button">+ Add featured artist / speaker / company</button>
+      </fieldset>
+
       <button class="btn" id="publish" type="button">Publish event</button>
+      <button class="ghost" id="cancel-edit" type="button" hidden>Cancel edit</button>
       <p class="msg" id="pub-msg" hidden></p>
-      <p class="hint">Published events appear on the main page immediately, sorted by date with the soonest first. Events automatically disappear from the main page the day after they happen.</p>
+      <p class="hint">Published events appear on the main page immediately, sorted by date with the soonest first. Events automatically disappear from the main page the day after they happen — archive one to pull it down early.</p>
     </div>
 
     <div class="panel">
-      <h2>Published events</h2>
+      <div class="head"><h2>Published events</h2><span class="count" id="list-count"></span></div>
       <table>
         <thead><tr><th>Date</th><th>Event</th><th>RSVP</th><th></th></tr></thead>
         <tbody id="list"></tbody>
@@ -92,85 +143,244 @@ a{color:var(--amber)}
       <p class="msg" id="list-msg" hidden></p>
       <p class="hint">The July 11 Mix &amp; Greet Open House is built into the main page and is not listed here. View the live page: <a href="/" target="_blank" rel="noopener">main site</a>.</p>
     </div>
+
+    <div class="panel">
+      <div class="head"><h2>Archive · past events</h2><span class="count" id="arch-count"></span></div>
+      <table>
+        <thead><tr><th>Date</th><th>Event</th><th>Featured</th><th></th></tr></thead>
+        <tbody id="archive"></tbody>
+      </table>
+      <p class="msg" id="arch-msg" hidden></p>
+      <p class="hint">Archived events stay here with their lineup and guest list intact, but no longer show on the main page. Restore one to put it back up.</p>
+    </div>
   </div>
 </div>
 
 <script>
-const API = '/api/events';
-let PASS = sessionStorage.getItem('blb_pass') || '';
+// Convex backend. The password is exchanged once for a 12h session token, so
+// it never travels with ordinary requests.
+const API_BASE = 'https://good-labrador-980.convex.site';
+const EVENTS = API_BASE + '/api/events';
+const LOGIN  = API_BASE + '/api/admin/login';
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+};
 
-async function post(body){
-  const r = await fetch(API, {
+let TOKEN = sessionStorage.getItem('mg_token') || '';
+let editingId = null;
+const DEFAULTS = { location: $('f-location').value, parking: $('f-parking').value };
+
+// --- transport ---------------------------------------------------------------
+async function api(body){
+  const r = await fetch(EVENTS, {
     method:'POST',
-    headers:{'content-type':'application/json','x-admin-pass':PASS},
+    headers:{'content-type':'application/json','x-admin-token':TOKEN},
     body: JSON.stringify(body)
   });
-  if (r.status === 401) throw new Error('auth');
+  if (r.status === 401) { signOut(); throw new Error('auth'); }
   if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'request failed');
   return r.json();
 }
 
-function showOffice(){
-  $('gate').hidden = true;
-  $('office').hidden = false;
-  loadList();
+function signOut(){
+  TOKEN = '';
+  sessionStorage.removeItem('mg_token');
+  $('office').hidden = true;
+  $('gate').hidden = false;
 }
 
-async function tryEnter(){
-  $('gate-msg').hidden = true;
+async function tryEnter(password){
+  const gm = $('gate-msg');
+  gm.hidden = true;
   try {
-    await post({action:'verify'});
-    sessionStorage.setItem('blb_pass', PASS);
-    showOffice();
-  } catch(e) {
-    if (e.message === 'auth') $('gate-msg').hidden = false;
-    else { $('gate-msg').textContent = 'Could not reach the events service. Try again in a minute.'; $('gate-msg').hidden = false; }
+    const r = await fetch(LOGIN, {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify({ password })
+    });
+    if (r.status === 401) { gm.textContent = 'Wrong password. Try again.'; gm.hidden = false; return; }
+    if (!r.ok) throw new Error('unreachable');
+    const { token } = await r.json();
+    TOKEN = token;
+    sessionStorage.setItem('mg_token', token);
+    $('gate').hidden = true;
+    $('office').hidden = false;
+    $('pass').value = '';
+    loadAll();
+  } catch(_) {
+    gm.textContent = 'Could not reach the events service. Try again in a minute.';
+    gm.hidden = false;
   }
 }
 
-$('enter').addEventListener('click', () => { PASS = $('pass').value; tryEnter(); });
-$('pass').addEventListener('keydown', e => { if (e.key === 'Enter') { PASS = $('pass').value; tryEnter(); } });
+$('enter').addEventListener('click', () => tryEnter($('pass').value));
+$('pass').addEventListener('keydown', e => { if (e.key === 'Enter') tryEnter($('pass').value); });
 
-async function loadList(){
-  const tbody = $('list');
-  tbody.textContent = '';
-  let events = [];
-  try { events = await (await fetch(API)).json(); } catch(_) {}
-  if (!events.length) {
-    $('list-msg').textContent = 'No events published yet.';
-    $('list-msg').className = 'msg';
-    $('list-msg').hidden = false;
-    return;
-  }
-  $('list-msg').hidden = true;
-  events.forEach(ev => {
-    const tr = document.createElement('tr');
-    const past = ev.date < new Date().toISOString().slice(0,10);
-    const cells = [
-      ev.date + (past ? ' (past)' : ''),
-      ev.title + (ev.subtitle ? ' · ' + ev.subtitle : ''),
-      ev.rsvp ? 'live' : 'opens soon'
-    ];
-    cells.forEach((t,i) => {
-      const td = document.createElement('td');
-      td.textContent = t;
-      if (i === 0 && past) td.className = 'muted';
-      tr.appendChild(td);
-    });
-    const td = document.createElement('td');
-    const del = document.createElement('button');
-    del.className = 'del'; del.type = 'button'; del.textContent = 'Delete';
-    del.addEventListener('click', async () => {
-      if (!confirm('Delete "' + ev.title + '"?')) return;
-      try { await post({action:'delete', id: ev.id}); loadList(); } catch(_){ alert('Delete failed.'); }
-    });
-    td.appendChild(del);
-    tr.appendChild(td);
-    tbody.appendChild(tr);
+// --- featured artist / speaker / company rows --------------------------------
+function featRow(data){
+  data = data || {};
+  const wrap = el('div', 'feat');
+  wrap._imageId = data.imageId || null;
+
+  const rm = el('button', 'rm', 'Remove');
+  rm.type = 'button';
+  rm.addEventListener('click', () => wrap.remove());
+  wrap.appendChild(rm);
+
+  const mk = (labelText, cls, tag, placeholder) => {
+    const box = el('div');
+    const id = cls + '-' + Math.random().toString(36).slice(2, 8);
+    const lab = el('label', null, labelText);
+    lab.setAttribute('for', id);
+    const input = el(tag || 'input', cls);
+    input.id = id;
+    if (placeholder) input.placeholder = placeholder;
+    box.appendChild(lab); box.appendChild(input);
+    return { box, input };
+  };
+
+  const r1 = el('div', 'row');
+  const name = mk('Name *', 'f-name', 'input', 'DJ Spinderella');
+  const kindBox = el('div');
+  const kindId = 'k-' + Math.random().toString(36).slice(2, 8);
+  const kindLab = el('label', null, 'Type'); kindLab.setAttribute('for', kindId);
+  const kind = el('select', 'f-kind'); kind.id = kindId;
+  [['artist','Artist'],['speaker','Speaker'],['company','Company / partner']].forEach(([v,t]) => {
+    const o = el('option', null, t); o.value = v; kind.appendChild(o);
   });
+  kind.value = data.kind || 'artist';
+  kindBox.appendChild(kindLab); kindBox.appendChild(kind);
+  r1.appendChild(name.box); r1.appendChild(kindBox);
+  wrap.appendChild(r1);
+
+  const r2 = el('div', 'row');
+  const role = mk('Role / billing', 'f-role', 'input', 'Headliner');
+  const link = mk('Link', 'f-link', 'input', 'https://...');
+  r2.appendChild(role.box); r2.appendChild(link.box);
+  wrap.appendChild(r2);
+
+  const bio = mk('Short bio / blurb', 'f-bio', 'textarea', 'One or two lines shown on the flyer.');
+  bio.input.style.minHeight = '60px';
+  wrap.appendChild(bio.box);
+
+  name.input.value = data.name || '';
+  role.input.value = data.role || '';
+  link.input.value = data.link || '';
+  bio.input.value  = data.bio  || '';
+
+  // image: uploaded straight to Convex storage, we only keep the id
+  const imgLab = el('label', null, 'Headshot or logo');
+  wrap.appendChild(imgLab);
+  const drop = el('div', 'drop');
+  const thumb = el('img', 'thumb');
+  const ph = el('div', 'thumb ph', 'NO IMAGE');
+  const right = el('div');
+  const file = el('input');
+  file.type = 'file'; file.accept = 'image/*';
+  const status = el('p', 'up');
+  right.appendChild(file); right.appendChild(status);
+  drop.appendChild(ph); drop.appendChild(thumb); drop.appendChild(right);
+  wrap.appendChild(drop);
+
+  const showImage = (src) => {
+    thumb.src = src;
+    thumb.hidden = false;
+    ph.hidden = true;
+    thumb.classList.toggle('logo', kind.value === 'company');
+  };
+  const clearImage = () => { thumb.hidden = true; ph.hidden = false; };
+  clearImage();
+  if (data.imageUrl) showImage(data.imageUrl);
+  kind.addEventListener('change', () => thumb.classList.toggle('logo', kind.value === 'company'));
+
+  file.addEventListener('change', async () => {
+    const f = file.files && file.files[0];
+    if (!f) return;
+    if (!/^image\//.test(f.type)) {
+      status.textContent = 'That file is not an image.'; status.className = 'up err'; return;
+    }
+    if (f.size > MAX_IMAGE_BYTES) {
+      status.textContent = 'Image is over 5 MB. Use a smaller one.'; status.className = 'up err'; return;
+    }
+    status.textContent = 'Uploading...'; status.className = 'up';
+    try {
+      const { uploadUrl } = await api({ action:'uploadUrl' });
+      const up = await fetch(uploadUrl, { method:'POST', headers:{'content-type': f.type}, body: f });
+      if (!up.ok) throw new Error('upload rejected');
+      const { storageId } = await up.json();
+      wrap._imageId = storageId;
+      showImage(URL.createObjectURL(f));
+      status.textContent = 'Uploaded. Save the event to keep it.'; status.className = 'up ok';
+    } catch(e) {
+      status.textContent = e.message === 'auth' ? 'Session expired — log in again.' : 'Upload failed. Try again.';
+      status.className = 'up err';
+      file.value = '';
+    }
+  });
+
+  return wrap;
 }
+
+$('feat-add').addEventListener('click', () => $('feat-list').appendChild(featRow()));
+
+function collectFeatured(){
+  return [...$('feat-list').children].map(w => {
+    const val = c => (w.querySelector('.' + c) || {}).value || '';
+    const f = {
+      name: val('f-name').trim(),
+      kind: val('f-kind'),
+      role: val('f-role').trim(),
+      link: val('f-link').trim(),
+      bio:  val('f-bio').trim()
+    };
+    if (w._imageId) f.imageId = w._imageId;
+    return f;
+  }).filter(f => f.name);
+}
+
+// --- form state ---------------------------------------------------------------
+function resetForm(){
+  editingId = null;
+  ['f-title','f-subtitle','f-date','f-start','f-end','f-notes','f-rsvp'].forEach(id => $(id).value = '');
+  $('f-location').value = DEFAULTS.location;
+  $('f-parking').value = DEFAULTS.parking;
+  $('f-invite').checked = true;
+  $('feat-list').textContent = '';
+  $('form-title').textContent = 'Publish a new event';
+  $('publish').textContent = 'Publish event';
+  $('cancel-edit').hidden = true;
+  $('form-panel').classList.remove('editing');
+}
+
+function loadIntoForm(ev){
+  editingId = ev.id;
+  $('f-title').value = ev.title || '';
+  $('f-subtitle').value = ev.subtitle || '';
+  $('f-date').value = ev.date || '';
+  $('f-start').value = ev.start || '';
+  $('f-end').value = ev.end || '';
+  $('f-location').value = ev.location || '';
+  $('f-parking').value = ev.parking || '';
+  $('f-notes').value = ev.notes || '';
+  $('f-rsvp').value = ev.rsvp || '';
+  $('f-invite').checked = !!ev.inviteOnly;
+  $('feat-list').textContent = '';
+  (ev.featured || []).forEach(f => $('feat-list').appendChild(featRow(f)));
+  $('form-title').textContent = 'Edit event';
+  $('publish').textContent = 'Save changes';
+  $('cancel-edit').hidden = false;
+  $('form-panel').classList.add('editing');
+  $('pub-msg').hidden = true;
+  $('form-panel').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+$('cancel-edit').addEventListener('click', () => { resetForm(); $('pub-msg').hidden = true; });
 
 $('publish').addEventListener('click', async () => {
   const msg = $('pub-msg');
@@ -184,30 +394,166 @@ $('publish').addEventListener('click', async () => {
     location: $('f-location').value.trim(),
     parking: $('f-parking').value.trim(),
     notes: $('f-notes').value.trim(),
-    rsvp: $('f-rsvp').value.trim(),
-    inviteOnly: $('f-invite').checked
+    rsvpUrl: $('f-rsvp').value.trim(),
+    inviteOnly: $('f-invite').checked,
+    featured: collectFeatured()
   };
   if (!event.title || !event.date) {
     msg.textContent = 'Event title and date are required.';
     msg.className = 'msg err'; msg.hidden = false;
     return;
   }
+  const wasEditing = editingId;
   $('publish').disabled = true;
   try {
-    await post({action:'create', event});
-    msg.textContent = 'Published. The event is live on the main page.';
+    const lists = wasEditing
+      ? await api({ action:'update', id: wasEditing, event })
+      : await api({ action:'create', event });
+    render(lists);
+    resetForm();
+    msg.textContent = wasEditing
+      ? 'Saved. The main page shows the update immediately.'
+      : 'Published. The event is live on the main page.';
     msg.className = 'msg ok'; msg.hidden = false;
-    ['f-title','f-subtitle','f-date','f-start','f-end','f-notes','f-rsvp'].forEach(id => $(id).value = '');
-    loadList();
   } catch(e) {
-    msg.textContent = e.message === 'auth' ? 'Session expired. Reload and log in again.' : 'Publish failed: ' + e.message;
+    msg.textContent = e.message === 'auth'
+      ? 'Session expired. Log in again.'
+      : (wasEditing ? 'Save failed: ' : 'Publish failed: ') + e.message;
     msg.className = 'msg err'; msg.hidden = false;
   } finally {
     $('publish').disabled = false;
   }
 });
 
-if (PASS) tryEnter();
+// --- lists --------------------------------------------------------------------
+function whoStrip(ev){
+  const box = el('div', 'who');
+  (ev.featured || []).slice(0, 4).forEach(f => {
+    if (f.imageUrl) {
+      const img = el('img');
+      img.src = f.imageUrl; img.alt = f.name; img.loading = 'lazy';
+      if (f.kind === 'company') img.className = 'logo';
+      box.appendChild(img);
+    }
+  });
+  const names = (ev.featured || []).map(f => f.name).join(', ');
+  if (names) box.appendChild(el('span', null, names));
+  return box.children.length ? box : null;
+}
+
+function actionCell(ev, buttons){
+  const td = el('td');
+  const wrap = el('div', 'actions');
+  buttons.forEach(([label, cls, fn]) => {
+    const b = el('button', 'mini ' + cls, label);
+    b.type = 'button';
+    b.addEventListener('click', () => fn(ev, b));
+    wrap.appendChild(b);
+  });
+  td.appendChild(wrap);
+  return td;
+}
+
+async function act(body, btn, failMsg){
+  if (btn) btn.disabled = true;
+  try { render(await api(body)); }
+  catch(e) { alert(e.message === 'auth' ? 'Session expired. Log in again.' : failMsg + '\n\n' + e.message); }
+  finally { if (btn) btn.disabled = false; }
+}
+
+const archive = (ev, b) => act({ action:'archive', id: ev.id }, b, 'Could not archive.');
+const restore = (ev, b) => act({ action:'restore', id: ev.id }, b, 'Could not restore.');
+const destroy = (ev, b) => {
+  if (!confirm('Permanently delete "' + ev.title + '"?\n\nThis cannot be undone. Archive it instead if you want to keep the record.')) return;
+  act({ action:'delete', id: ev.id }, b, 'Could not delete.');
+};
+
+function renderPublished(events){
+  const tbody = $('list');
+  tbody.textContent = '';
+  $('list-count').textContent = events.length ? events.length + ' live' : '';
+  if (!events.length) {
+    $('list-msg').textContent = 'No events published yet.';
+    $('list-msg').className = 'msg'; $('list-msg').hidden = false;
+    return;
+  }
+  $('list-msg').hidden = true;
+  const today = new Date().toISOString().slice(0,10);
+  events.forEach(ev => {
+    const tr = el('tr');
+    const past = ev.date < today;
+
+    const dateTd = el('td', past ? 'muted' : null, ev.date + (past ? ' (past)' : ''));
+    tr.appendChild(dateTd);
+
+    const titleTd = el('td');
+    titleTd.appendChild(el('span', null, ev.title + (ev.subtitle ? ' · ' + ev.subtitle : '')));
+    if (ev.inviteOnly) titleTd.appendChild(el('span', 'badge', 'invite'));
+    const who = whoStrip(ev);
+    if (who) titleTd.appendChild(who);
+    tr.appendChild(titleTd);
+
+    const rsvpTd = el('td');
+    rsvpTd.appendChild(el('span', 'badge ' + (ev.rsvp ? 'live' : 'soon'), ev.rsvp ? 'live' : 'opens soon'));
+    tr.appendChild(rsvpTd);
+
+    tr.appendChild(actionCell(ev, [
+      ['Edit', 'go', loadIntoForm],
+      ['Archive', '', archive],
+      ['Delete', 'danger', destroy]
+    ]));
+    tbody.appendChild(tr);
+  });
+}
+
+function renderArchive(events){
+  const tbody = $('archive');
+  tbody.textContent = '';
+  $('arch-count').textContent = events.length ? events.length + ' archived' : '';
+  if (!events.length) {
+    $('arch-msg').textContent = 'Nothing archived yet. Archive a past event to start the history.';
+    $('arch-msg').className = 'msg'; $('arch-msg').hidden = false;
+    return;
+  }
+  $('arch-msg').hidden = true;
+  events.forEach(ev => {
+    const tr = el('tr');
+    tr.appendChild(el('td', 'muted', ev.date));
+
+    const titleTd = el('td');
+    titleTd.appendChild(el('span', null, ev.title + (ev.subtitle ? ' · ' + ev.subtitle : '')));
+    tr.appendChild(titleTd);
+
+    const featTd = el('td');
+    const who = whoStrip(ev);
+    if (who) featTd.appendChild(who); else featTd.appendChild(el('span', 'muted', '—'));
+    tr.appendChild(featTd);
+
+    tr.appendChild(actionCell(ev, [
+      ['Edit', 'go', loadIntoForm],
+      ['Restore', '', restore],
+      ['Delete', 'danger', destroy]
+    ]));
+    tbody.appendChild(tr);
+  });
+}
+
+function render(lists){
+  renderPublished(lists.published || []);
+  renderArchive(lists.archived || []);
+}
+
+async function loadAll(){
+  try { render(await api({ action:'list' })); }
+  catch(e) {
+    if (e.message !== 'auth') {
+      $('list-msg').textContent = 'Could not load events. Reload the page.';
+      $('list-msg').className = 'msg err'; $('list-msg').hidden = false;
+    }
+  }
+}
+
+if (TOKEN) { $('gate').hidden = true; $('office').hidden = false; loadAll(); }
 </script>
 </body>
 </html>
