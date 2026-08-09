@@ -14,12 +14,14 @@ cd "$(dirname "$0")/.."
 
 # 1Password reference for the client's Convex Production Deploy Key.
 # Override by exporting CONVEX_DEPLOY_KEY_OP.
-: "${CONVEX_DEPLOY_KEY_OP:=op://Security/cvo457rdrh6e5e6wu6j4kizqai/Convex Deploy Key}"
+: "${CONVEX_DEPLOY_KEY_OP:=op://Security/ekxrxev2mjwa7wr55mj33v7aci/Convex Deploy Key}"
 
 if [ -z "${CONVEX_DEPLOY_KEY:-}" ]; then
   if command -v op >/dev/null 2>&1; then
     echo "Reading Convex deploy key from 1Password: ${CONVEX_DEPLOY_KEY_OP}"
-    CONVEX_DEPLOY_KEY="$(op read "${CONVEX_DEPLOY_KEY_OP}")"
+    # A 1Password service-account token masks personal vaults, so `op read`
+    # reports the item "isn't in the vault". Drop it for this one call.
+    CONVEX_DEPLOY_KEY="$(env -u OP_SERVICE_ACCOUNT_TOKEN op read "${CONVEX_DEPLOY_KEY_OP}")"
   fi
 fi
 
