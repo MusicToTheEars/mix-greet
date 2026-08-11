@@ -10,52 +10,54 @@
 <link rel="stylesheet" href="/brand.css">
 <style>
 /* page-specific — everything else comes from the shared brand layer */
-.masthead{font-size:clamp(38px,9vw,60px);margin-top:12px}
-.tagline{font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
-  font-size:clamp(18px,4vw,26px);line-height:1;color:var(--ink);margin-top:4px}
+.masthead{font-size:clamp(38px,9vw,60px)}
+.tagline{font-size:clamp(18px,4vw,26px)}
 .meter{margin:clamp(28px,5vw,40px) 0}
 
 /* featured artist / speaker / partner editor */
-.feat{border-top:2px solid var(--line);padding-top:6px;margin-top:18px;position:relative}
+.feat{border-top:2px solid var(--surface-line);padding-top:6px;margin-top:18px;position:relative}
 .feat:first-of-type{border-top:none;margin-top:6px}
 .feat .drop{display:flex;align-items:center;gap:14px;margin-top:14px}
-.feat .thumb{width:64px;height:64px;flex:0 0 64px;border:2px solid var(--line);background:var(--bg);object-fit:cover;display:block}
+.feat .thumb{width:64px;height:64px;flex:0 0 64px;border:2px solid var(--surface-line);background:var(--field);object-fit:cover;display:block}
 .feat .thumb.logo{object-fit:contain}
-.feat .thumb.ph{display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:.1em;color:var(--muted);text-align:center;line-height:1.3}
+.feat .thumb.ph{display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:.1em;color:var(--text-muted);text-align:center;line-height:1.3}
 .feat .drop div{flex:1;min-width:0}
 .feat input[type=file]{font-size:11px;padding:8px;border-style:dashed}
-.feat input[type=file]::file-selector-button{font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--line);border:0;color:var(--ink);padding:6px 12px;margin-right:12px;cursor:pointer}
-.feat .rm{position:absolute;top:8px;right:0;background:none;border:0;color:var(--muted);font-size:11px;letter-spacing:.14em}
-.feat .rm:hover{color:var(--red)}
-.feat .up{font-size:11px;color:var(--muted);margin-top:6px;letter-spacing:.06em}
-.feat .up.err{color:var(--red)}
-.feat .up.ok{color:var(--green)}
-.add{margin-top:20px;background:none;border:2px dashed var(--line);color:var(--muted);padding:12px 20px;font-size:11px;width:100%}
-.add:hover{border-color:var(--amber);color:var(--amber)}
+.feat input[type=file]::file-selector-button{font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:var(--surface-line);border:0;color:var(--text);padding:6px 12px;margin-right:12px;cursor:pointer}
+.feat .rm{position:absolute;top:8px;right:0;background:none;border:0;color:var(--text-muted);font-size:11px;letter-spacing:.14em}
+.feat .rm:hover{color:var(--danger)}
+.feat .up{font-size:11px;color:var(--text-muted);margin-top:6px;letter-spacing:.06em}
+.feat .up.err{color:var(--danger)}
+.feat .up.ok{color:var(--ok-ink)}
+.add{margin-top:20px;background:none;border:2px dashed var(--surface-line);color:var(--text-muted);padding:12px 20px;font-size:11px;width:100%}
+.add:hover{border-color:var(--brand);color:var(--brand)}
 
 /* lineup strip inside the event tables */
-.who{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--muted)}
-.who img{width:26px;height:26px;object-fit:cover;border:2px solid var(--line);border-radius:50%}
-.who img.logo{border-radius:0;object-fit:contain;background:var(--bg)}
+.who{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--text-muted)}
+.who img{width:26px;height:26px;object-fit:cover;border:2px solid var(--surface-line);border-radius:50%;background:var(--field)}
+.who img.logo{border-radius:0;object-fit:contain}
 </style>
 </head>
 <body>
 
-<header class="wrap">
-  <div class="rail">
-    <a href="/" aria-label="Mix &amp; Greet home">
-      <img src="/academix-logo.png" alt="Academix" width="723" height="120">
-    </a>
-    <span class="date">BACK OFFICE</span>
-  </div>
-  <hr class="rule">
-</header>
+<div class="dark-zone">
+  <header class="wrap">
+    <div class="rail">
+      <a href="/" aria-label="Mix &amp; Greet home">
+        <img src="/academix-logo.png" alt="Academix" width="723" height="120">
+      </a>
+      <span class="date">BACK OFFICE</span>
+    </div>
+    <hr class="rule">
+  </header>
+  <section class="wrap masthead-block">
+    <p class="eyebrow">Academix Beat Lab</p>
+    <h1 class="masthead">Mix<span class="amp">&amp;</span>Greet</h1>
+    <p class="tagline">Event Back Office</p>
+  </section>
+</div>
 
-<main class="wrap">
-  <p class="eyebrow">Academix Beat Lab</p>
-  <h1 class="masthead">Mix<span class="amp">&amp;</span>Greet</h1>
-  <p class="tagline">Event Back Office</p>
-
+<main class="wrap light">
   <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
 
   <div class="panel accent" id="gate">
@@ -123,14 +125,16 @@
   </div>
 </main>
 
-<footer class="wrap">
-  <hr class="bar">
-  <div class="foot-row">
-    <span class="l">BEAT LAB — ACADEMIX</span>
-    <span class="r">BACK OFFICE · STAFF ONLY</span>
+<footer class="dark-zone">
+  <div class="wrap">
+    <hr class="bar">
+    <div class="foot-row">
+      <span class="l">BEAT LAB — ACADEMIX</span>
+      <span class="r">BACK OFFICE · STAFF ONLY</span>
+    </div>
+    <hr class="bar">
+    <p class="copyright">© 2026 ACADEMIX BEAT LAB · 1933 S. BROADWAY, SUITE 1202, LOS ANGELES, CA 90007</p>
   </div>
-  <hr class="bar">
-  <p class="copyright">© 2026 ACADEMIX BEAT LAB · 1933 S. BROADWAY, SUITE 1202, LOS ANGELES, CA 90007</p>
 </footer>
 
 <script>

@@ -10,49 +10,51 @@
 <link rel="stylesheet" href="/brand.css">
 <style>
 /* page-specific — everything else comes from the shared brand layer */
-.masthead{font-size:clamp(44px,11vw,72px);margin-top:14px}
-.tagline{font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
-  font-size:clamp(20px,5vw,30px);line-height:1;color:var(--ink);margin-top:4px}
+.masthead{font-size:clamp(44px,11vw,72px)}
+.tagline{font-size:clamp(20px,5vw,30px)}
 .meter{margin:clamp(30px,6vw,44px) 0}
 
 .event-title{font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
   line-height:.92;font-size:clamp(30px,6vw,42px);color:var(--brand);margin:0;
   letter-spacing:.01em;border:0;padding:0}
-.event-meta{margin:12px 0 0;color:var(--muted);font-size:13.5px;line-height:1.7;letter-spacing:.04em}
+.event-meta{margin:12px 0 0;color:var(--text-muted);font-size:13.5px;line-height:1.7;letter-spacing:.04em}
 .event-meta div+div{margin-top:2px}
 
-form{margin-top:26px;border-top:2px solid var(--line);padding-top:22px}
+form{margin-top:26px;border-top:2px solid var(--surface-line);padding-top:22px}
 form label:first-child{margin-top:0}
 .hp{position:absolute;left:-9999px;top:-9999px;height:0;width:0;overflow:hidden}
 
 .state{text-align:center;padding:30px 4px}
 .state h2{font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;font-size:clamp(28px,7vw,40px);
   text-transform:uppercase;margin:0 0 10px;border:0;padding:0;letter-spacing:.02em;line-height:1}
-.state.ok h2{color:var(--green)}
-.state.wait h2{color:var(--amber)}
-.state.err h2{color:var(--red)}
-.state p{color:var(--muted);line-height:1.7;margin:0;font-size:14px}
-.state p b{color:var(--ink);font-weight:700}
-.error-inline{margin-top:14px;color:var(--red);font-size:13px;letter-spacing:.06em;display:none}
+.state.ok h2{color:var(--ok-ink)}
+.state.wait h2{color:var(--accent-ink)}
+.state.err h2{color:var(--danger)}
+.state p{color:var(--text-muted);line-height:1.7;margin:0;font-size:14px}
+.state p b{color:var(--text);font-weight:700}
+.error-inline{margin-top:14px;color:var(--danger);font-size:13px;letter-spacing:.06em;display:none}
 </style>
 </head>
 <body>
 
-<header class="wrap narrow">
-  <div class="rail">
-    <a href="https://www.academixbeatlab.com/" aria-label="Academix Beat Lab">
-      <img src="/academix-logo.png" alt="Academix" width="723" height="120">
-    </a>
-    <span class="date">RSVP</span>
-  </div>
-  <hr class="rule">
-</header>
+<div class="dark-zone">
+  <header class="wrap narrow">
+    <div class="rail">
+      <a href="https://www.academixbeatlab.com/" aria-label="Academix Beat Lab">
+        <img src="/academix-logo.png" alt="Academix" width="723" height="120">
+      </a>
+      <span class="date">RSVP</span>
+    </div>
+    <hr class="rule">
+  </header>
+  <section class="wrap narrow masthead-block">
+    <p class="eyebrow">Academix Beat Lab presents</p>
+    <h1 class="masthead">Mix<span class="amp">&amp;</span>Greet</h1>
+    <p class="tagline">Where Creatives Connect</p>
+  </section>
+</div>
 
-<main class="wrap narrow">
-  <p class="eyebrow">Academix Beat Lab presents</p>
-  <h1 class="masthead">Mix<span class="amp">&amp;</span>Greet</h1>
-  <p class="tagline">Where Creatives Connect</p>
-
+<main class="wrap narrow light">
   <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
 
   <div class="panel accent">
@@ -118,14 +120,16 @@ form label:first-child{margin-top:0}
   </div>
 </main>
 
-<footer class="wrap narrow">
-  <hr class="bar">
-  <div class="foot-row">
-    <span class="l">BEAT LAB — ACADEMIX</span>
-    <span class="r">INVITE ONLY · MUST RSVP</span>
+<footer class="dark-zone">
+  <div class="wrap narrow">
+    <hr class="bar">
+    <div class="foot-row">
+      <span class="l">BEAT LAB — ACADEMIX</span>
+      <span class="r">INVITE ONLY · MUST RSVP</span>
+    </div>
+    <hr class="bar">
+    <p class="copyright">© 2026 ACADEMIX BEAT LAB · 1933 S. BROADWAY, SUITE 1202, LOS ANGELES, CA 90007</p>
   </div>
-  <hr class="bar">
-  <p class="copyright">© 2026 ACADEMIX BEAT LAB · 1933 S. BROADWAY, SUITE 1202, LOS ANGELES, CA 90007</p>
 </footer>
 
 <script>
