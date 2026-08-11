@@ -21,11 +21,16 @@
   --ink:#EDEAE3; --muted:#8B8B94;
   --amber:#FFB300; --green:#37C871; --red:#EC1C24; --brand:#EC1C24;
   --amber-ink:#B87700; --line-lt:#E5E3DE; --muted-lt:#84848C;
+  /* Academix red, deepened for light surfaces — the same relationship
+     --amber-ink has to --amber. #EC1C24 only reaches 4.2:1 on --surface,
+     which is short for 13px bold labels; this hits 5.3:1 and still reads
+     as the same red. */
+  --brand-ink:#C8151C;
 
   /* semantic roles for the light content column */
   --text:#16161A; --text-soft:#3A3A42; --text-muted:var(--muted-lt);
   --surface:#F5F4F1; --surface-line:var(--line-lt); --field:#FFFFFF;
-  --accent-ink:var(--amber-ink);
+  --accent-ink:var(--brand-ink);
   --ok-ink:#1E7F46;      /* --green is too light to read on white */
   --danger:var(--red);
 }
@@ -37,7 +42,7 @@ body{
 }
 .dark-zone{background:var(--bg);color:var(--ink)}
 a{color:var(--accent-ink);text-underline-offset:4px}
-.dark-zone a{color:var(--amber)}
+.dark-zone a{color:var(--brand)}
 img{display:block;max-width:100%}
 ::selection{background:var(--brand);color:#FFFFFF}
 [hidden]{display:none!important}
@@ -65,7 +70,7 @@ header.wrap{padding-top:clamp(24px,4vw,44px);padding-bottom:0}
 .masthead .amp{color:var(--ink)}
 .tagline{font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
   line-height:1;color:var(--ink);margin-top:4px}
-.eyebrow{color:var(--amber);letter-spacing:.3em;font-weight:500;font-size:clamp(11px,1.5vw,14px);text-transform:uppercase}
+.eyebrow{color:var(--brand);letter-spacing:.3em;font-weight:500;font-size:clamp(11px,1.5vw,14px);text-transform:uppercase}
 
 /* ---- LED meter divider (signature) ---- */
 .meter{display:flex;gap:5px;margin:clamp(52px,8vw,84px) 0;background:#101014;padding:9px 10px;border-radius:8px;
@@ -111,12 +116,12 @@ header.wrap{padding-top:clamp(24px,4vw,44px);padding-bottom:0}
 .slab{display:flex;align-items:center;gap:18px;margin-bottom:clamp(22px,3.5vw,32px)}
 .slab h2{font-size:clamp(13px,1.8vw,16px);letter-spacing:.32em;font-weight:700;color:var(--text);text-transform:uppercase;white-space:nowrap;border:0;padding:0}
 .slab::after{content:"";flex:1;height:2px;background:var(--surface-line)}
-.slab .dot{width:10px;height:10px;background:var(--amber);flex:none}
+.slab .dot{width:10px;height:10px;background:var(--brand);flex:none}
 
 /* ---- panels ---- */
 .panel{background:var(--surface);border:2px solid var(--surface-line);padding:clamp(22px,4vw,32px);margin-top:24px}
-.panel.accent{border-top:6px solid var(--amber)}
-.panel.editing{border-color:var(--amber)}
+.panel.accent{border-top:6px solid var(--brand)}
+.panel.editing{border-color:var(--brand)}
 .head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:2px solid var(--surface-line);padding-bottom:12px}
 .head h2{border:none;padding:0}
 
