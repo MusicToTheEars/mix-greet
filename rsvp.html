@@ -5,151 +5,128 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>RSVP · Mix &amp; Greet</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/brand.css">
 <style>
-:root{
-  --bg:#0B0B0D;--panel:#141419;--ink:#EDEAE3;--muted:#8B8B94;
-  --amber:#FFB300;--red:#EC1C24;--line:#2A2A32;--green:#37C871;
-}
-*{box-sizing:border-box}
-body{
-  margin:0;background:var(--bg);color:var(--ink);
-  font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;
-  -webkit-font-smoothing:antialiased;
-}
-.wrap{max-width:560px;margin:0 auto;padding:48px 20px 80px}
-.masthead{
-  font-family:'Big Shoulders Display',Impact,sans-serif;font-weight:800;
-  font-size:34px;letter-spacing:.02em;text-transform:uppercase;line-height:.9;
-}
-.masthead .amp{color:var(--red)}
-.kicker{
-  margin-top:10px;font-size:11px;letter-spacing:.22em;text-transform:uppercase;
-  color:var(--amber);
-}
-.card{
-  margin-top:28px;background:var(--panel);border:1px solid var(--line);
-  border-radius:14px;overflow:hidden;
-}
-.card .bar{height:4px;background:var(--amber)}
-.card .inner{padding:28px}
-.event-title{
-  font-family:'Big Shoulders Display',Impact,sans-serif;font-weight:800;
-  font-size:26px;text-transform:uppercase;letter-spacing:.02em;margin:0;
-}
-.event-meta{margin:10px 0 0;color:var(--muted);font-size:14px;line-height:1.7}
-.event-meta b{color:var(--ink);font-weight:600}
-form{margin-top:24px;border-top:1px solid var(--line);padding-top:24px}
-label{
-  display:block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--muted);margin:18px 0 7px;
-}
-label:first-child{margin-top:0}
-input,textarea,select{
-  width:100%;padding:12px 14px;background:var(--bg);color:var(--ink);
-  border:1px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;
-}
-input:focus,textarea:focus,select:focus{outline:none;border-color:var(--amber)}
-textarea{min-height:84px;resize:vertical}
-.row{display:flex;gap:14px}
-.row>div{flex:1;min-width:0}
+/* page-specific — everything else comes from the shared brand layer */
+.masthead{font-size:clamp(44px,11vw,72px);margin-top:14px}
+.tagline{font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
+  font-size:clamp(20px,5vw,30px);line-height:1;color:var(--ink);margin-top:4px}
+.meter{margin:clamp(30px,6vw,44px) 0}
+
+.event-title{font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
+  line-height:.92;font-size:clamp(30px,6vw,42px);color:var(--brand);margin:0;
+  letter-spacing:.01em;border:0;padding:0}
+.event-meta{margin:12px 0 0;color:var(--muted);font-size:13.5px;line-height:1.7;letter-spacing:.04em}
+.event-meta div+div{margin-top:2px}
+
+form{margin-top:26px;border-top:2px solid var(--line);padding-top:22px}
+form label:first-child{margin-top:0}
 .hp{position:absolute;left:-9999px;top:-9999px;height:0;width:0;overflow:hidden}
-button{
-  margin-top:26px;width:100%;padding:15px 26px;border:0;border-radius:8px;
-  background:var(--amber);color:#0B0B0D;font-size:13px;font-weight:700;
-  letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
-  transition:background .15s;
-}
-button:hover{background:#FFD45E}
-button:disabled{background:var(--line);color:var(--muted);cursor:default}
-.state{margin-top:28px;text-align:center;padding:36px 20px}
-.state h2{
-  font-family:'Big Shoulders Display',Impact,sans-serif;font-weight:800;
-  font-size:30px;text-transform:uppercase;margin:0 0 10px;
-}
+
+.state{text-align:center;padding:30px 4px}
+.state h2{font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;font-size:clamp(28px,7vw,40px);
+  text-transform:uppercase;margin:0 0 10px;border:0;padding:0;letter-spacing:.02em;line-height:1}
 .state.ok h2{color:var(--green)}
 .state.wait h2{color:var(--amber)}
 .state.err h2{color:var(--red)}
-.state p{color:var(--muted);line-height:1.7;margin:0}
-.error-inline{margin-top:14px;color:var(--red);font-size:14px;display:none}
-.foot{margin-top:32px;text-align:center;color:var(--muted);font-size:12px;letter-spacing:.06em}
-.hidden{display:none}
+.state p{color:var(--muted);line-height:1.7;margin:0;font-size:14px}
+.state p b{color:var(--ink);font-weight:700}
+.error-inline{margin-top:14px;color:var(--red);font-size:13px;letter-spacing:.06em;display:none}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="masthead">Mix<span class="amp">&amp;</span>Greet</div>
-  <div class="kicker">RSVP · Academix BEAT Lab</div>
 
-  <div class="card">
-    <div class="bar"></div>
-    <div class="inner">
-
-      <div id="loading" class="state"><p>Loading event…</p></div>
-
-      <div id="notfound" class="state err hidden">
-        <h2>Event not found</h2>
-        <p>This RSVP link doesn't match an open event. Check the link, or reach out to the Mix &amp; Greet team.</p>
-      </div>
-
-      <div id="eventBlock" class="hidden">
-        <h1 class="event-title" id="evTitle"></h1>
-        <p class="event-meta" id="evMeta"></p>
-
-        <form id="rsvpForm" novalidate>
-          <label for="f-name">Name</label>
-          <input id="f-name" name="name" autocomplete="name" required maxlength="120">
-
-          <label for="f-email">Email</label>
-          <input id="f-email" name="email" type="email" autocomplete="email" required maxlength="200">
-
-          <div class="row">
-            <div>
-              <label for="f-guests">Party size</label>
-              <select id="f-guests" name="guests">
-                <option value="1" selected>Just me</option>
-                <option value="2">2 people</option>
-                <option value="3">3 people</option>
-                <option value="4">4 people</option>
-                <option value="5">5 people</option>
-              </select>
-            </div>
-            <div>
-              <label for="f-phone">Phone (optional)</label>
-              <input id="f-phone" name="phone" type="tel" autocomplete="tel" maxlength="40">
-            </div>
-          </div>
-
-          <label for="f-notes">Anything we should know? (optional)</label>
-          <textarea id="f-notes" name="notes" maxlength="500"></textarea>
-
-          <div class="hp" aria-hidden="true">
-            <label for="f-website">Website</label>
-            <input id="f-website" name="website" tabindex="-1" autocomplete="off">
-          </div>
-
-          <button id="submitBtn" type="submit">RSVP Now</button>
-          <div class="error-inline" id="formError"></div>
-        </form>
-      </div>
-
-      <div id="confirmed" class="state ok hidden">
-        <h2>You're on the list</h2>
-        <p>Check your inbox: a confirmation with all the details is on its way to <b id="okEmail"></b>.</p>
-      </div>
-
-      <div id="waitlisted" class="state wait hidden">
-        <h2>You're on the waitlist</h2>
-        <p>This event is at capacity. We'll email <b id="waitEmail"></b> the moment a spot opens up.</p>
-      </div>
-
-    </div>
+<header class="wrap narrow">
+  <div class="rail">
+    <a href="https://www.academixbeatlab.com/" aria-label="Academix Beat Lab">
+      <img src="/academix-logo.png" alt="Academix" width="723" height="120">
+    </a>
+    <span class="date">RSVP</span>
   </div>
+  <hr class="rule">
+</header>
 
-  <div class="foot">Where Creatives Connect</div>
-</div>
+<main class="wrap narrow">
+  <p class="eyebrow">Academix Beat Lab presents</p>
+  <h1 class="masthead">Mix<span class="amp">&amp;</span>Greet</h1>
+  <p class="tagline">Where Creatives Connect</p>
+
+  <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+  <div class="panel accent">
+
+    <div id="loading" class="state"><p>Loading event…</p></div>
+
+    <div id="notfound" class="state err hidden">
+      <h2>Event not found</h2>
+      <p>This RSVP link doesn't match an open event. Check the link, or reach out to the Mix &amp; Greet team.</p>
+    </div>
+
+    <div id="eventBlock" class="hidden">
+      <h2 class="event-title" id="evTitle"></h2>
+      <p class="event-meta" id="evMeta"></p>
+
+      <form id="rsvpForm" novalidate>
+        <label for="f-name">Name</label>
+        <input id="f-name" name="name" autocomplete="name" required maxlength="120">
+
+        <label for="f-email">Email</label>
+        <input id="f-email" name="email" type="email" autocomplete="email" required maxlength="200">
+
+        <div class="row">
+          <div>
+            <label for="f-guests">Party size</label>
+            <select id="f-guests" name="guests">
+              <option value="1" selected>Just me</option>
+              <option value="2">2 people</option>
+              <option value="3">3 people</option>
+              <option value="4">4 people</option>
+              <option value="5">5 people</option>
+            </select>
+          </div>
+          <div>
+            <label for="f-phone">Phone (optional)</label>
+            <input id="f-phone" name="phone" type="tel" autocomplete="tel" maxlength="40">
+          </div>
+        </div>
+
+        <label for="f-notes">Anything we should know? (optional)</label>
+        <textarea id="f-notes" name="notes" maxlength="500"></textarea>
+
+        <div class="hp" aria-hidden="true">
+          <label for="f-website">Website</label>
+          <input id="f-website" name="website" tabindex="-1" autocomplete="off">
+        </div>
+
+        <button class="btn block" id="submitBtn" type="submit">RSVP Now</button>
+        <div class="error-inline" id="formError"></div>
+      </form>
+    </div>
+
+    <div id="confirmed" class="state ok hidden">
+      <h2>You're on the list</h2>
+      <p>Check your inbox: a confirmation with all the details is on its way to <b id="okEmail"></b>.</p>
+    </div>
+
+    <div id="waitlisted" class="state wait hidden">
+      <h2>You're on the waitlist</h2>
+      <p>This event is at capacity. We'll email <b id="waitEmail"></b> the moment a spot opens up.</p>
+    </div>
+
+  </div>
+</main>
+
+<footer class="wrap narrow">
+  <hr class="bar">
+  <div class="foot-row">
+    <span class="l">BEAT LAB — ACADEMIX</span>
+    <span class="r">INVITE ONLY · MUST RSVP</span>
+  </div>
+  <hr class="bar">
+  <p class="copyright">© 2026 ACADEMIX BEAT LAB · 1933 S. BROADWAY, SUITE 1202, LOS ANGELES, CA 90007</p>
+</footer>
 
 <script>
 // Convex HTTP Actions deployment for Mix & Greet (public URL, not a secret).
