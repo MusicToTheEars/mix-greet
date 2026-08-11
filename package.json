@@ -7,7 +7,6 @@
   },
   "dependencies": {
     "@convex-dev/resend": "^0.1.0",
-    "@netlify/blobs": "^8.1.0",
     "convex": "^1.17.0"
   },
   "devDependencies": {

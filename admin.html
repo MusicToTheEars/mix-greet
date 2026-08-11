@@ -14,6 +14,32 @@
 .tagline{font-size:clamp(18px,4vw,26px)}
 .meter{margin:clamp(28px,5vw,40px) 0}
 
+/* ---- WCAG AA on the light column -------------------------------------------
+   brand.css:24-28 already documents the arithmetic: #EC1C24 measures 4.01:1 on
+   the #F5F4F1 panel, short of the 4.5:1 that 11-13px control labels need, and
+   --brand-ink #C8151C exists for exactly this — 5.33:1, same red to the eye.
+   The muted grey needed the same treatment: --muted-lt #84848C is 3.37:1 on the
+   panel and 3.71:1 on a white field, so every label, hint, table header, badge
+   and secondary button in the back office was failing. #6B6B73 is the same hue
+   two steps down: 4.80:1 on the panel, 5.28:1 on white.
+   Scoped here rather than in brand.css because brand.css is shared with pages
+   this agent does not own; the tokens keep their names so nothing else moves. */
+:root{ --text-muted:#6B6B73; --danger:#C8151C; }
+.mini.go{color:var(--brand-ink);border-color:var(--brand-ink)}
+.mini.go:hover{background:var(--brand-ink);color:#FFFFFF}
+.mini.danger:hover{border-color:var(--danger);color:var(--danger)}
+.btn{border-color:var(--brand-ink);background:var(--brand-ink)}
+.btn:hover,.btn:focus-visible{background:transparent;color:var(--brand-ink)}
+.btn.ghost{color:var(--brand-ink)}
+.btn.ghost:hover{background:var(--brand-ink);color:#FFFFFF}
+.ghost:hover{border-color:var(--brand-ink);color:var(--brand-ink)}
+.add:hover{border-color:var(--brand-ink);color:var(--brand-ink)}
+.feat .rm:hover{color:var(--danger)}
+/* brand.css:197 sets the footer copyright to a one-off #5A5A64, which measures
+   2.89:1 on the #0B0B0D dark zone. --muted is the brand's own secondary ink and
+   already appears on dark elsewhere: 5.82:1, no new colour invented. */
+.copyright{color:var(--muted)}
+
 /* featured artist / speaker / partner editor */
 .feat{border-top:2px solid var(--surface-line);padding-top:6px;margin-top:18px;position:relative}
 .feat:first-of-type{border-top:none;margin-top:6px}
@@ -31,6 +57,100 @@
 .feat .up.ok{color:var(--ok-ink)}
 .add{margin-top:20px;background:none;border:2px dashed var(--surface-line);color:var(--text-muted);padding:12px 20px;font-size:11px;width:100%}
 .add:hover{border-color:var(--brand);color:var(--brand)}
+
+/* the hosted invite link — the one thing the operator actually shares */
+.invite{margin-top:24px;background:var(--field);border:2px solid var(--brand);padding:18px 18px 16px}
+.invite .lab{margin:0 0 10px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  font-weight:700;color:var(--brand-ink)}
+.invite .line{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+.invite input{flex:1 1 240px;width:auto;min-width:0;font-size:12.5px;padding:11px 12px}
+.invite .btn{flex:0 0 auto;margin-top:0;padding:11px 24px;font-size:12px}
+.invite .foot{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap;margin-top:12px}
+.invite .foot a{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand-ink)}
+.invite .note{margin:0;font-size:12px;color:var(--text-muted);line-height:1.6;flex:1 1 220px}
+.invite.ext{border-color:var(--surface-line)}
+.invite.ext .lab{color:var(--text-muted)}
+
+/* ---- the invite link, in the table ---------------------------------------
+   The column is headed INVITE LINK, so it shows the link. A URL parked in a
+   button's title tooltip is not a link: the operator copies blind, cannot
+   proofread a pasted Eventbrite URL, cannot read a slug, and cannot tell two
+   hosted events apart in a list. The URL is what this entire feature exists to
+   produce, so it is set at full ink in the body mono face, selectable in one
+   gesture, and allowed to break anywhere — an unbreakable 46-character string
+   is exactly what used to push the phone layout into a horizontal scroll. */
+.link-cell{display:flex;flex-direction:column;gap:8px;align-items:flex-start;min-width:0}
+.link-cell .badge{margin-left:0}
+.link-cell .mini{text-align:left}
+.link-cell .url{font-size:12px;line-height:1.5;color:var(--text);
+  overflow-wrap:anywhere;word-break:break-word;-webkit-user-select:all;user-select:all}
+.link-cell .url.dark{color:var(--text-muted)}
+.link-cell .why{font-size:11px;line-height:1.5;color:var(--text-muted);letter-spacing:.02em}
+/* An external event has TWO live addresses: the operator's pasted URL, and the
+   /i/ slug we minted for it, which is live and hands the guest on to that URL.
+   Hiding the second one does not take it out of circulation, it only stops the
+   operator knowing a second address for their party exists. Indented behind a
+   rule so it can never be misread as the link the main page uses. */
+.link-cell .alt{display:flex;flex-direction:column;gap:5px;align-items:flex-start;
+  border-left:2px solid var(--surface-line);padding-left:10px;min-width:0;align-self:stretch}
+.link-cell .alt-lab{font-size:10px;font-weight:700;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--text-muted)}
+/* A date is one token. Wrapping "2026-08-11" over two lines to buy width for a
+   column that then has to hyphenate a URL is the wrong trade. */
+#list td:first-child,#archive td:first-child{white-space:nowrap}
+.link-cell .btns{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch}
+.link-cell .btns>*{line-height:1.45}
+/* "Open" has to be a real anchor to get a new tab, so it borrows the .mini
+   look that brand.css only gives to <button>. */
+.link-cell a.mini{display:inline-block;font-weight:700;letter-spacing:.2em;
+  text-transform:uppercase;text-decoration:none;color:var(--text-muted);
+  border-color:var(--surface-line)}
+.link-cell a.mini:hover{border-color:var(--text);color:var(--text)}
+
+/* ---- guest list (staff only) ---------------------------------------------- */
+#guests-panel .foot{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+#guests-panel td{word-break:break-word}
+#guests-panel .g-mail{font-size:12px;color:var(--text-muted);overflow-wrap:anywhere}
+.g-wait{color:var(--brand-ink);font-weight:700}
+
+/* ---- deployment warning ---------------------------------------------------
+   Loud on purpose. When this shows, every URL on the page was built from a host
+   the backend guessed, and it looks exactly as correct as a real one. */
+.warn{margin-top:18px;background:var(--field);border:2px solid var(--brand-ink);
+  border-left-width:6px;padding:14px 16px}
+.warn b{display:block;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--brand-ink);margin-bottom:6px}
+.warn span{display:block;font-size:12px;line-height:1.6;color:var(--text-soft);
+  overflow-wrap:anywhere}
+
+/* ---- phone: the event tables stack ----------------------------------------
+   Four columns of a data table do not fit a 390px viewport. Measured before
+   this rule: documentElement.scrollWidth 408 against innerWidth 390, the table
+   364px inside a 346px panel, and ARCHIVE / DELETE cut mid-word off the right
+   edge — on the device most likely to be running "publish, then text the link".
+   Each row becomes a block, so a row can no longer be wider than its panel. */
+@media (max-width:560px){
+  .stack thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;
+    overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .stack,.stack tbody,.stack tr,.stack td{display:block;width:100%}
+  /* 4px between rows, 2px inside one, so the eye can tell "next event" from
+     "next field of this event" without reading a word. */
+  .stack tr{border-bottom:4px solid var(--surface-line);padding:16px 0}
+  .stack tr:last-child{border-bottom:0}
+  .stack td{border:0;padding:5px 0}
+  .stack .actions{justify-content:flex-start}
+  .link-cell .mini{letter-spacing:.06em}
+  /* Stacking hides the header row, which took the column names with it. The
+     link cell's buttons and the manage cell's buttons then landed as two
+     identical adjacent rows with nothing between them — DELETE reading as the
+     sixth button of a block that starts with COPY LINK. Each cell carries its
+     own column name instead, and the manage cell is ruled off from the link it
+     is not part of. */
+  .stack td[data-label]::before{content:attr(data-label);display:block;
+    font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--text-muted);margin:0 0 7px}
+  .stack td.manage{border-top:2px solid var(--surface-line);margin-top:11px;padding-top:12px}
+}
 
 /* lineup strip inside the event tables */
 .who{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--text-muted)}
@@ -86,8 +206,16 @@
       <input id="f-parking" value="Street meter $1.00+ · private lot $15">
       <label for="f-notes">Specifics / notes</label>
       <textarea id="f-notes" placeholder="Anything guests should know: lineup, what to bring, age policy..."></textarea>
-      <label for="f-rsvp">RSVP link (leave empty to show &quot;RSVP Opens Soon&quot;)</label>
-      <input id="f-rsvp" type="url" placeholder="https://...">
+      <label for="f-rsvp-mode">How guests RSVP</label>
+      <select id="f-rsvp-mode">
+        <option value="hosted">Hosted invite page — we mint the link for you</option>
+        <option value="external">External link — Canva, Eventbrite, anything else</option>
+        <option value="closed">Closed — show &quot;RSVP Opens Soon&quot;</option>
+      </select>
+      <div id="rsvp-ext" hidden>
+        <label for="f-rsvp">External RSVP link</label>
+        <input id="f-rsvp" type="url" placeholder="https://...">
+      </div>
       <div class="check"><input type="checkbox" id="f-invite" checked><label for="f-invite">Invite only</label></div>
 
       <fieldset>
@@ -100,27 +228,57 @@
       <button class="btn" id="publish" type="button">Publish event</button>
       <button class="ghost" id="cancel-edit" type="button" hidden>Cancel edit</button>
       <p class="msg" id="pub-msg" hidden></p>
+
+      <div class="invite" id="invite-box" hidden>
+        <p class="lab" id="invite-lab">Invite link</p>
+        <div class="line">
+          <input id="invite-url" readonly aria-label="Invite link">
+          <button class="btn" id="invite-copy" type="button">Copy</button>
+        </div>
+        <div class="foot">
+          <a id="invite-open" href="#" target="_blank" rel="noopener">Open invite page &#8599;</a>
+          <p class="note" id="invite-note">Text or email this link. It opens the RSVP page for this event.</p>
+        </div>
+      </div>
       <p class="hint">Published events appear on the main page immediately, sorted by date with the soonest first. Events automatically disappear from the main page the day after they happen — archive one to pull it down early.</p>
     </div>
 
     <div class="panel">
       <div class="head"><h2>Published events</h2><span class="count" id="list-count"></span></div>
-      <table>
-        <thead><tr><th>Date</th><th>Event</th><th>RSVP</th><th></th></tr></thead>
+      <div class="warn" id="origin-warn" hidden>
+        <b>Check the invite host</b>
+        <span id="origin-warn-text"></span>
+      </div>
+      <table class="stack">
+        <thead><tr><th>Date</th><th>Event</th><th>Invite link</th><th></th></tr></thead>
         <tbody id="list"></tbody>
       </table>
       <p class="msg" id="list-msg" hidden></p>
       <p class="hint">The July 11 Mix &amp; Greet Open House is built into the main page and is not listed here. View the live page: <a href="/" target="_blank" rel="noopener">main site</a>.</p>
     </div>
 
+    <div class="panel" id="guests-panel" hidden>
+      <div class="head"><h2 id="guests-title">Who&rsquo;s coming</h2><span class="count" id="guests-count"></span></div>
+      <table class="stack">
+        <thead><tr><th>Guest</th><th>Party</th><th>Status</th><th>Responded</th></tr></thead>
+        <tbody id="guests-list"></tbody>
+      </table>
+      <p class="msg" id="guests-msg" hidden></p>
+      <div class="foot">
+        <button class="mini go" id="guests-csv" type="button">Download CSV</button>
+        <button class="mini" id="guests-close" type="button">Close</button>
+      </div>
+      <p class="hint">Staff only. Guest names, emails and phone numbers are never shown on the invite page or anywhere else public &mdash; invite links are shareable and unauthenticated, so the page a guest sees carries no guest list and no headcount.</p>
+    </div>
+
     <div class="panel">
       <div class="head"><h2>Archive · past events</h2><span class="count" id="arch-count"></span></div>
-      <table>
-        <thead><tr><th>Date</th><th>Event</th><th>Featured</th><th></th></tr></thead>
+      <table class="stack">
+        <thead><tr><th>Date</th><th>Event</th><th>Invite link</th><th></th></tr></thead>
         <tbody id="archive"></tbody>
       </table>
       <p class="msg" id="arch-msg" hidden></p>
-      <p class="hint">Archived events stay here with their lineup and guest list intact, but no longer show on the main page. Restore one to put it back up.</p>
+      <p class="hint">Archived events stay here with their lineup and guest list intact, but no longer show on the main page. The invite link we minted stops working the moment they are archived &mdash; it is kept visible above so you can tell which link is still circulating. An external link you pasted in is yours, not ours: archiving cannot close it. Restore one to put it back up.</p>
     </div>
   </div>
 </main>
@@ -143,6 +301,7 @@
 const API_BASE = 'https://good-labrador-980.convex.site';
 const EVENTS = API_BASE + '/api/events';
 const LOGIN  = API_BASE + '/api/admin/login';
+const RSVPS  = API_BASE + '/api/admin/rsvps';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const $ = id => document.getElementById(id);
@@ -169,10 +328,21 @@ async function api(body){
   return r.json();
 }
 
+// The guest list and its CSV are GETs on a different route, and both are gated
+// by the same token header — which is why the CSV cannot be a plain <a href>
+// and comes back as a blob instead.
+async function apiGet(url, asBlob){
+  const r = await fetch(url, { headers:{'x-admin-token':TOKEN} });
+  if (r.status === 401) { signOut(); throw new Error('auth'); }
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'request failed');
+  return asBlob ? r.blob() : r.json();
+}
+
 function signOut(){
   TOKEN = '';
   sessionStorage.removeItem('mg_token');
   $('office').hidden = true;
+  $('guests-panel').hidden = true;
   $('gate').hidden = false;
 }
 
@@ -202,6 +372,171 @@ async function tryEnter(password){
 
 $('enter').addEventListener('click', () => tryEnter($('pass').value));
 $('pass').addEventListener('keydown', e => { if (e.key === 'Enter') tryEnter($('pass').value); });
+
+// --- invite links --------------------------------------------------------------
+// The backend mints a slug at creation and returns the absolute link as
+// `inviteUrl`. The fallback rebuilds the same URL from whatever key we have, so
+// this page still shows a working link against a backend that predates slugs.
+function inviteFor(ev){
+  if (!ev) return '';
+  if (ev.inviteUrl) return ev.inviteUrl;
+  const key = ev.slug || ev.id;
+  return key ? location.origin + '/rsvp?event=' + encodeURIComponent(key) : '';
+}
+
+// What the INVITE LINK column prints, for every row in every state. There is
+// always a URL to show — a parked or archived event still has a minted slug,
+// and being able to read it is the difference between "which of these five
+// events is this" and a blind copy. `live` is whether a guest following it
+// right now lands on a working RSVP; `why` says so in one line when it does not.
+//
+// `past` is not optional decoration. rsvp.html gates its form on `!past`, so a
+// published event whose date has gone by serves "THIS ONE HAS WRAPPED" no
+// matter what its mode says — and an event stays `published` until somebody
+// archives it, so that is the state EVERY event is in the morning after it
+// happens. Without this branch the one column whose whole job is "does this
+// link work" printed a green HOSTED badge and an Open button over a page that
+// takes no RSVPs.
+//
+// `alt` is the event's OTHER address. Only an external event has two: it keeps
+// its minted /i/ slug, that slug is live, and rsvp.html hands whoever follows
+// it straight to the pasted URL. It is in circulation whether or not the
+// operator remembers minting it, so the column shows it rather than hiding a
+// second live address behind an edit form.
+function linkTarget(ev, archived, past){
+  const mode = ev.rsvpMode || (ev.rsvp ? 'external' : 'hosted');
+  const external = mode === 'external';
+  const hosted = inviteFor(ev);
+  const url = external ? (ev.rsvpExternalUrl || ev.rsvp || '') : hosted;
+  const alt = (external && hosted) ? { url: hosted, why: '' } : null;
+
+  if (archived) {
+    if (alt) alt.why = 'Dead — anyone following it now sees "event not found".';
+    return { mode: mode, url: url, alt: alt, live: false,
+      badge: 'archived', badgeCls: 'soon',
+      // Archiving kills OUR link. It has no reach at all over a URL the
+      // operator pasted in, and saying otherwise about somebody's live
+      // Eventbrite page is the same lie in the other direction.
+      why: (external && url)
+        ? 'Archived — off the main page. This link is yours, not ours: it keeps taking responses until you close it where it is hosted.'
+        : 'Archived — this link no longer opens. Anyone still holding it sees "event not found".' };
+  }
+  if (past) {
+    if (alt) alt.why = 'Also in circulation, and it reads "This one has wrapped" too.';
+    return { mode: mode, url: url, alt: alt, live: false,
+      badge: 'wrapped', badgeCls: 'soon',
+      why: (external && url)
+        ? 'This date has passed — our invite page reads "This one has wrapped" and the event is off the main page. Your own link is untouched. Archive the event to file it below.'
+        : 'This date has passed — the invite page reads "This one has wrapped" and takes no RSVPs, whatever the mode says. Archive the event to file it below.' };
+  }
+  if (mode === 'closed') {
+    // A closed event keeps whichever URL it would use when reopened, so the
+    // operator can proofread now and open later without a second look. A row
+    // parked from "external" still carries the pasted link, and Open RSVPs
+    // below puts guests back on it rather than converting the event to hosted.
+    const parked = ev.rsvpExternalUrl || '';
+    return { mode: mode, url: parked || hosted, live: false,
+      alt: (parked && hosted) ? { url: hosted, why: 'The hosted address for this event. Parked with it.' } : null,
+      badge: 'opens soon', badgeCls: 'soon',
+      why: parked
+        ? 'Parked — the main page shows "RSVP Opens Soon". Open RSVPs sends guests back to this saved link.'
+        : 'Parked — the main page shows "RSVP Opens Soon". This link goes live when you open RSVPs.' };
+  }
+  if (external) {
+    // With no pasted URL there is nothing to hand off TO. rsvp.html refuses to
+    // quietly demote the event to our own form in that case — it turns the
+    // guest away instead — so the minted address resolves but takes nothing.
+    if (alt) alt.why = url
+      ? 'Also live — it hands guests to the link above.'
+      : 'It resolves, but with no link to hand off to it turns guests away rather than taking an RSVP.';
+    return { mode: mode, url: url, alt: alt, live: !!url,
+      badge: 'external', badgeCls: 'live',
+      why: url
+        ? ''
+        : 'No external link saved — guests reaching this event are told the host’s link is missing. Edit the event to paste one.' };
+  }
+  return { mode: mode, url: url, alt: null, live: !!url,
+    badge: 'hosted', badgeCls: 'live', why: '' };
+}
+
+// navigator.clipboard needs a secure context; select-and-execCommand covers the
+// rest. Returns true when the text is on the clipboard either way.
+//
+// execCommand can only copy a real selection, so without a caller-supplied
+// field it needs a node of its own. That node is parked off-screen and hidden
+// from assistive tech: the old version appended a bare, unstyled <input> to
+// document.body — below the dark footer, in the layout, every time the table's
+// copy button fell back.
+async function copyText(text, sourceInput){
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch(_) {}
+  let tmp = sourceInput;
+  if (!tmp) {
+    tmp = el('input');
+    tmp.setAttribute('aria-hidden', 'true');
+    tmp.tabIndex = -1;
+    tmp.style.cssText = 'position:fixed;top:-1000px;left:-1000px;width:1px;height:1px;'
+      + 'padding:0;border:0;opacity:0;pointer-events:none';
+    document.body.appendChild(tmp);
+  }
+  tmp.value = text;
+  tmp.select(); tmp.setSelectionRange(0, text.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch(_) {}
+  if (!sourceInput) tmp.remove();
+  return ok;
+}
+
+function flash(btn, label){
+  const was = btn.textContent;
+  btn.textContent = label;
+  setTimeout(() => { btn.textContent = was; }, 1600);
+}
+
+// Shown after a save, and it is the whole point of the panel — square, 2px,
+// brand red, one click to copy.
+function showInvite(ev){
+  const box = $('invite-box');
+  const url = inviteFor(ev);
+  if (!ev || !url) { box.hidden = true; return; }
+  const external = ev.rsvpMode === 'external';
+  const closed = ev.rsvpMode === 'closed';
+  // Same rule the table follows, for the same reason: a date that has gone by
+  // outranks the mode, because rsvp.html serves "This one has wrapped" either
+  // way. Editing last month's event must not hand back a confident invite link.
+  const past = !!ev.date && ev.date < localToday();
+  box.classList.toggle('ext', external || closed || past);
+  $('invite-lab').textContent = past
+    ? 'Invite link · this date has passed'
+    : (external
+      ? 'Invite link · external RSVP is live'
+      : (closed ? 'Invite link · RSVPs are closed' : 'Invite link'));
+  $('invite-url').value = url;
+  $('invite-open').href = url;
+  $('invite-note').textContent = past
+    ? 'Kept so you can tell which link is still circulating. Anyone following it now reads "This one has wrapped" — move the date forward to reopen it.'
+    : (external
+      ? 'Guests on the main page go to your external link. This hosted address is live too, and hands anyone who has it straight on to that link.'
+      : (closed
+        ? 'The main page shows "RSVP Opens Soon". Open RSVPs on this event to start taking responses again.'
+        : 'Text or email this link. It opens the RSVP page for this event.'));
+  box.hidden = false;
+}
+
+$('invite-copy').addEventListener('click', async e => {
+  const ok = await copyText($('invite-url').value, $('invite-url'));
+  flash(e.currentTarget, ok ? 'Copied' : 'Press ⌘C');
+});
+
+// The external-link field only exists when the operator picks that mode.
+function syncRsvpMode(){
+  $('rsvp-ext').hidden = $('f-rsvp-mode').value !== 'external';
+}
+$('f-rsvp-mode').addEventListener('change', syncRsvpMode);
 
 // --- featured artist / speaker / company rows --------------------------------
 function featRow(data){
@@ -331,6 +666,8 @@ function resetForm(){
   ['f-title','f-subtitle','f-date','f-start','f-end','f-notes','f-rsvp'].forEach(id => $(id).value = '');
   $('f-location').value = DEFAULTS.location;
   $('f-parking').value = DEFAULTS.parking;
+  $('f-rsvp-mode').value = 'hosted';
+  syncRsvpMode();
   $('f-invite').checked = true;
   $('feat-list').textContent = '';
   $('form-title').textContent = 'Publish a new event';
@@ -349,7 +686,12 @@ function loadIntoForm(ev){
   $('f-location').value = ev.location || '';
   $('f-parking').value = ev.parking || '';
   $('f-notes').value = ev.notes || '';
-  $('f-rsvp').value = ev.rsvp || '';
+  // Never read `rsvp` here: on a hosted event that field carries OUR invite
+  // link, and echoing it back would turn the event into an external one
+  // pointing at itself. `rsvpExternalUrl` is only ever the operator's own URL.
+  $('f-rsvp').value = ev.rsvpExternalUrl || (ev.rsvpMode === 'external' ? ev.rsvp : '') || '';
+  $('f-rsvp-mode').value = ev.rsvpMode || (ev.rsvp ? 'external' : 'hosted');
+  syncRsvpMode();
   $('f-invite').checked = !!ev.inviteOnly;
   $('feat-list').textContent = '';
   (ev.featured || []).forEach(f => $('feat-list').appendChild(featRow(f)));
@@ -358,14 +700,21 @@ function loadIntoForm(ev){
   $('cancel-edit').hidden = false;
   $('form-panel').classList.add('editing');
   $('pub-msg').hidden = true;
+  showInvite(ev);
   $('form-panel').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
-$('cancel-edit').addEventListener('click', () => { resetForm(); $('pub-msg').hidden = true; });
+$('cancel-edit').addEventListener('click', () => {
+  resetForm();
+  $('pub-msg').hidden = true;
+  $('invite-box').hidden = true;
+});
 
 $('publish').addEventListener('click', async () => {
   const msg = $('pub-msg');
   msg.hidden = true;
+  $('invite-box').hidden = true;
+  const mode = $('f-rsvp-mode').value;
   const event = {
     title: $('f-title').value.trim(),
     subtitle: $('f-subtitle').value.trim(),
@@ -375,12 +724,25 @@ $('publish').addEventListener('click', async () => {
     location: $('f-location').value.trim(),
     parking: $('f-parking').value.trim(),
     notes: $('f-notes').value.trim(),
-    rsvpUrl: $('f-rsvp').value.trim(),
+    // "Closed" keeps the pasted URL, "hosted" clears it. Parking an event is
+    // not the same statement as replacing its RSVP with ours: this used to send
+    // an empty string for both, so choosing Closed in the dropdown silently
+    // deleted the operator's Eventbrite link and reopening could only ever come
+    // back as hosted. Choosing the hosted page IS the statement that the
+    // override is gone, so that one still clears — no stale URL survives a
+    // deliberate switch to our own form.
+    rsvpUrl: mode === 'hosted' ? '' : $('f-rsvp').value.trim(),
+    rsvpMode: mode,
     inviteOnly: $('f-invite').checked,
     featured: collectFeatured()
   };
   if (!event.title || !event.date) {
     msg.textContent = 'Event title and date are required.';
+    msg.className = 'msg err'; msg.hidden = false;
+    return;
+  }
+  if (mode === 'external' && !/^https?:\/\//i.test(event.rsvpUrl)) {
+    msg.textContent = 'Paste a full external RSVP link starting with https://, or switch to the hosted invite page.';
     msg.className = 'msg err'; msg.hidden = false;
     return;
   }
@@ -394,8 +756,15 @@ $('publish').addEventListener('click', async () => {
     resetForm();
     msg.textContent = wasEditing
       ? 'Saved. The main page shows the update immediately.'
-      : 'Published. The event is live on the main page.';
+      : 'Published. The event is live on the main page — here is its invite link.';
     msg.className = 'msg ok'; msg.hidden = false;
+    // `saved` is the row the backend just wrote. Older backends do not send it,
+    // so fall back to finding the same event in the lists that came back.
+    const all = (lists.published || []).concat(lists.archived || []);
+    showInvite(lists.saved
+      || (wasEditing
+        ? all.find(e => e.id === wasEditing)
+        : all.find(e => e.title === event.title && e.date === event.date)));
   } catch(e) {
     msg.textContent = e.message === 'auth'
       ? 'Session expired. Log in again.'
@@ -407,6 +776,16 @@ $('publish').addEventListener('click', async () => {
 });
 
 // --- lists --------------------------------------------------------------------
+// Local calendar date, not UTC. `new Date().toISOString().slice(0,10)` rolls
+// over at 5pm Pacific, so between 5pm and midnight it stamps an event happening
+// THAT EVENING as "(past)" and greys it out — on exactly the evening the
+// operator is most likely to have the office open.
+function localToday(){
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
 function whoStrip(ev){
   const box = el('div', 'who');
   (ev.featured || []).slice(0, 4).forEach(f => {
@@ -422,8 +801,103 @@ function whoStrip(ev){
   return box.children.length ? box : null;
 }
 
-function actionCell(ev, buttons){
+// The INVITE LINK column. Shows, in this order: which mode the event is in, the
+// URL itself in full, why it is not live when it is not, and the controls —
+// copy, open, and the one-click way in or out of "parked".
+//
+// The URL is a <span>, not an <a>: on a parked or archived row the address is
+// real but dead, and a link that navigates nowhere is worse than text you can
+// read. Live rows get a separate "Open" anchor so the operator can eyeball the
+// page a guest will see.
+function linkCell(ev, archived, past){
   const td = el('td');
+  td.dataset.label = 'Invite link';
+  const box = el('div', 'link-cell');
+  const t = linkTarget(ev, archived, past);
+
+  box.appendChild(el('span', 'badge ' + t.badgeCls, t.badge));
+
+  if (t.url) {
+    const u = el('span', 'url' + (t.live ? '' : ' dark'), t.url);
+    // Copying from the table falls back to execCommand off a hidden node, so
+    // hand it this row's own text instead of the button's tooltip.
+    box.appendChild(u);
+  }
+  if (t.why) box.appendChild(el('span', 'why', t.why));
+
+  // The second address, when the event has one. Set apart rather than stacked
+  // in with the first, so it can never be mistaken for the link the main page
+  // sends guests to.
+  if (t.alt) {
+    const alt = el('div', 'alt');
+    alt.appendChild(el('span', 'alt-lab', 'Also minted · hosted address'));
+    alt.appendChild(el('span', 'url dark', t.alt.url));
+    if (t.alt.why) alt.appendChild(el('span', 'why', t.alt.why));
+    box.appendChild(alt);
+  }
+
+  const btns = el('div', 'btns');
+  const copyBtn = (label, text, cls) => {
+    const b = el('button', 'mini ' + (cls || ''), label);
+    b.type = 'button';
+    b.addEventListener('click', async () => flash(b, (await copyText(text)) ? 'Copied' : 'Failed'));
+    btns.appendChild(b);
+  };
+  if (t.url) copyBtn('Copy link', t.url, 'go');
+  if (t.url && t.live) {
+    const a = el('a', 'mini', 'Open ↗');
+    a.href = t.url; a.target = '_blank'; a.rel = 'noopener';
+    btns.appendChild(a);
+  }
+  if (t.alt) copyBtn('Copy hosted', t.alt.url);
+
+  // `setRsvpMode` in convex/events.ts and the openRsvps / openExternalRsvps /
+  // closeRsvps actions in convex/http.ts exist for exactly this row.
+  //
+  // Nothing here is offered on a row the date has already settled: an event
+  // that has happened takes no RSVPs whatever its mode, so "Open RSVPs" on it
+  // would promise something rsvp.html refuses to deliver. Archived rows are
+  // restored, not reopened.
+  const canSwitch = !archived && !past;
+  if (canSwitch && t.mode === 'closed') {
+    // Reopening restores the mode the event was parked FROM. An event parked
+    // with a pasted link goes back to that link; converting it to our hosted
+    // form would move every guest off the operator's page without saying so.
+    const backToExternal = !!ev.rsvpExternalUrl;
+    const b = el('button', 'mini go', 'Open RSVPs');
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      if (!confirm('Open RSVPs for "' + ev.title + '"?\n\n' + (backToExternal
+        ? 'The main page swaps "RSVP Opens Soon" for a live button pointing back at your saved external link.'
+        : 'Guests will be able to RSVP on this link immediately, and the main page swaps "RSVP Opens Soon" for a live button.'))) return;
+      act({ action: backToExternal ? 'openExternalRsvps' : 'openRsvps', id: ev.id },
+        b, 'Could not open RSVPs.');
+    });
+    btns.appendChild(b);
+  }
+  // Hosted and external both park from here. Parking an external event used to
+  // mean Edit -> dropdown -> Save, and that path deleted the pasted link on the
+  // way through; it is preserved now, so this is reversible in one click.
+  if (canSwitch && (t.mode === 'hosted' || t.mode === 'external')) {
+    const b = el('button', 'mini', 'Close RSVPs');
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      if (!confirm('Close RSVPs for "' + ev.title + '"?\n\n' + (t.mode === 'external'
+        ? 'The main page goes back to "RSVP Opens Soon" and stops sending guests to your external link. The link is kept — reopening puts them straight back on it.'
+        : 'The main page goes back to "RSVP Opens Soon" and this link stops taking responses. RSVPs already collected are kept, and the link is unchanged when you reopen.'))) return;
+      act({ action:'closeRsvps', id: ev.id }, b, 'Could not close RSVPs.');
+    });
+    btns.appendChild(b);
+  }
+  if (btns.children.length) box.appendChild(btns);
+
+  td.appendChild(box);
+  return td;
+}
+
+function actionCell(ev, buttons){
+  const td = el('td', 'manage');
+  td.dataset.label = 'Manage';
   const wrap = el('div', 'actions');
   buttons.forEach(([label, cls, fn]) => {
     const b = el('button', 'mini ' + cls, label);
@@ -449,6 +923,117 @@ const destroy = (ev, b) => {
   act({ action:'delete', id: ev.id }, b, 'Could not delete.');
 };
 
+// --- who's coming (staff only) ------------------------------------------------
+// /api/admin/rsvps and /api/admin/rsvps.csv have been token-gated and shipped
+// since the RSVP form went in; until now nothing in the office called them, so
+// the back office minted the link and then showed the operator nothing about
+// who answered it. This is the second half of that loop. It is admin-only by
+// construction: the invite page carries no guest list and no headcount, because
+// invite links are shareable and unauthenticated.
+let guestsEvent = null;
+
+const STATUS_LABEL = {
+  confirmed: 'Confirmed', waitlist: 'Waitlist',
+  cancelled: 'Cancelled', checked_in: 'Checked in'
+};
+
+function guestRow(r){
+  const tr = el('tr');
+
+  const who = el('td');
+  who.dataset.label = 'Guest';
+  who.appendChild(el('span', null, r.name));
+  const mail = el('div', 'g-mail', r.email + (r.phone ? ' · ' + r.phone : ''));
+  who.appendChild(mail);
+  if (r.notes) who.appendChild(el('div', 'g-mail', '“' + r.notes + '”'));
+  tr.appendChild(who);
+
+  const party = el('td', null, r.guests > 1 ? r.guests + ' guests' : '1 guest');
+  party.dataset.label = 'Party';
+  tr.appendChild(party);
+
+  const st = el('td');
+  st.dataset.label = 'Status';
+  st.appendChild(el('span', r.status === 'waitlist' ? 'g-wait' : null,
+    STATUS_LABEL[r.status] || r.status));
+  tr.appendChild(st);
+
+  const when = el('td', 'muted', (r.createdAt || '').slice(0, 10));
+  when.dataset.label = 'Responded';
+  tr.appendChild(when);
+  return tr;
+}
+
+async function showGuests(ev, btn){
+  guestsEvent = ev;
+  const panel = $('guests-panel');
+  const msg = $('guests-msg');
+  const tbody = $('guests-list');
+  panel.hidden = false;
+  $('guests-title').textContent = 'Who’s coming · ' + ev.title;
+  $('guests-count').textContent = 'loading…';
+  tbody.textContent = '';
+  msg.hidden = true;
+  if (btn) btn.disabled = true;
+  try {
+    const data = await apiGet(RSVPS + '?eventId=' + encodeURIComponent(ev.slug || ev.id));
+    const rsvps = data.rsvps || [];
+    const seats = rsvps
+      .filter(r => r.status === 'confirmed' || r.status === 'checked_in')
+      .reduce((n, r) => n + (Number(r.guests) || 0), 0);
+    const waiting = rsvps.filter(r => r.status === 'waitlist').length;
+    $('guests-count').textContent = rsvps.length
+      ? rsvps.length + (rsvps.length === 1 ? ' response' : ' responses') + ' · ' + seats
+        + (seats === 1 ? ' seat' : ' seats') + (waiting ? ' · ' + waiting + ' waitlisted' : '')
+      : '';
+    rsvps.forEach(r => tbody.appendChild(guestRow(r)));
+    if (!rsvps.length) {
+      msg.textContent = ev.rsvpMode === 'external'
+        ? 'No RSVPs here — this event sends guests to your external link, so responses are collected there.'
+        : 'No RSVPs yet. They appear here as guests submit the invite page.';
+      msg.className = 'msg'; msg.hidden = false;
+    }
+    $('guests-csv').disabled = !rsvps.length;
+  } catch(e) {
+    $('guests-count').textContent = '';
+    if (e.message !== 'auth') {
+      msg.textContent = 'Could not load the guest list: ' + e.message;
+      msg.className = 'msg err'; msg.hidden = false;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+  panel.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+$('guests-close').addEventListener('click', () => {
+  $('guests-panel').hidden = true;
+  guestsEvent = null;
+});
+
+$('guests-csv').addEventListener('click', async e => {
+  if (!guestsEvent) return;
+  const b = e.currentTarget;
+  b.disabled = true;
+  try {
+    const blob = await apiGet(
+      RSVPS + '.csv?eventId=' + encodeURIComponent(guestsEvent.slug || guestsEvent.id), true);
+    const href = URL.createObjectURL(blob);
+    const a = el('a');
+    a.href = href;
+    a.download = 'rsvps-' + guestsEvent.date + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 2000);
+    flash(b, 'Downloaded');
+  } catch(err) {
+    if (err.message !== 'auth') alert('Could not export the CSV.\n\n' + err.message);
+  } finally {
+    b.disabled = false;
+  }
+});
+
 function renderPublished(events){
   const tbody = $('list');
   tbody.textContent = '';
@@ -459,26 +1044,29 @@ function renderPublished(events){
     return;
   }
   $('list-msg').hidden = true;
-  const today = new Date().toISOString().slice(0,10);
+  const today = localToday();
   events.forEach(ev => {
     const tr = el('tr');
     const past = ev.date < today;
 
     const dateTd = el('td', past ? 'muted' : null, ev.date + (past ? ' (past)' : ''));
+    dateTd.dataset.label = 'Date';
     tr.appendChild(dateTd);
 
     const titleTd = el('td');
+    titleTd.dataset.label = 'Event';
     titleTd.appendChild(el('span', null, ev.title + (ev.subtitle ? ' · ' + ev.subtitle : '')));
     if (ev.inviteOnly) titleTd.appendChild(el('span', 'badge', 'invite'));
     const who = whoStrip(ev);
     if (who) titleTd.appendChild(who);
     tr.appendChild(titleTd);
 
-    const rsvpTd = el('td');
-    rsvpTd.appendChild(el('span', 'badge ' + (ev.rsvp ? 'live' : 'soon'), ev.rsvp ? 'live' : 'opens soon'));
-    tr.appendChild(rsvpTd);
+    // The same `past` that greys the date decides what the link column claims.
+    // These two cells disagreeing is how a dead link kept its green badge.
+    tr.appendChild(linkCell(ev, false, past));
 
     tr.appendChild(actionCell(ev, [
+      ['Guests', '', showGuests],
       ['Edit', 'go', loadIntoForm],
       ['Archive', '', archive],
       ['Delete', 'danger', destroy]
@@ -499,18 +1087,28 @@ function renderArchive(events){
   $('arch-msg').hidden = true;
   events.forEach(ev => {
     const tr = el('tr');
-    tr.appendChild(el('td', 'muted', ev.date));
+    const dateTd = el('td', 'muted', ev.date);
+    dateTd.dataset.label = 'Date';
+    tr.appendChild(dateTd);
 
+    // Lineup moves into the event cell, the way the published table already
+    // does it, which frees the third column for the invite link. Archiving used
+    // to make an event's minted link unreadable from the UI entirely — no
+    // badge, no copy, no URL — so the operator lost sight of a string that had
+    // already been texted to a room full of people.
     const titleTd = el('td');
+    titleTd.dataset.label = 'Event';
     titleTd.appendChild(el('span', null, ev.title + (ev.subtitle ? ' · ' + ev.subtitle : '')));
+    const who = whoStrip(ev);
+    if (who) titleTd.appendChild(who);
     tr.appendChild(titleTd);
 
-    const featTd = el('td');
-    const who = whoStrip(ev);
-    if (who) featTd.appendChild(who); else featTd.appendChild(el('span', 'muted', '—'));
-    tr.appendChild(featTd);
+    // Archived beats past: the link is gone either way, and "archived" is the
+    // state the operator can act on from this table.
+    tr.appendChild(linkCell(ev, true, false));
 
     tr.appendChild(actionCell(ev, [
+      ['Guests', '', showGuests],
       ['Edit', 'go', loadIntoForm],
       ['Restore', '', restore],
       ['Delete', 'danger', destroy]
@@ -519,9 +1117,32 @@ function renderArchive(events){
   });
 }
 
+// Which host every URL on this page was built from. Only ever visible when the
+// backend had to guess it — see inviteOriginInfo() in convex/events.ts. A
+// guessed origin still renders as a confident, perfectly-formed absolute URL,
+// so without this the first sign of a misconfigured deployment is a guest
+// saying the link is dead.
+function renderOrigin(info){
+  const box = $('origin-warn');
+  if (!info || info.source !== 'fallback') { box.hidden = true; return; }
+  $('origin-warn-text').textContent =
+    'Invite links are being built on ' + info.origin + ', which is a built-in fallback — '
+    + 'neither INVITE_ORIGIN nor SITE_ORIGIN is set on the Convex deployment. '
+    + 'If that is not the host this site is served from, every link below is dead. '
+    + 'Check one with Open before sending it.';
+  box.hidden = false;
+}
+
 function render(lists){
+  renderOrigin(lists.linkOrigin);
   renderPublished(lists.published || []);
   renderArchive(lists.archived || []);
+  // Keep an open guest list pointed at the row that was just rewritten.
+  if (guestsEvent && !$('guests-panel').hidden) {
+    const fresh = (lists.published || []).concat(lists.archived || [])
+      .find(e => e.id === guestsEvent.id);
+    if (fresh) guestsEvent = fresh; else { $('guests-panel').hidden = true; guestsEvent = null; }
+  }
 }
 
 async function loadAll(){
@@ -534,6 +1155,7 @@ async function loadAll(){
   }
 }
 
+syncRsvpMode();
 if (TOKEN) { $('gate').hidden = true; $('office').hidden = false; loadAll(); }
 </script>
 </body>

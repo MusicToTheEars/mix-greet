@@ -2,179 +2,1441 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>RSVP · Mix &amp; Greet</title>
+<meta name="theme-color" content="#0B0B0D">
+<title>You're Invited · Mix &amp; Greet</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<!-- Invite links get texted and pasted into group chats, so the link preview is
+     part of the invitation. Per-event OG tags would need a server render; this
+     static card at least keeps a pasted link from previewing as a bare URL. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="You're invited · Mix &amp; Greet">
+<meta property="og:description" content="An Academix BEAT Lab session in Downtown Los Angeles. Open the invitation for the lineup, the address and the RSVP.">
+<meta property="og:image" content="/social-card.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="You're invited · Mix &amp; Greet">
+<meta name="twitter:description" content="An Academix BEAT Lab session in Downtown Los Angeles. Open the invitation for the lineup, the address and the RSVP.">
+<meta name="twitter:image" content="/social-card.jpg">
 <link rel="stylesheet" href="/brand.css">
+<!-- The hero fades in once the event is rendered. The dimmed start state lives
+     behind this class rather than in the base rule so that a JS failure, a bad
+     slug or a dead API can never strand the page at 12% opacity: no script,
+     no class, full brightness. Every exit path in load() removes it. -->
+<script>document.documentElement.classList.add('boot');</script>
 <style>
-/* page-specific — everything else comes from the shared brand layer */
-.masthead{font-size:clamp(44px,11vw,72px)}
-.tagline{font-size:clamp(20px,5vw,30px)}
-.meter{margin:clamp(30px,6vw,44px) 0}
+/* ============================================================
+   /rsvp — the hosted invitation.
 
-.event-title{font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
-  line-height:.92;font-size:clamp(30px,6vw,42px);color:var(--brand);margin:0;
-  letter-spacing:.01em;border:0;padding:0}
-.event-meta{margin:12px 0 0;color:var(--text-muted);font-size:13.5px;line-height:1.7;letter-spacing:.04em}
-.event-meta div+div{margin-top:2px}
+   The page is a POSTER, not a form. Tokens, chrome and controls come
+   from brand.css; this sheet adds the invite composition:
 
-form{margin-top:26px;border-top:2px solid var(--surface-line);padding-top:22px}
-form label:first-child{margin-top:0}
+     dark band  — masthead, the flyer (uploaded artwork, or a typeset
+                  plate built from the event when there is none), and
+                  one lozenge under it
+     light band — the typeset details column + the RSVP panel, whose
+                  fields stay folded away until the guest commits
+     dark foot  — same rhythm as index.html
+
+   Square corners, 2px borders, Academix red as the only accent.
+   ============================================================ */
+
+html{scroll-behavior:smooth}
+.wrap.invite{max-width:1040px}
+
+/* --- contrast overrides, scoped to this page ---------------------------
+   brand.css's --text-muted (#84848C) measures 3.37:1 on the #F5F4F1 panel
+   and 3.71:1 on white, so every small label built on it failed WCAG AA on
+   the one surface that has to convert. Re-pointing the token here fixes
+   each consumer at once without touching the shared sheet: #5F5F68 is
+   5.75:1 on the panel and 6.32:1 on white. */
+body{--text-muted:#5F5F68}
+/* brand.css's footer grey is 2.89:1 on the dark band; --muted is 5.82:1. */
+.copyright{color:var(--muted)}
+
+/* screen-reader-only: keeps the semantics of a labelled fact while the
+   label itself stops being printed (see .facts below) */
+.sr{
+  position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;
+}
+
+/* perforation under the rail rule — the printed edge the flyer tears from */
+.ticks{display:flex;justify-content:space-between;margin-top:0;height:7px}
+.ticks i{width:2px;height:7px;background:var(--line)}
+
+/* ---------- dark band ---------- */
+/* The backdrop. Three stacked layers behind static content, matching what the
+   bar does with a theme asset + a fixed particle film:
+     .dust    — the theme wash: two large red blooms, one hot behind the flyer
+     .dust.b  — print grain, an SVG turbulence tile at low alpha
+     #motes   — a real drifting particle field on a canvas, three depth planes
+                parallaxed against scroll (see ambient() at the foot of the JS)
+   The wash and the grain are static CSS, so a reduced-motion visitor, a
+   JS failure and a very old browser all still get a lit, textured band —
+   the field is the only part that moves. */
+.dark-zone.top{position:relative;overflow:hidden;isolation:isolate}
+.dark-zone.top > header,.dark-zone.top > section{position:relative;z-index:2}
+.dark-zone.top > .dust,.dark-zone.top > .motes{
+  position:absolute;inset:0;z-index:0;pointer-events:none;
+}
+.dark-zone.top > .dust{
+  background:
+    radial-gradient(58% 46% at 79% 2%,rgba(236,28,36,.30),transparent 66%),
+    radial-gradient(74% 58% at 96% 40%,rgba(236,28,36,.13),transparent 68%),
+    radial-gradient(64% 52% at -6% 96%,rgba(236,28,36,.11),transparent 64%),
+    radial-gradient(90% 70% at 30% 30%,rgba(237,234,227,.05),transparent 70%);
+}
+.dark-zone.top > .dust.b{
+  opacity:.42;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='170'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='170' height='170' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:170px 170px;
+}
+.dark-zone.top > .motes{z-index:1;width:100%;height:100%;display:block}
+
+.hero{padding-top:clamp(26px,4.5vw,46px);padding-bottom:clamp(38px,6vw,68px)}
+/* Two columns, exactly the bar's split: everything the guest has to KNOW is
+   typeset down the left, and the right column is the flyer with the single
+   lozenge under it. Source order is head → flyer → info so that the stacked
+   mobile view puts the artwork directly under the title, which is what the
+   bar does at 390. Row gap is 0; each block carries its own top margin. */
+.hero-grid{
+  display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,34vw,404px);
+  grid-template-rows:max-content 1fr;
+  gap:0 clamp(24px,3.6vw,56px);align-items:start;
+}
+.hero-head{grid-column:1;grid-row:1;min-width:0}
+.hero-info{grid-column:1;grid-row:2;min-width:0}
+/* the flyer and, beneath it, the single lozenge the transaction hides behind.
+   Sticky like the bar's right column, so the artwork and the commit control
+   ride down with the scroll instead of leaving a void beside the facts. */
+.poster-col{
+  grid-column:2;grid-row:1 / span 2;min-width:0;
+  display:flex;flex-direction:column;gap:clamp(14px,2vw,20px);
+}
+@media (min-width:901px){
+  .poster-col{position:sticky;top:clamp(14px,3vh,26px);align-self:start}
+}
+
+/* brand.css sets .eyebrow in Academix red, which measures 4.46:1 on #0B0B0D —
+   a rounding error short of AA at 14px. The title directly beneath it is
+   already the loud red, so the eyebrow drops to the muted rung of the ink
+   ladder: 5.82:1, and a quieter lead-in to a shouted headline. */
+.hero .eyebrow{margin-bottom:clamp(10px,2vw,16px);color:var(--muted)}
+.hero-title{
+  font-size:clamp(43px,10vw,92px);line-height:.86;margin:0;
+  transition:opacity .5s ease;
+}
+.boot .hero-title{opacity:.12}
+/* A long event name has to stay a headline, not become the whole page: two
+   step-downs keep any title the back office allows inside three lines. */
+.hero-title.t-md{font-size:clamp(36px,7.6vw,68px)}
+.hero-title.t-sm{font-size:clamp(31px,6.2vw,54px);line-height:.9}
+.hero-sub{
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
+  font-size:clamp(19px,4.2vw,32px);line-height:1.02;color:var(--ink);margin-top:10px;
+  letter-spacing:.01em;max-width:22ch;
+}
+
+/* the when slab — typeset, not tabulated, and printed exactly once on the
+   page. The venue is NOT repeated here: it is one typeset fact below, with
+   the directions link attached to it. */
+.hero-when{
+  margin-top:0;
+  border-top:2px solid var(--line);border-bottom:2px solid var(--line);
+  padding:clamp(13px,2vw,17px) 0;
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;
+}
+.hero-when .d{
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
+  font-size:clamp(25px,5.2vw,40px);line-height:1;color:var(--ink);letter-spacing:.01em;
+}
+/* Academix red on #0B0B0D measures 4.45:1 — a hair under AA for a 15px
+   label — so hierarchy here is carried by the ink ladder, not by hue. */
+.hero-when .t{
+  font-size:clamp(12px,2.1vw,15px);letter-spacing:.2em;font-weight:700;
+  text-transform:uppercase;color:var(--ink);white-space:nowrap;
+}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{
+  font-size:10.5px;letter-spacing:.2em;font-weight:700;text-transform:uppercase;
+  padding:7px 11px;border:2px solid #4A4A56;color:var(--muted);white-space:nowrap;
+}
+/* Inverted rather than red-filled: white on Academix red is 4.42:1, which is
+   short of AA at this size, and #0B0B0D on cream is 19.7:1. */
+.chip.hot{background:var(--ink);border-color:var(--ink);color:#0B0B0D}
+.chip.on{color:var(--ink);border-color:#5A5A68}
+
+/* the lozenge. Cream fill, near-black label — the bar's "maximum contrast
+   against the theme, never a brand hue" rule, and 16.4:1 instead of the
+   4.42:1 white-on-red it replaces. */
+.hero-cta{display:flex;flex-direction:column;gap:9px;margin-top:0}
+.hero-cta .btn,.stickybar .btn{
+  margin-top:0;padding:16px 30px;font-size:13.5px;
+  background:var(--ink);border-color:var(--ink);color:#0B0B0D;
+}
+.hero-cta .btn:hover,.hero-cta .btn:focus-visible,
+.stickybar .btn:hover,.stickybar .btn:focus-visible{background:transparent;color:var(--ink)}
+.hero-cta .btn:focus-visible,.stickybar .btn:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+.hero-cta .note{
+  font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);
+  text-align:center;
+}
+
+/* ---------- the flyer ----------
+   Per the bar: "412x515, object-fit:contain, border-radius 0, no shadow, no
+   border, no frame, no caption — the artwork is presented as artwork."
+
+   Two sources feed the SAME box, and the box is never empty:
+
+   1. .flyer — artwork this page composes from the event itself. It is a
+      designed graphic, not a spec sheet: a printed field (red bloom, halftone
+      grain, screen-printed disc), the event's own portraits laid in as a
+      red duotone when it has any, and one type lockup with a misregistered
+      red ghost behind it. No border, no rules, no caption, no facts.
+      This renders first and always, so the column is a poster from the very
+      first paint whatever the API returns.
+
+   2. #posterWrap — the host's uploaded artwork, when the back office grows a
+      field for it. It is swapped IN over the composed flyer only after the
+      file actually decodes, so a slow or dead storage URL never blanks the
+      column and there is no layout shift while it loads.
+
+   Both are square-cornered, unframed, uncaptioned and unshadowed. */
+.poster{background:transparent;border:0;opacity:0;transition:opacity .4s ease}
+.poster.on{opacity:1}
+/* height:auto already means a portrait flyer is never cropped; object-fit is
+   belt and braces if anything ever constrains the box. */
+#evPoster{width:100%;height:auto;display:block;object-fit:contain}
+
+.flyer{
+  position:relative;overflow:hidden;aspect-ratio:4/5;background:#0B0B0D;
+  border:0;border-radius:0;box-shadow:none;isolation:isolate;
+  container-type:inline-size;
+  transition:opacity .5s ease .06s,transform .5s ease .06s;
+}
+.boot .flyer{opacity:0;transform:translateY(10px)}
+.fl-l{position:absolute;inset:0;pointer-events:none}
+
+/* One face — the headliner's — printed as a single-ink duotone, not pasted in
+   as a thumbnail and never more than one: two photographs side by side read
+   as a contact sheet, and a poster is one image. Greyscale and hard contrast
+   first, then a flat Academix red multiplied through it, which is exactly how
+   a one-colour press lays down a halftone: black in the shadows, red in the
+   highlights, nothing in between. */
+.fl-art{display:grid;z-index:0}
+.fl-art img{width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(1) contrast(1.3) brightness(1.06)}
+.fl-ink{z-index:1;background:#EC1C24;mix-blend-mode:multiply}
+.flyer:not(.has-art) .fl-ink{display:none}
+/* the press: a red bloom off the top-right and a cream lift from the bottom-left */
+.fl-wash{
+  z-index:2;
+  background:
+    radial-gradient(78% 58% at 84% 4%,rgba(236,28,36,.55),transparent 62%),
+    radial-gradient(70% 54% at 4% 98%,rgba(237,234,227,.10),transparent 64%);
+}
+.flyer.has-art .fl-wash{opacity:.42}
+/* the halftone: a dot screen fading in across the lower left, so the empty
+   half of the sheet reads as printed paper rather than as flat black */
+.fl-wash::after{
+  content:"";position:absolute;inset:0;
+  background-image:radial-gradient(rgba(237,234,227,.34) 1px,transparent 1.5px);
+  background-size:7px 7px;opacity:.55;
+  -webkit-mask-image:linear-gradient(212deg,transparent 44%,#000 104%);
+  mask-image:linear-gradient(212deg,transparent 44%,#000 104%);
+}
+.flyer.has-art .fl-wash::after{opacity:.3}
+.fl-mark{z-index:3;width:100%;height:100%;display:block}
+/* Over a red duotone a red disc is invisible, so the plate drops out and the
+   mark plays as concentric hairlines struck over the photograph. */
+.flyer.has-art .fl-disc{display:none}
+.flyer.has-art .fl-rings{opacity:.36}
+.flyer.has-art .fl-arcs{stroke:#EDEAE3;opacity:.34}
+.fl-grain{
+  z-index:4;opacity:.55;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='150' height='150' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size:150px 150px;
+}
+/* keeps the type off the artwork's own values without printing a box round it */
+.fl-scrim{
+  z-index:5;
+  background:linear-gradient(180deg,
+    rgba(11,11,13,.80) 0%,rgba(11,11,13,.10) 20%,
+    rgba(11,11,13,0) 40%,rgba(11,11,13,.72) 76%,rgba(11,11,13,.94) 100%);
+}
+.flyer.has-art .fl-scrim{
+  background:linear-gradient(180deg,
+    rgba(11,11,13,.88) 0%,rgba(11,11,13,.16) 22%,
+    rgba(11,11,13,.04) 42%,rgba(11,11,13,.86) 74%,rgba(11,11,13,.97) 100%);
+}
+.fl-type{
+  position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;
+  justify-content:space-between;padding:clamp(15px,4.6cqw,22px);
+}
+.fl-no{font-size:9.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.fl-rule{display:block;width:44px;height:4px;background:var(--brand);margin-bottom:11px}
+.fl-title{
+  margin:0;
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
+  line-height:.88;letter-spacing:.012em;color:var(--ink);
+  font-size:38px;font-size:clamp(27px,13.2cqw,52px);
+  /* screen-print misregistration: the red plate lands a hair off the cream
+     one. Done with a shadow rather than a second copy of the words, so the
+     poster's lockup is one string in the DOM as well as one lockup on screen. */
+  text-shadow:3px 4px 0 rgba(236,28,36,.6);
+}
+.fl-title.t-md{font-size:32px;font-size:clamp(24px,10.4cqw,42px)}
+.fl-title.t-sm{font-size:26px;font-size:clamp(21px,8.2cqw,34px);line-height:.94}
+.flyer .amp{color:var(--brand)}
+
+/* ---------- the facts, in the hero's left column ----------
+   Icon gutter + one typeset line, exactly the bar's "there is not a single
+   Date: / Location: / Capacity: label on the page — the information is
+   typeset, not tabulated". The labels survive for screen readers only.
+   These live in the dark band, beside the flyer, because the bar's whole
+   left column is where a guest reads the event; splitting them into a second
+   band below is what left the fold sparse and the facts printed twice. */
+.hero-info{margin-top:clamp(20px,3.4vw,30px)}
+.facts{list-style:none;margin:clamp(20px,3vw,26px) 0 0;padding:0;display:flex;flex-direction:column;gap:clamp(15px,2.2vw,20px)}
+.facts li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:15px;align-items:start}
+.facts .ic{width:22px;height:22px;color:var(--brand);flex:none;margin-top:2px}
+.facts .v{font-size:clamp(14.5px,1.9vw,16.5px);line-height:1.5;color:var(--ink);font-weight:500}
+.facts .v.soft{font-weight:400;color:var(--muted);font-size:14.5px;line-height:1.62}
+.facts .v small{display:block;font-size:13.5px;font-weight:400;color:var(--muted);margin-top:4px;letter-spacing:0}
+/* Cream label on a red rule: Academix red is 4.45:1 on #0B0B0D, a hair under
+   AA for an 11px label, so the hue rides the underline and the ink carries
+   the text. Hover inverts rather than tinting, for the same reason. */
+.facts a{
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;
+  color:var(--ink);text-decoration:none;border-bottom:2px solid var(--brand);
+  padding-bottom:3px;display:inline-block;margin-top:10px;
+}
+.facts a:hover,.facts a:focus-visible{background:var(--ink);color:#0B0B0D;border-bottom-color:var(--ink)}
+.facts a:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+
+.cal-btn{
+  display:inline-flex;align-items:center;gap:10px;margin-top:clamp(20px,3vw,26px);
+  background:transparent;border:2px solid var(--text);color:var(--text);
+  font-family:'Plex Mono',ui-monospace,monospace;font-weight:700;font-size:12px;
+  letter-spacing:.18em;padding:12px 18px;
+}
+.cal-btn svg{width:18px;height:18px;flex:none}
+.cal-btn:hover,.cal-btn:focus-visible{background:var(--text);color:var(--surface)}
+.cal-btn:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+/* same control on the dark band */
+.hero-info .cal-btn{border-color:#4A4A56;color:var(--ink)}
+.hero-info .cal-btn:hover,.hero-info .cal-btn:focus-visible{background:var(--ink);color:#0B0B0D;border-color:var(--ink)}
+
+/* ---------- light band ----------
+   One column, not two. The commit card is centred under the content the way
+   the bar centres its own card below both columns — a 366px rail pinned
+   beside a short section is what left a 400x520 hole in the lower right. */
+.meter{margin:clamp(28px,5vw,40px) 0 clamp(30px,5vw,44px)}
+.invite-body{display:block}
+.col-side{max-width:560px;margin:0 auto}
+.block+.block{margin-top:clamp(34px,5vw,52px)}
+/* only opens a gap above the commit card when there is something above it */
+.col-main .block:not(.hidden){margin-bottom:clamp(34px,5vw,54px)}
+
+/* the lineup — the asset Partiful has no slot for, billed like a poster.
+   Two up on a wide screen so the band is filled by content rather than by a
+   stretched single column. */
+.acts{display:grid;grid-template-columns:1fr;gap:clamp(24px,3.4vw,34px) clamp(28px,4vw,48px)}
+@media (min-width:780px){.acts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.act{display:grid;grid-template-columns:104px minmax(0,1fr);gap:24px;align-items:start}
+.act .ph,.act .ini{
+  width:104px;height:104px;flex:none;object-fit:cover;
+  border:2px solid var(--surface-line);background:#FFFFFF;
+}
+/* Partner marks arrive as transparent PNGs and we cannot know their polarity.
+   This project's own academix-logo.png is white type plus a red mark, so on
+   the old white tile only the word "mix" survived. Ink ground plus a soft
+   cream halo drawn from the file's own alpha reads BOTH ways: a knocked-out
+   mark sits clean on the dark tile, and a dark mark gets an outline instead
+   of disappearing into it. */
+.act .ph.logo{
+  object-fit:contain;padding:12px;background:#16161A;border-color:#16161A;
+  filter:drop-shadow(0 0 1.5px rgba(237,234,227,.85)) drop-shadow(0 0 4px rgba(237,234,227,.35));
+}
+.act .ini{
+  background:#16161A;color:#EDEAE3;display:flex;align-items:center;justify-content:center;
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;font-size:36px;letter-spacing:.02em;
+}
+.act .no{font-size:10px;letter-spacing:.24em;color:var(--text-muted);font-weight:700}
+.act .nm{
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
+  font-size:clamp(25px,3.7vw,34px);line-height:.94;color:var(--text);margin-top:5px;
+}
+.act .rl{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent-ink);font-weight:700;margin-top:8px}
+.act .bo{font-size:14.5px;line-height:1.68;color:var(--text-soft);margin-top:11px}
+.act .lk{
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;
+  color:var(--accent-ink);text-decoration:none;border-bottom:2px solid currentColor;
+  padding-bottom:2px;display:inline-block;margin-top:11px;
+}
+.act .lk:hover,.act .lk:focus-visible{color:var(--text)}
+
+/* ---------- the RSVP panel ----------
+   Folded shut until the guest commits: kicker, one line, one button. The
+   fields only exist on screen once #rsvpOpen (or the hero lozenge, the
+   sticky bar, or a ?rsvp=1 deep link) asks for them. */
+.rsvp-panel{margin-top:0;padding:clamp(22px,3vw,28px)}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.panel-kicker{
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
+  font-size:clamp(34px,5vw,44px);line-height:.9;color:var(--accent-ink);
+  border:0;padding:0;letter-spacing:.01em;
+}
+.panel-count{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-muted);font-weight:700;white-space:nowrap}
+.panel-lead{font-size:13px;line-height:1.65;color:var(--text-soft);letter-spacing:.04em;margin-top:8px}
+
+#formWrap.shut #rsvpForm{display:none}
+#formWrap:not(.shut) #rsvpOpen{display:none}
+#rsvpOpen{margin-top:20px;background:var(--accent-ink);border-color:var(--accent-ink);color:#FFFFFF}
+#rsvpOpen:hover,#rsvpOpen:focus-visible{background:transparent;color:var(--accent-ink)}
+#rsvpOpen:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+
+#rsvpForm{margin-top:20px}
+#rsvpForm label:first-of-type{margin-top:0}
+/* 16px keeps iOS Safari from zooming the page on focus */
+#rsvpForm input,#rsvpForm select,#rsvpForm textarea{
+  font-size:16px;padding:12px 12px;border-color:#8E8B84;
+}
+#rsvpForm input:focus,#rsvpForm select:focus,#rsvpForm textarea:focus{border-color:var(--accent-ink)}
+#rsvpForm select{
+  -webkit-appearance:none;appearance:none;padding-right:38px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%2316161A' stroke-width='2'/></svg>");
+  background-repeat:no-repeat;background-position:right 12px center;background-size:12px 8px;
+}
+#rsvpForm textarea{min-height:70px}
 .hp{position:absolute;left:-9999px;top:-9999px;height:0;width:0;overflow:hidden}
+/* The bar's validation model — the button lights up, nothing turns red — but
+   built as a fill rather than an opacity fade. Dimming a red button to 42%
+   left a 2.15:1 white label; the outline state below is 12.9:1 and the filled
+   state is 5.89:1, so the affordance still appears without the label ever
+   becoming unreadable. */
+#submitBtn{
+  background:transparent;border-color:var(--text);color:var(--text);
+  transition:background .18s,color .18s,border-color .18s;
+}
+#submitBtn.ready{background:var(--accent-ink);border-color:var(--accent-ink);color:#FFFFFF}
+#submitBtn.ready:hover,#submitBtn.ready:focus-visible{background:transparent;color:var(--accent-ink)}
+#submitBtn:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+#submitBtn:disabled{opacity:1;color:var(--text-muted);border-color:var(--text-muted);background:transparent}
+.reassure{font-size:11.5px;line-height:1.6;color:var(--text-muted);letter-spacing:.04em;margin-top:14px;text-align:center}
+.error-inline{margin-top:14px;color:var(--accent-ink);font-size:12.5px;letter-spacing:.06em;line-height:1.6;display:none}
 
-.state{text-align:center;padding:30px 4px}
-.state h2{font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;font-size:clamp(28px,7vw,40px);
-  text-transform:uppercase;margin:0 0 10px;border:0;padding:0;letter-spacing:.02em;line-height:1}
+/* ---------- states ---------- */
+.state{padding:8px 0 4px}
+.state h2{
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;
+  font-size:clamp(30px,4.6vw,40px);text-transform:uppercase;margin:0 0 10px;
+  border:0;padding:0;letter-spacing:.02em;line-height:.94;
+}
 .state.ok h2{color:var(--ok-ink)}
-.state.wait h2{color:var(--accent-ink)}
-.state.err h2{color:var(--danger)}
-.state p{color:var(--text-muted);line-height:1.7;margin:0;font-size:14px}
+.state.wait h2,.state.shut h2,.state.out h2{color:var(--accent-ink)}
+.state.err h2{color:var(--accent-ink)}
+.state p{color:var(--text-soft);line-height:1.7;margin:0;font-size:13.5px}
 .state p b{color:var(--text);font-weight:700}
-.error-inline{margin-top:14px;color:var(--danger);font-size:13px;letter-spacing:.06em;display:none}
+.state .recap{
+  margin-top:18px;border-top:2px solid var(--surface-line);padding-top:16px;
+  display:flex;flex-direction:column;gap:9px;
+}
+.state .recap .rk{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-muted)}
+.state .recap .rv{font-size:14px;color:var(--text);font-weight:500;line-height:1.5;margin-top:2px}
+.state .acts-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.state .acts-row .cal-btn,.state .acts-row .btn{margin-top:0}
+.state .acts-row .btn{
+  padding:12px 22px;font-size:12px;
+  background:var(--accent-ink);border-color:var(--accent-ink);color:#FFFFFF;
+}
+.state .acts-row .btn:hover,.state .acts-row .btn:focus-visible{background:transparent;color:var(--accent-ink)}
+a.copy-btn,.copy-btn{
+  background:transparent;border:2px solid var(--text-muted);color:var(--text);
+  font-family:'Plex Mono',ui-monospace,monospace;font-weight:700;font-size:12px;
+  letter-spacing:.18em;padding:12px 18px;text-transform:uppercase;text-decoration:none;
+  display:inline-block;line-height:1.35;
+}
+a.copy-btn:hover,.copy-btn:hover,.copy-btn:focus-visible{border-color:var(--text);background:var(--text);color:var(--surface)}
+
+/* full-width states (loading / not found) sit in their own panel */
+.page-state{max-width:560px;margin:0 auto;text-align:center;padding:clamp(30px,6vw,54px) 4px}
+.page-state h2{
+  border:0;padding:0;color:var(--text);
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;
+  font-size:clamp(28px,4.4vw,38px);letter-spacing:.02em;line-height:.94;
+}
+.page-state p{color:var(--text-soft);font-size:14px;line-height:1.7;margin-top:12px}
+.load-bar{width:120px;height:6px;background:var(--surface-line);margin:0 auto 18px;overflow:hidden}
+.load-bar i{display:block;width:40%;height:100%;background:var(--brand);animation:loadslide 1.1s ease-in-out infinite}
+@keyframes loadslide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+.load-note{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-muted)}
+
+/* ---------- mobile sticky RSVP bar ---------- */
+.stickybar{
+  position:fixed;left:0;right:0;bottom:0;z-index:80;
+  background:var(--bg);border-top:2px solid var(--line);
+  padding:10px 16px;padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  transform:translateY(110%);transition:transform .22s ease;
+}
+.stickybar.up{transform:translateY(0)}
+.stickybar .btn{margin-top:0;padding:15px 20px}
+body.has-sticky{padding-bottom:84px}
+@media (min-width:901px){.stickybar{display:none}body.has-sticky{padding-bottom:0}}
+
+@media (max-width:900px){
+  /* stacks in source order — head, then the artwork directly under the title
+     the way the bar does at 390, then the facts */
+  .hero-grid{grid-template-columns:minmax(0,1fr);gap:clamp(24px,5vw,32px)}
+  .hero-head,.poster-col,.hero-info{grid-column:1;grid-row:auto}
+  .hero-info{margin-top:0}
+  .col-side{max-width:none}
+}
+@media (max-width:360px){
+  /* brand.css pins the footer row to a single nowrap line below 640px, and at
+     320px that line is wider than the screen. Let it wrap again rather than
+     hand the whole page a horizontal scrollbar. */
+  .foot-row{flex-wrap:wrap;white-space:normal}
+}
+@media (max-width:520px){
+  .act{grid-template-columns:76px minmax(0,1fr);gap:16px}
+  .act .ph,.act .ini{width:76px;height:76px}
+  .act .ini{font-size:27px}
+}
+@media (prefers-reduced-motion:reduce){
+  /* brand.css already sets scroll-behavior:auto here; this page's own
+     html{scroll-behavior:smooth} loads later and would otherwise win. */
+  html{scroll-behavior:auto}
+  .hero-title,.flyer,.poster{transition:none;opacity:1;transform:none}
+  .boot .hero-title{opacity:1}
+  .boot .flyer{opacity:1;transform:none}
+  .load-bar i{animation:none;width:100%}
+  .stickybar{transition:none}
+  /* ambient() also refuses to start the particle field under this query; the
+     wash and the grain are static, so the band stays lit either way. */
+  .dark-zone.top > .motes{display:none}
+}
 </style>
 </head>
 <body>
 
-<div class="dark-zone">
-  <header class="wrap narrow">
+<div class="dark-zone top">
+  <div class="dust" aria-hidden="true"></div>
+  <div class="dust b" aria-hidden="true"></div>
+  <canvas class="motes" id="motes" aria-hidden="true"></canvas>
+
+  <header class="wrap invite">
     <div class="rail">
       <a href="https://www.academixbeatlab.com/" aria-label="Academix Beat Lab">
         <img src="/academix-logo.png" alt="Academix" width="723" height="120">
       </a>
-      <span class="date">RSVP</span>
+      <span class="date" id="railTag">Invitation</span>
     </div>
     <hr class="rule">
+    <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   </header>
-  <section class="wrap narrow masthead-block">
-    <p class="eyebrow">Academix Beat Lab presents</p>
-    <h1 class="masthead">Mix<span class="amp">&amp;</span>Greet</h1>
-    <p class="tagline">Where Creatives Connect</p>
+
+  <section class="wrap invite hero" id="hero" aria-busy="true">
+    <div class="hero-grid">
+
+      <div class="hero-head">
+        <p class="eyebrow">Academix Beat Lab presents</p>
+        <h1 class="masthead hero-title" id="evTitle">Mix<span class="amp">&amp;</span>Greet</h1>
+        <p class="hero-sub" id="evSub">Where Creatives Connect</p>
+      </div>
+
+      <div class="poster-col">
+        <!-- the host's uploaded artwork, swapped in over the composed flyer
+             only once the file has actually decoded -->
+        <div class="poster hidden" id="posterWrap">
+          <img id="evPoster" alt="" decoding="async">
+        </div>
+
+        <!-- the composed flyer: artwork this page prints from the event.
+             No border, no rules, no caption, no facts — the layers below are
+             a printed field, the event's own faces re-inked red, and one type
+             lockup. renderFlyer() fills #flTitle, #tkNo and #plateArt. -->
+        <div class="flyer" id="ticket" role="img" aria-label="Event flyer">
+          <div class="fl-l fl-art" id="plateArt"></div>
+          <div class="fl-l fl-ink"></div>
+          <div class="fl-l fl-wash"></div>
+          <svg class="fl-l fl-mark" viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" focusable="false">
+            <g class="fl-rings" fill="none" stroke="#EDEAE3" stroke-width="1" opacity=".18">
+              <circle cx="322" cy="128" r="188"/><circle cx="322" cy="128" r="160"/>
+              <circle cx="322" cy="128" r="132"/><circle cx="322" cy="128" r="104"/>
+              <circle cx="322" cy="128" r="76"/><circle cx="322" cy="128" r="48"/>
+              <circle cx="322" cy="128" r="106"/><circle cx="322" cy="128" r="92"/>
+              <circle cx="322" cy="128" r="64"/><circle cx="322" cy="128" r="36"/>
+            </g>
+            <circle class="fl-disc" cx="322" cy="128" r="118" fill="#EC1C24" opacity=".55"/>
+            <g class="fl-rings" fill="none" stroke="#EDEAE3" stroke-width=".9" opacity=".24">
+              <circle cx="322" cy="128" r="106"/><circle cx="322" cy="128" r="92"/>
+              <circle cx="322" cy="128" r="78"/><circle cx="322" cy="128" r="64"/>
+              <circle cx="322" cy="128" r="50"/><circle cx="322" cy="128" r="36"/>
+            </g>
+            <circle class="fl-hub" cx="322" cy="128" r="9" fill="#EDEAE3" opacity=".85"/>
+            <g class="fl-arcs" fill="none" stroke="#EC1C24" stroke-width="2" opacity=".5">
+              <path d="M-40 402a150 150 0 0 1 150-150"/>
+              <path d="M-40 448a196 196 0 0 1 196-196"/>
+              <path d="M-40 494a242 242 0 0 1 242-242"/>
+            </g>
+          </svg>
+          <div class="fl-l fl-grain"></div>
+          <div class="fl-l fl-scrim"></div>
+          <div class="fl-type">
+            <span class="fl-no" id="tkNo"></span>
+            <div>
+              <i class="fl-rule"></i>
+              <p class="fl-title" id="flTitle"></p>
+            </div>
+          </div>
+          <!-- Retired ticket-stub nodes. The stub printed the date, the doors,
+               the room, the bill, the access line and the seat count a second
+               time; all six are now typeset exactly once in the left column.
+               The ids are kept so nothing that addressed them can break. -->
+          <div class="retired" hidden>
+            <span id="tkDay"></span><span id="tkMon"></span><span id="tkWd"></span>
+            <span id="heroLineup"></span>
+            <span id="tkDoorsRow"><span id="tkDoors"></span></span>
+            <span id="tkRoomRow"><span id="tkRoom"></span></span>
+            <span id="tkAccess"></span><span id="tkSeats"></span>
+          </div>
+        </div>
+
+        <div class="hero-cta hidden" id="heroCta">
+          <a class="btn block" href="#rsvp-panel" id="heroRsvp">RSVP</a>
+          <span class="note" id="heroNote">Two fields, about twenty seconds</span>
+        </div>
+      </div>
+
+      <div class="hero-info">
+        <div class="hero-when hidden" id="evMeta"></div>
+        <div class="chips" id="evChips"></div>
+        <section aria-labelledby="detailsHead">
+          <h2 id="detailsHead" class="sr">The details</h2>
+          <ul class="facts" id="evFacts"></ul>
+          <button class="cal-btn" id="icsBtn" type="button">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h14v12H3z"/><path d="M3 9h14M7 3v4M13 3v4"/></svg>
+            Add to calendar
+          </button>
+        </section>
+      </div>
+
+    </div>
   </section>
 </div>
 
-<main class="wrap narrow light">
+<main class="wrap invite light">
   <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
 
-  <div class="panel accent">
+  <div id="loading" class="page-state">
+    <div class="load-bar" aria-hidden="true"><i></i></div>
+    <p class="load-note">Opening your invitation</p>
+  </div>
 
-    <div id="loading" class="state"><p>Loading event…</p></div>
+  <div id="notfound" class="page-state hidden">
+    <h2>This invitation has expired</h2>
+    <p>The link doesn't match an event that's currently open. Ask whoever sent it to share it again, or see what's coming up next.</p>
+    <p><a class="copy-btn" href="https://www.academixbeatlab.com/" style="margin-top:18px">See what's next</a></p>
+  </div>
 
-    <div id="notfound" class="state err hidden">
-      <h2>Event not found</h2>
-      <p>This RSVP link doesn't match an open event. Check the link, or reach out to the Mix &amp; Greet team.</p>
+  <div id="eventBlock" class="invite-body hidden">
+
+    <div class="col-main">
+      <section class="block hidden" id="lineupBlock" aria-labelledby="lineupHead">
+        <div class="slab"><span class="dot"></span><h2 id="lineupHead">The Lineup</h2></div>
+        <div class="acts" id="evActs"></div>
+      </section>
     </div>
 
-    <div id="eventBlock" class="hidden">
-      <h2 class="event-title" id="evTitle"></h2>
-      <p class="event-meta" id="evMeta"></p>
+    <aside class="col-side">
+      <div class="panel accent rsvp-panel" id="rsvp-panel">
 
-      <form id="rsvpForm" novalidate>
-        <label for="f-name">Name</label>
-        <input id="f-name" name="name" autocomplete="name" required maxlength="120">
-
-        <label for="f-email">Email</label>
-        <input id="f-email" name="email" type="email" autocomplete="email" required maxlength="200">
-
-        <div class="row">
-          <div>
-            <label for="f-guests">Party size</label>
-            <select id="f-guests" name="guests">
-              <option value="1" selected>Just me</option>
-              <option value="2">2 people</option>
-              <option value="3">3 people</option>
-              <option value="4">4 people</option>
-              <option value="5">5 people</option>
-            </select>
+        <div id="formWrap" class="shut">
+          <div class="panel-head">
+            <h2 class="panel-kicker">RSVP</h2>
+            <span class="panel-count" id="panelCount"></span>
           </div>
-          <div>
-            <label for="f-phone">Phone (optional)</label>
-            <input id="f-phone" name="phone" type="tel" autocomplete="tel" maxlength="40">
+          <p class="panel-lead" id="panelLead">Two fields and you're in. We'll email the address, the time and a calendar file straight back.</p>
+
+          <button class="btn block" id="rsvpOpen" type="button">RSVP</button>
+
+          <form id="rsvpForm" novalidate>
+            <label for="f-name">Your name</label>
+            <input id="f-name" name="name" autocomplete="name" autocapitalize="words" required maxlength="120" enterkeyhint="next">
+
+            <label for="f-email">Email</label>
+            <input id="f-email" name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" required maxlength="200" enterkeyhint="next">
+
+            <div class="row">
+              <div>
+                <label for="f-guests">Party size</label>
+                <select id="f-guests" name="guests">
+                  <option value="1" selected>Just me</option>
+                  <option value="2">2 people</option>
+                  <option value="3">3 people</option>
+                  <option value="4">4 people</option>
+                  <option value="5">5 people</option>
+                </select>
+              </div>
+              <div>
+                <label for="f-phone">Phone (optional)</label>
+                <input id="f-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="40">
+              </div>
+            </div>
+
+            <label for="f-notes">Anything we should know? (optional)</label>
+            <textarea id="f-notes" name="notes" maxlength="500"></textarea>
+
+            <div class="hp" aria-hidden="true">
+              <label for="f-website">Website</label>
+              <input id="f-website" name="website" tabindex="-1" autocomplete="off">
+            </div>
+
+            <button class="btn block" id="submitBtn" type="submit">RSVP Now</button>
+            <div class="error-inline" id="formError" role="alert"></div>
+            <p class="reassure">One email with the details. No spam, ever.</p>
+          </form>
+        </div>
+
+        <div id="confirmed" class="state ok hidden">
+          <h2>You're on the list</h2>
+          <p>Confirmation on its way to <b id="okEmail"></b>. Save the date now so it doesn't get lost in a text thread.</p>
+          <div class="recap" id="okRecap"></div>
+          <div class="acts-row">
+            <button class="cal-btn" id="icsBtn2" type="button">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h14v12H3z"/><path d="M3 9h14M7 3v4M13 3v4"/></svg>
+              Add to calendar
+            </button>
+            <button class="copy-btn" id="shareBtn" type="button">Share invite</button>
           </div>
         </div>
 
-        <label for="f-notes">Anything we should know? (optional)</label>
-        <textarea id="f-notes" name="notes" maxlength="500"></textarea>
-
-        <div class="hp" aria-hidden="true">
-          <label for="f-website">Website</label>
-          <input id="f-website" name="website" tabindex="-1" autocomplete="off">
+        <div id="waitlisted" class="state wait hidden">
+          <h2>You're on the waitlist</h2>
+          <p>This one is at capacity. We'll email <b id="waitEmail"></b> the moment a spot opens up — no need to check back.</p>
+          <div class="recap" id="waitRecap"></div>
+          <div class="acts-row">
+            <button class="copy-btn" id="shareBtn2" type="button">Share invite</button>
+          </div>
         </div>
 
-        <button class="btn block" id="submitBtn" type="submit">RSVP Now</button>
-        <div class="error-inline" id="formError"></div>
-      </form>
-    </div>
+        <div id="externalState" class="state out hidden">
+          <h2>RSVP with the host</h2>
+          <p>This one takes RSVPs on its own form. Same event, same door list — it just lives somewhere else.</p>
+          <div class="acts-row">
+            <a class="btn" id="externalLink" href="#" target="_blank" rel="noopener">Open the RSVP form</a>
+            <button class="copy-btn" id="shareBtn3" type="button">Share invite</button>
+          </div>
+        </div>
 
-    <div id="confirmed" class="state ok hidden">
-      <h2>You're on the list</h2>
-      <p>Check your inbox: a confirmation with all the details is on its way to <b id="okEmail"></b>.</p>
-    </div>
+        <div id="closedState" class="state shut hidden">
+          <h2 id="closedHead">RSVPs are closed</h2>
+          <p id="closedCopy">This event isn't taking RSVPs right now. Keep an eye on the Mix &amp; Greet page for the next one.</p>
+          <div class="acts-row">
+            <a class="copy-btn" href="https://www.academixbeatlab.com/">See what's next</a>
+          </div>
+        </div>
 
-    <div id="waitlisted" class="state wait hidden">
-      <h2>You're on the waitlist</h2>
-      <p>This event is at capacity. We'll email <b id="waitEmail"></b> the moment a spot opens up.</p>
-    </div>
+      </div>
+    </aside>
 
   </div>
 </main>
 
 <footer class="dark-zone">
-  <div class="wrap narrow">
+  <div class="wrap invite">
     <hr class="bar">
     <div class="foot-row">
       <span class="l">BEAT LAB — ACADEMIX</span>
-      <span class="r">INVITE ONLY · MUST RSVP</span>
+      <span class="r" id="footTag">INVITE ONLY · MUST RSVP</span>
     </div>
     <hr class="bar">
-    <p class="copyright">© 2026 ACADEMIX BEAT LAB · 1933 S. BROADWAY, SUITE 1202, LOS ANGELES, CA 90007</p>
+    <p class="copyright">© 2026 ACADEMIX BEAT LAB · DOWNTOWN LOS ANGELES</p>
   </div>
 </footer>
+
+<div class="stickybar" id="stickyBar" aria-hidden="true">
+  <a class="btn block" href="#rsvp-panel" id="stickyRsvp" tabindex="-1">RSVP</a>
+</div>
 
 <script>
 // Convex HTTP Actions deployment for Mix & Greet (public URL, not a secret).
 const API = 'https://good-labrador-980.convex.site';
 
 const qs = new URLSearchParams(location.search);
-const eventId = qs.get('event') || '';
+// The invite link carries either the minted slug or the Convex document id.
+// /i/<key> is rewritten to ?event=<key> at the edge (vercel.json).
+const eventKey = (qs.get('event') || '').trim();
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+};
+const svg = (paths) =>
+  '<svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' + paths + '</svg>';
 
-function fmtWhen(ev){
-  let s = '';
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ev.date || '');
-  if (m) {
-    const d = new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
-    s = d.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric', timeZone:'UTC'});
+const ICONS = {
+  pin: '<path d="M10 18.5S16 13 16 8.5a6 6 0 1 0-12 0C4 13 10 18.5 10 18.5z"/><circle cx="10" cy="8.5" r="2.2"/>',
+  car: '<path d="M3 12.5h14v4H3z"/><path d="M4.8 12.5L6.4 8h7.2l1.6 4.5"/><path d="M6 16.5v2M14 16.5v2"/>',
+  note: '<path d="M4 2.5h12v15H4z"/><path d="M7 6.5h6M7 10h6M7 13.5h4"/>',
+  pass: '<path d="M2.5 6h15v3.2a1.8 1.8 0 0 0 0 3.6V16h-15v-3.2a1.8 1.8 0 0 0 0-3.6V6z"/><path d="M10 6v2M10 12v2"/>'
+};
+
+let EVENT = null;
+let SUBMITTED = false;
+let EXTERNAL = false;
+
+// Every path out of load() runs this, so the hero can never be stranded at the
+// dimmed start state by a bad slug, a 404 or a dead network.
+function heroReady(){
+  document.documentElement.classList.remove('boot');
+  $('hero').setAttribute('aria-busy', 'false');
+}
+
+/* ---------- urls ----------
+   One gate for every URL that reaches an href. `ev.rsvp` was already checked
+   inline; featured links were not, so a stored "javascript:..." landed straight
+   in an anchor. Both go through here now. */
+function safeUrl(u){
+  const s = String(u == null ? '' : u).trim();
+  return /^https?:\/\//i.test(s) ? s : '';
+}
+// The event's own artwork. `posterId` exists on the events table and the
+// confirmation email already resolves it, but the public /api/events shape has
+// not started returning a URL for it yet, so this accepts every spelling the
+// back office might settle on — and, as a last resort, builds the URL itself
+// from a bare Convex storage id, which is the one field name the schema
+// already uses. A file that does not resolve simply fails to decode and the
+// composed flyer stays on screen, so guessing here can only ever help.
+function storageUrl(id){
+  const s = String(id == null ? '' : id).trim();
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(s)) return '';
+  return API.replace(/\.convex\.site$/, '.convex.cloud') + '/api/storage/' + encodeURIComponent(s);
+}
+function posterUrl(ev){
+  const img = ev.image || ev.poster;
+  const cands = [
+    ev.imageUrl,
+    typeof img === 'string' ? img : (img && img.url),
+    ev.coverUrl, ev.posterUrl, ev.flyerUrl, ev.artworkUrl, ev.posterImageUrl
+  ];
+  for (const c of cands) { const s = safeUrl(c); if (s) return s; }
+  const byId = storageUrl(ev.posterId || (img && img.id));
+  return byId;
+}
+
+/* ---------- dates ---------- */
+function evDate(s){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+function longDate(d){
+  return d.toLocaleDateString('en-US', {weekday:'short', month:'long', day:'numeric', year:'numeric'})
+          .toUpperCase().replace(/,/g, ' ·');
+}
+function timeLine(ev){
+  if (!ev.start) return '';
+  return ev.end ? ev.start + ' – ' + ev.end : 'From ' + ev.start;
+}
+// "7:00 PM" / "19:00" / "7pm" -> {h, min}
+function parseTime(s){
+  const m = /(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?/i.exec(s || '') || /(\d{1,2}):(\d{2})/.exec(s || '');
+  if (!m) return null;
+  let h = +m[1];
+  const min = m[2] ? +m[2] : 0;
+  const ap = (m[3] || '').toLowerCase();
+  if (ap === 'p' && h < 12) h += 12;
+  if (ap === 'a' && h === 12) h = 0;
+  return (h > 23 || min > 59) ? null : {h, min};
+}
+function daysOut(d){
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((d - today) / 86400000);
+}
+function countdownLabel(n){
+  if (n < 0) return null;
+  if (n === 0) return 'Happening today';
+  if (n === 1) return 'Tomorrow';
+  if (n <= 45) return 'In ' + n + ' days';
+  return null;
+}
+function countdownTag(n){
+  if (n < 0) return '';
+  if (n === 0) return 'Today';
+  if (n === 1) return 'Tomorrow';
+  if (n <= 90) return n + ' days out';
+  return '';
+}
+
+/* ---------- text helpers ---------- */
+// One address string is two facts: the room and the street. Splitting on the
+// first separator lets the venue read as a name and the rest as an address,
+// which is what a printed flyer does.
+function venueParts(loc){
+  const s = String(loc || '').trim();
+  if (!s) return {head:'', rest:''};
+  const m = /\s·\s|,\s/.exec(s);
+  if (!m) return {head:s, rest:''};
+  return {head: s.slice(0, m.index), rest: s.slice(m.index + m[0].length)};
+}
+/* ---------- title lockup: "&" stays cream ---------- */
+function renderTitle(node, text){
+  node.textContent = '';
+  const len = String(text).length;
+  node.classList.remove('t-md', 't-sm');
+  if (len > 34) node.classList.add('t-sm');
+  else if (len > 20) node.classList.add('t-md');
+  String(text).split('&').forEach((part, i) => {
+    if (i) node.appendChild(el('span', 'amp', '&'));
+    node.appendChild(document.createTextNode(part));
+  });
+}
+function initials(name){
+  return String(name || '').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+}
+function featuredOf(ev){ return (ev.featured || []).filter(f => f && f.name); }
+function kindLabel(f){
+  if (f.role) return f.role;
+  if (f.kind === 'company') return 'Partner';
+  if (f.kind === 'speaker') return 'Speaker';
+  return 'Artist';
+}
+// A headshot that degrades to an initials tile if the file 404s, so a broken
+// storage URL never leaves a hole in the bill.
+function portrait(f, imgCls, iniCls, eager){
+  const src = safeUrl(f.imageUrl);
+  if (!src) return el('div', iniCls, initials(f.name));
+  const img = el('img', f.kind === 'company' ? imgCls + ' logo' : imgCls);
+  img.src = src;
+  img.alt = f.name;
+  img.decoding = 'async';
+  if (!eager) img.loading = 'lazy';
+  img.addEventListener('error', () => {
+    img.replaceWith(el('div', iniCls, initials(f.name)));
+  });
+  return img;
+}
+
+/* ---------- calendar file ---------- */
+function icsEsc(s){
+  return String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+}
+function icsFold(line){
+  const out = [];
+  let s = line;
+  while (s.length > 73) { out.push(s.slice(0, 73)); s = ' ' + s.slice(73); }
+  out.push(s);
+  return out.join('\r\n');
+}
+function stampFor(d){
+  const z = n => String(n).padStart(2, '0');
+  return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate());
+}
+function buildIcs(ev){
+  const d = evDate(ev.date);
+  if (!d) return null;
+  const z = n => String(n).padStart(2, '0');
+  const start = parseTime(ev.start);
+  const end = parseTime(ev.end);
+  let dtStart, dtEnd;
+  if (start) {
+    // No TZID: a floating time is read as the reader's local clock, which is
+    // what a printed flyer time means anyway.
+    dtStart = 'DTSTART:' + stampFor(d) + 'T' + z(start.h) + z(start.min) + '00';
+    let endDay = d;
+    let e = end || {h: start.h + 3, min: start.min};
+    if (!end && e.h > 23) { e = {h: 23, min: 59}; }
+    if (end && (end.h * 60 + end.min) <= (start.h * 60 + start.min)) {
+      endDay = new Date(d.getTime() + 86400000); // ran past midnight
+    }
+    dtEnd = 'DTEND:' + stampFor(endDay) + 'T' + z(e.h) + z(e.min) + '00';
   } else {
-    s = ev.date || '';
+    dtStart = 'DTSTART;VALUE=DATE:' + stampFor(d);
+    dtEnd = 'DTEND;VALUE=DATE:' + stampFor(new Date(d.getTime() + 86400000));
   }
-  if (ev.start) s += ' · ' + ev.start + (ev.end ? ' – ' + ev.end : '');
-  return s;
+  const bill = featuredOf(ev).map(f => f.name + ' (' + kindLabel(f) + ')').join(', ');
+  const desc = [
+    ev.subtitle,
+    bill ? 'On the bill: ' + bill : '',
+    ev.notes,
+    ev.parking ? 'Parking: ' + ev.parking : ''
+  ].filter(Boolean).join('\n\n');
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Academix Beat Lab//Mix & Greet//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    'UID:' + (ev.id || 'event') + '@mixandgreet',
+    'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''),
+    dtStart,
+    dtEnd,
+    icsFold('SUMMARY:' + icsEsc(ev.title)),
+    ev.location ? icsFold('LOCATION:' + icsEsc(ev.location)) : '',
+    desc ? icsFold('DESCRIPTION:' + icsEsc(desc)) : '',
+    icsFold('URL:' + icsEsc(inviteUrl())),
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].filter(Boolean);
+  return lines.join('\r\n') + '\r\n';
+}
+function downloadIcs(){
+  if (!EVENT) return;
+  const body = buildIcs(EVENT);
+  if (!body) return;
+  const blob = new Blob([body], {type: 'text/calendar;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (EVENT.title || 'mix-and-greet').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.ics';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+/* ---------- share ---------- */
+function inviteUrl(){
+  const u = new URL(location.href);
+  u.hash = '';
+  u.searchParams.delete('rsvp');
+  return u.toString();
+}
+async function shareInvite(btn){
+  const url = inviteUrl();
+  const title = EVENT ? EVENT.title : 'Mix & Greet';
+  if (navigator.share) {
+    try { await navigator.share({title, text: "You're invited to " + title, url}); return; } catch (_) { /* cancelled */ }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    const was = btn.textContent;
+    btn.textContent = 'Link copied';
+    setTimeout(() => { btn.textContent = was; }, 1800);
+  } catch (_) {
+    window.prompt('Copy this invite link:', url);
+  }
+}
+
+/* ---------- render: dark band ---------- */
+function renderHero(ev){
+  renderTitle($('evTitle'), ev.title || 'Mix & Greet');
+  $('evSub').textContent = ev.subtitle || 'Where Creatives Connect';
+
+  // The one printing of the date and the time on the whole page. The venue is
+  // typeset once too, as a fact below with the directions link attached — it
+  // is deliberately not repeated here, and nothing restates any of it on the
+  // flyer.
+  const d = evDate(ev.date);
+  const when = $('evMeta');
+  when.textContent = '';
+  when.appendChild(el('span', 'd', d ? longDate(d) : 'Date to come'));
+  const t = timeLine(ev);
+  if (t) when.appendChild(el('span', 't', t));
+  when.classList.remove('hidden');
+
+  // Deliberately short: access and capacity are printed on the flyer, and
+  // repeating them here would read as a spec sheet instead of an invitation.
+  const chips = $('evChips');
+  chips.textContent = '';
+  chips.appendChild(ev.inviteOnly
+    ? el('span', 'chip hot', 'Invite Only')
+    : el('span', 'chip on', 'Open to the community'));
+  const cd = d ? countdownLabel(daysOut(d)) : null;
+  if (cd) chips.appendChild(el('span', 'chip on', cd));
+
+  $('railTag').textContent = ev.inviteOnly ? 'Invitation' : 'RSVP';
+  // worded away from the chip above it, which already says "Invite Only"
+  $('footTag').textContent = ev.inviteOnly ? 'BY INVITATION · MUST RSVP' : 'RSVP REQUIRED';
+}
+
+/* ---------- render: the flyer ----------
+   The right column is a poster on every code path.
+
+   renderFlyer() runs first and unconditionally: it composes artwork out of
+   the event — a printed field, the event's own faces re-inked red when it has
+   any, and one type lockup. It prints no date, no time, no venue, no bill and
+   no capacity; all of those are typeset exactly once in the left column.
+
+   tryArtwork() then attempts the host's uploaded file and swaps it in over
+   the composed flyer only after the image has decoded, so a slow, missing or
+   dead storage URL can never blank the column or shift the layout. */
+function renderFlyer(ev){
+  const key = ev.slug || ev.id || '';
+  // Strip the separators first: "mix-greet-vol-2".slice(-4) printed "OL-2".
+  const serial = key.replace(/[^a-z0-9]/gi, '').slice(-4).toUpperCase();
+  $('tkNo').textContent = serial ? 'No. ' + serial : '';
+
+  const title = ev.title || 'Mix & Greet';
+  const flyer = $('ticket');
+  flyer.setAttribute('aria-label', 'Poster for ' + title);
+
+  // The lockup, printed twice a few pixels apart: a red plate under a cream
+  // one, the way a screen print misregisters. Both halves are built with
+  // renderTitle(), so the ampersand keeps its own colour and every character
+  // still arrives as a text node.
+  const t = $('flTitle');
+  renderTitle(t, title);
+  const size = title.length > 30 ? 't-sm' : (title.length > 17 ? 't-md' : '');
+  t.className = 'fl-title' + (size ? ' ' + size : '');
+
+  // The headliner's photograph becomes the poster's plate: one image, never a
+  // strip of them — two photographs side by side read as a contact sheet, and
+  // a poster is one image. Partner logos are left out on purpose: a knocked-
+  // out wordmark does not survive a duotone, and the marks have a proper tile
+  // in the lineup below.
+  const art = $('plateArt');
+  art.textContent = '';
+  const faces = featuredOf(ev)
+    .filter(f => f.kind !== 'company' && safeUrl(f.imageUrl))
+    .slice(0, 1);
+  faces.forEach(f => {
+    const img = el('img');
+    img.src = safeUrl(f.imageUrl);
+    img.alt = '';
+    img.decoding = 'async';
+    // A 404 here must not punch a hole in the composition: drop the plate and
+    // let the printed field carry the poster on its own.
+    img.addEventListener('error', () => {
+      img.remove();
+      if (!art.querySelector('img')) flyer.classList.remove('has-art');
+    }, {once: true});
+    art.appendChild(img);
+  });
+  flyer.classList.toggle('has-art', faces.length > 0);
+}
+
+function tryArtwork(ev){
+  const src = posterUrl(ev);
+  if (!src) return;
+  const img = $('evPoster');
+  const wrap = $('posterWrap');
+  img.alt = (ev.title || 'Mix & Greet') + ' — event flyer';
+  img.addEventListener('load', () => {
+    wrap.classList.remove('hidden');
+    hide('ticket');
+    requestAnimationFrame(() => wrap.classList.add('on'));
+  }, {once: true});
+  img.src = src; // on error nothing happens: the composed flyer stays up
+}
+
+/* ---------- render: light band ---------- */
+// The label is kept for assistive tech and dropped from the page: per the bar,
+// "there is not a single Date: / Location: / Capacity: label", and that one
+// decision is most of what separates an invitation from an events form.
+function fact(icon, srLabel, valueNode){
+  const li = document.createElement('li');
+  const holder = document.createElement('div');
+  holder.innerHTML = svg(ICONS[icon]);
+  li.appendChild(holder.firstChild);
+  const body = el('div');
+  if (srLabel) body.appendChild(el('span', 'sr', srLabel + ': '));
+  body.appendChild(valueNode);
+  li.appendChild(body);
+  return li;
+}
+
+function renderFacts(ev){
+  const ul = $('evFacts');
+  ul.textContent = '';
+
+  if (ev.location) {
+    const v = el('div', 'v');
+    const parts = venueParts(ev.location);
+    v.appendChild(document.createTextNode(parts.head));
+    if (parts.rest) v.appendChild(el('small', null, parts.rest));
+    const a = el('a', null, 'Get directions →');
+    a.href = 'https://maps.google.com/?q=' + encodeURIComponent(ev.location);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    v.appendChild(a);
+    ul.appendChild(fact('pin', 'Where', v));
+  }
+  if (ev.parking) {
+    ul.appendChild(fact('car', 'Parking', el('div', 'v soft', ev.parking)));
+  }
+  if (ev.notes) {
+    ul.appendChild(fact('note', 'Good to know', el('div', 'v soft', ev.notes)));
+  }
+  // The chip above already prints "Invite Only" / "Open to the community",
+  // so this line carries only what the chip cannot: what RSVPing actually
+  // does, and the size of the room. Capacity is printed here and nowhere else.
+  const access = ev.inviteOnly
+    ? 'Your name goes on the door list when you RSVP.'
+    : 'RSVP holds your spot.';
+  ul.appendChild(fact('pass', 'Access', el('div', 'v soft',
+    access + (ev.capacity ? ' Room for ' + ev.capacity + '.' : ''))));
+}
+
+function renderLineup(ev){
+  const acts = featuredOf(ev);
+  if (!acts.length) return;
+  $('lineupHead').textContent = acts.some(f => f.kind === 'company')
+    ? 'Lineup & Partners'
+    : 'The Lineup';
+  const box = $('evActs');
+  box.textContent = '';
+  acts.forEach((f, i) => {
+    const row = el('div', 'act');
+    row.appendChild(portrait(f, 'ph', 'ini', false));
+    const txt = el('div');
+    txt.appendChild(el('p', 'no', String(i + 1).padStart(2, '0')));
+    txt.appendChild(el('p', 'nm', f.name));
+    txt.appendChild(el('p', 'rl', kindLabel(f)));
+    if (f.bio) txt.appendChild(el('p', 'bo', f.bio));
+    const link = safeUrl(f.link);
+    if (link) {
+      // Labelled with where it goes rather than with the name set 30px above
+      // it — the bar prints the host's own link as the link.
+      let where = link;
+      try { where = new URL(link).hostname.replace(/^www\./, ''); } catch (_) {}
+      const a = el('a', 'lk', where + ' →');
+      a.href = link;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      txt.appendChild(a);
+    }
+    row.appendChild(txt);
+    box.appendChild(row);
+  });
+  $('lineupBlock').classList.remove('hidden');
+}
+
+function recap(node, email, guests){
+  node.textContent = '';
+  const add = (k, v) => {
+    if (!v) return;
+    const row = el('div');
+    row.appendChild(el('span', 'rk', k));
+    row.appendChild(el('div', 'rv', v));
+    node.appendChild(row);
+  };
+  const d = evDate(EVENT.date);
+  add('Event', EVENT.title);
+  add('When', (d ? longDate(d) : EVENT.date) + (timeLine(EVENT) ? ' · ' + timeLine(EVENT) : ''));
+  add('Where', EVENT.location);
+  add('Party', guests > 1 ? guests + ' people' : 'Just you');
+}
+
+/* ---------- sticky mobile CTA ----------
+   Rides along whenever neither the hero button nor the panel is on screen. */
+function watchSticky(){
+  const bar = $('stickyBar');
+  const link = $('stickyRsvp');
+  const seen = new Map();
+  if (!('IntersectionObserver' in window)) return;
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => seen.set(e.target, e.isIntersecting));
+    const wanted = !SUBMITTED && ![...seen.values()].some(Boolean);
+    bar.classList.toggle('up', wanted);
+    bar.setAttribute('aria-hidden', wanted ? 'false' : 'true');
+    link.tabIndex = wanted ? 0 : -1;
+    document.body.classList.toggle('has-sticky', wanted);
+  }, {rootMargin: '-30px 0px -110px 0px'});
+  io.observe($('rsvp-panel'));
+  io.observe($('heroCta'));
+}
+
+/* ---------- load ---------- */
+// /api/events?event=<key> answers with a single published event, or 404. The
+// page deliberately never falls back to the unfiltered list: that endpoint
+// returns every published event in full, which would make an "Invite Only"
+// event's unlisted link enumerable from a page that only needs one row.
+async function fetchEvent(key){
+  try {
+    const res = await fetch(API + '/api/events?event=' + encodeURIComponent(key));
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      // A deployment that predates the ?event= parameter ignores it. Narrow the
+      // array here rather than firing a second, unfiltered request.
+      const k = key.toLowerCase();
+      return data.find(e => e && [e.id, e.slug].some(v => v && String(v).toLowerCase() === k)) || null;
+    }
+    return (data && data.id) ? data : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Collapse the invitation down to the message. Called on every unresolvable
+// link. Without this the hero, the composed flyer (empty, so it prints a stray
+// red rule over nothing) and a live-but-inert ADD TO CALENDAR button all stay
+// on screen, pushing "This invitation has expired" below the fold.
+function deadLink(){
+  show('notfound');
+  ['icsBtn','icsBtn2','shareBtn','shareBtn2','shareBtn3','heroRsvp','stickyRsvp'].forEach(id => {
+    const n = $(id); if (n) n.hidden = true;
+  });
+  ['hero','ticket','rsvp-panel','stickyBar','lineupBlock','formWrap','evChips','heroCta']
+    .forEach(id => { const n = $(id); if (n) n.classList.add('hidden'); });
 }
 
 async function load(){
-  if (!eventId) { hide('loading'); show('notfound'); return; }
   try {
-    const res = await fetch(API + '/api/events');
-    const events = await res.json();
-    const ev = (Array.isArray(events) ? events : []).find(e => e.id === eventId);
-    if (!ev || ev.rsvpMode === 'closed') { hide('loading'); show('notfound'); return; }
-    $('evTitle').textContent = ev.title;
-    const bits = [fmtWhen(ev)];
-    if (ev.location) bits.push(ev.location);
-    $('evMeta').innerHTML = bits.map(b => {
-      const div = document.createElement('div');
-      div.textContent = b;
-      return div.outerHTML;
-    }).join('');
-    hide('loading'); show('eventBlock');
-  } catch (err) {
-    hide('loading'); show('notfound');
+    // A dead link is the most common way this page is opened: a stale slug, a
+    // typo, or the API down all land here. Everything that would dress the page
+    // up as a real invitation has to come down, or the guest reads a convincing
+    // invite with controls that do nothing and has to scroll to learn it is dead.
+    if (!eventKey) { hide('loading'); deadLink(); return; }
+    const ev = await fetchEvent(eventKey);
+    if (!ev) { hide('loading'); deadLink(); return; }
+
+    EVENT = ev;
+    document.title = (ev.title || 'Mix & Greet') + ' · You\u2019re invited';
+    renderHero(ev);
+    renderFlyer(ev);   // always: the column is a poster from the first paint
+    tryArtwork(ev);    // and becomes the host's own poster if a file resolves
+    renderFacts(ev);
+    renderLineup(ev);
+
+    // A dateless event has no calendar file to hand out, so the button that
+    // would silently do nothing is not rendered at all.
+    if (!buildIcs(ev)) { hide('icsBtn'); hide('icsBtn2'); }
+
+    const d = evDate(ev.date);
+    const past = d ? daysOut(d) < 0 : false;
+    // "external" is the operator's instruction about WHO takes the RSVP, so a
+    // stored destination that cannot be linked (javascript:, a relative path,
+    // an empty string) must not quietly demote the event to our hosted form:
+    // that would collect names the operator never asked us to collect, on a
+    // door list they will never read. It falls to the closed state instead,
+    // and says which link is missing.
+    const wantsExternal = ev.rsvpMode === 'external';
+    const target = wantsExternal ? (safeUrl(ev.rsvp) || safeUrl(ev.rsvpExternalUrl)) : '';
+    EXTERNAL = wantsExternal && !!target;
+    const open = ev.rsvpMode !== 'closed' && !past && (!wantsExternal || EXTERNAL);
+
+    if (!open) {
+      hide('formWrap');
+      if (past) {
+        $('closedHead').textContent = 'This one has wrapped';
+        $('closedCopy').textContent = 'RSVPs for this date are closed. The next Mix & Greet is already in the works.';
+      } else if (wantsExternal) {
+        $('closedHead').textContent = 'RSVPs are with the host';
+        $('closedCopy').textContent = 'This one takes RSVPs on its own form, and that link isn’t working from here. Ask whoever sent the invitation for the RSVP link.';
+      }
+      show('closedState');
+      $('tkAccess').textContent = past ? 'Wrapped' : 'RSVPs closed';
+      $('heroCta').classList.add('hidden');
+    } else if (EXTERNAL) {
+      // The operator points this event at their own form; the invitation still
+      // does its job, the commitment step just happens somewhere else.
+      hide('formWrap');
+      $('externalLink').href = target;
+      show('externalState');
+      const heroLink = $('heroRsvp');
+      heroLink.href = target;
+      heroLink.target = '_blank';
+      heroLink.rel = 'noopener';
+      $('stickyRsvp').href = target;
+      $('stickyRsvp').target = '_blank';
+      $('stickyRsvp').rel = 'noopener';
+      $('heroNote').textContent = 'Opens the host\u2019s RSVP form';
+      $('heroCta').classList.remove('hidden');
+    } else {
+      const cd = d ? countdownTag(daysOut(d)) : '';
+      if (cd) $('panelCount').textContent = cd;
+      if (ev.capacity) {
+        // deliberately does NOT restate the seat count: it is typeset once, in
+        // the access line beside the flyer.
+        $('panelLead').textContent = 'Two fields and you\u2019re in. The confirmation email ' +
+          'carries the address, the time and a calendar file.';
+      }
+      $('heroCta').classList.remove('hidden');
+    }
+
+    hide('loading');
+    show('eventBlock');
+
+    // After the panel is actually laid out: sticky observer, then deep link.
+    requestAnimationFrame(() => {
+      if (open && !EXTERNAL) watchSticky();
+      if (open && !EXTERNAL && qs.get('rsvp')) openForm();
+    });
+  } finally {
+    // Whatever happened above — rendered event, 404, thrown error — the hero
+    // stops being a 12%-opacity ghost.
+    heroReady();
   }
 }
+
+/* ---------- the fold ----------
+   The whole RSVP apparatus lives behind one button until the guest commits,
+   which is the difference between an invitation and a form. */
+function revealForm(){
+  const w = $('formWrap');
+  if (!w || w.classList.contains('hidden')) return false;
+  w.classList.remove('shut');
+  return true;
+}
+// A texted link can carry ?rsvp=1 and drop the guest straight into the form.
+// One instant scrollTo, not scrollIntoView + scrollBy: with html{scroll-behavior:
+// smooth} the second call would retarget the first one's animation and land the
+// page back at the top. It also runs again after load, because a fresh
+// navigation resets scroll position on its own.
+function openForm(){
+  if (!revealForm()) return;
+  const go = () => {
+    const top = $('rsvp-panel').getBoundingClientRect().top + window.scrollY - 18;
+    window.scrollTo({top: Math.max(0, top), behavior: 'instant'});
+    $('f-name').focus({preventScroll: true});
+  };
+  go();
+  if (document.readyState !== 'complete') window.addEventListener('load', go, {once: true});
+  setTimeout(go, 150);
+}
+// The hero lozenge and the sticky bar both open the fold rather than jumping to
+// a form that is already on screen. Their href stays a real anchor so the page
+// still works with the script disabled.
+const CALM = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function ctaClick(e){
+  if (EXTERNAL) return;
+  if (!$('formWrap') || $('formWrap').classList.contains('hidden')) return;
+  e.preventDefault();
+  revealForm();
+  const top = $('rsvp-panel').getBoundingClientRect().top + window.scrollY - 18;
+  window.scrollTo({top: Math.max(0, top), behavior: CALM ? 'auto' : 'smooth'});
+  setTimeout(() => $('f-name').focus({preventScroll: true}), CALM ? 0 : 420);
+}
+$('heroRsvp').addEventListener('click', ctaClick);
+$('stickyRsvp').addEventListener('click', ctaClick);
+$('rsvpOpen').addEventListener('click', () => {
+  revealForm();
+  $('f-name').focus({preventScroll: true});
+});
+
+/* ---------- form ---------- */
+const EMAIL_RE = /^\S+@\S+\.\S{2,}$/;
+function formValid(){
+  return !!$('f-name').value.trim() && EMAIL_RE.test($('f-email').value.trim());
+}
+function submitLabel(){
+  const n = Number($('f-guests').value) || 1;
+  return n > 1 ? 'RSVP for ' + n : 'RSVP Now';
+}
+function syncButton(){
+  const btn = $('submitBtn');
+  btn.classList.toggle('ready', formValid());
+  if (!btn.disabled) btn.textContent = submitLabel();
+}
+['f-name', 'f-email', 'f-guests'].forEach(id => {
+  $(id).addEventListener('input', syncButton);
+  $(id).addEventListener('change', syncButton);
+});
+syncButton();
 
 $('rsvpForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -182,22 +1444,26 @@ $('rsvpForm').addEventListener('submit', async (e) => {
   errBox.style.display = 'none';
   const name = $('f-name').value.trim();
   const email = $('f-email').value.trim();
-  if (!name || !/^\S+@\S+\.\S{2,}$/.test(email)) {
-    errBox.textContent = 'Please enter your name and a valid email.';
+  if (!name || !EMAIL_RE.test(email)) {
+    errBox.textContent = 'Add your name and a valid email and we\u2019ll lock it in.';
     errBox.style.display = 'block';
+    ($('f-name').value.trim() ? $('f-email') : $('f-name')).focus();
     return;
   }
+  const guests = Number($('f-guests').value) || 1;
   const btn = $('submitBtn');
-  btn.disabled = true; btn.textContent = 'Sending…';
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
   try {
     const res = await fetch(API + '/api/rsvp', {
       method: 'POST',
       headers: {'content-type': 'application/json'},
       body: JSON.stringify({
-        eventId,
+        // canonical id, so a slug in the URL still resolves server-side
+        eventId: (EVENT && EVENT.id) || eventKey,
         name,
         email,
-        guests: Number($('f-guests').value) || 1,
+        guests,
         phone: $('f-phone').value.trim(),
         notes: $('f-notes').value.trim(),
         website: $('f-website').value
@@ -205,22 +1471,164 @@ $('rsvpForm').addEventListener('submit', async (e) => {
     });
     const out = await res.json().catch(() => ({}));
     if (res.ok && out.ok) {
-      hide('eventBlock');
-      if (out.status === 'waitlist') { $('waitEmail').textContent = email; show('waitlisted'); }
-      else { $('okEmail').textContent = email; show('confirmed'); }
+      SUBMITTED = true;
+      $('stickyBar').classList.remove('up');
+      document.body.classList.remove('has-sticky');
+      hide('formWrap');
+      if (out.status === 'waitlist') {
+        $('waitEmail').textContent = email;
+        recap($('waitRecap'), email, guests);
+        show('waitlisted');
+      } else {
+        $('okEmail').textContent = email;
+        recap($('okRecap'), email, guests);
+        show('confirmed');
+      }
+      $('rsvp-panel').scrollIntoView({block: 'center', behavior: CALM ? 'auto' : 'smooth'});
     } else {
       errBox.textContent = out.error || 'Something went wrong. Please try again.';
       errBox.style.display = 'block';
-      btn.disabled = false; btn.textContent = 'RSVP Now';
+      btn.disabled = false;
+      btn.textContent = submitLabel();
     }
   } catch (err) {
     errBox.textContent = 'Network error. Please try again.';
     errBox.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'RSVP Now';
+    btn.disabled = false;
+    btn.textContent = submitLabel();
   }
 });
 
+$('icsBtn').addEventListener('click', downloadIcs);
+$('icsBtn2').addEventListener('click', downloadIcs);
+['shareBtn', 'shareBtn2', 'shareBtn3'].forEach(id => {
+  $(id).addEventListener('click', (e) => shareInvite(e.currentTarget));
+});
+
+/* ---------- the ambient layer ----------
+   The bar's backdrop is a looping theme video with a second, position:fixed
+   particle film drifting over it, and the parallax is free because one layer
+   scrolls and the other does not. This is that, at the weight a static invite
+   can afford: no video, one canvas, three depth planes.
+
+   Each plane drifts at its own speed AND is offset against scroll by its own
+   factor, so the near motes slide past the far ones as the band moves — real
+   parallax, not a translated background. The field stops dead when the band
+   leaves the viewport, when the tab is hidden, and when the visitor has asked
+   for reduced motion, in which case it never starts and the static wash and
+   grain behind it carry the band on their own. */
+function ambient(){
+  const cv = $('motes');
+  const band = document.querySelector('.dark-zone.top');
+  if (!cv || !band || CALM) return;
+  const ctx = cv.getContext && cv.getContext('2d');
+  if (!ctx) return;
+
+  // one soft sprite per ink, drawn once and blitted — cheaper and softer than
+  // a per-particle radial gradient every frame
+  const sprite = (r, g, b) => {
+    const s = document.createElement('canvas');
+    s.width = s.height = 64;
+    const c = s.getContext('2d');
+    const grad = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(' + r + ',' + g + ',' + b + ',1)');
+    grad.addColorStop(.42, 'rgba(' + r + ',' + g + ',' + b + ',.45)');
+    grad.addColorStop(1, 'rgba(' + r + ',' + g + ',' + b + ',0)');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, 64, 64);
+    return s;
+  };
+  const INK = [sprite(237, 234, 227), sprite(236, 28, 36)];
+  const PLANE = [
+    {depth: .05, size: [1.6, 3.2], alpha: [.05, .12], speed: 3},
+    {depth: .13, size: [2.6, 5.6], alpha: [.07, .17], speed: 6},
+    {depth: .26, size: [4.4, 9.5], alpha: [.10, .26], speed: 11}
+  ];
+
+  let W = 0, H = 0, dpr = 1, parts = [], raf = 0, last = 0, onScreen = true;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  function build(){
+    const box = band.getBoundingClientRect();
+    W = Math.max(1, Math.round(box.width));
+    H = Math.max(1, Math.round(box.height));
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // density, not a fixed count: the same air at 320px and at 1600px
+    const n = Math.max(54, Math.min(170, Math.round((W * H) / 7600)));
+    parts = [];
+    for (let i = 0; i < n; i++) {
+      const p = PLANE[i % 3];
+      parts.push({
+        p,
+        x: rnd(0, W),
+        y: rnd(-60, H + 60),
+        s: rnd(p.size[0], p.size[1]),
+        a: rnd(p.alpha[0], p.alpha[1]),
+        vx: rnd(-.34, .34) * p.speed,
+        vy: rnd(-1, -.18) * p.speed,
+        ink: Math.random() < .16 ? 1 : 0
+      });
+    }
+  }
+
+  function frame(now){
+    raf = 0;
+    const dt = Math.min(.05, last ? (now - last) / 1000 : .016);
+    last = now;
+    ctx.clearRect(0, 0, W, H);
+    const scrolled = window.scrollY || window.pageYOffset || 0;
+    const span = H + 120;
+    for (let i = 0; i < parts.length; i++) {
+      const q = parts[i];
+      q.x += q.vx * dt;
+      q.y += q.vy * dt;
+      if (q.x < -30) q.x = W + 30; else if (q.x > W + 30) q.x = -30;
+      if (q.y < -60) q.y = H + 60;
+      // the plane's own share of the scroll, wrapped so the field never runs out
+      let y = q.y - scrolled * q.p.depth;
+      y = ((y + 60) % span + span) % span - 60;
+      ctx.globalAlpha = q.a;
+      ctx.drawImage(INK[q.ink], q.x - q.s, y - q.s, q.s * 2, q.s * 2);
+    }
+    ctx.globalAlpha = 1;
+    tick();
+  }
+  function tick(){
+    if (raf || !onScreen || document.hidden) return;
+    raf = requestAnimationFrame(frame);
+  }
+  function stop(){
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    last = 0;
+  }
+
+  build();
+  tick();
+  document.addEventListener('visibilitychange', () => { document.hidden ? stop() : tick(); });
+  window.addEventListener('scroll', tick, {passive: true});
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((es) => {
+      onScreen = es[0].isIntersecting;
+      onScreen ? tick() : stop();
+    }, {rootMargin: '80px'}).observe(band);
+  }
+  if ('ResizeObserver' in window) {
+    let t = 0;
+    new ResizeObserver(() => {
+      clearTimeout(t);
+      t = setTimeout(() => { build(); tick(); }, 140);
+    }).observe(band);
+  } else {
+    window.addEventListener('resize', () => { build(); tick(); });
+  }
+}
+
 load();
+ambient();
 </script>
 </body>
 </html>

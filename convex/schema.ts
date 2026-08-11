@@ -8,6 +8,15 @@ export default defineSchema({
   // Events. Superset of the current Netlify Blobs record so migration is lossless.
   events: defineTable({
     legacyId: v.optional(v.string()), // crypto.randomUUID() from the Blobs era
+    // Short, URL-safe public key for the hosted invite link. It is the whole
+    // path segment a guest sees: "mix-and-greet-vol-2-k7fq" ->
+    // https://mixandgreet.com/i/mix-and-greet-vol-2-k7fq
+    // Minted at creation and NEVER rewritten, not even on a retitle, so a link
+    // already in circulation stays valid for the life of the event. Optional
+    // because rows created before this field existed must keep validating; the
+    // back office backfills them on first load and every read falls back to the
+    // document id, so pre-slug links keep resolving too.
+    slug: v.optional(v.string()),
     title: v.string(),
     subtitle: v.optional(v.string()),
     date: v.string(), // "YYYY-MM-DD" (keeps string-sort semantics)
@@ -26,6 +35,13 @@ export default defineSchema({
     capacity: v.optional(v.number()),
     status: v.union(v.literal("published"), v.literal("archived")),
     legacyCreatedAt: v.optional(v.string()), // original ISO string, migration only
+
+    // The event's flyer. Same Convex-file-storage pattern as featured[].imageId
+    // below: the id is stored, and every read resolves it to a URL. This is what
+    // makes an invite (and the confirmation email that follows it) look like
+    // THIS party rather than like a template. Optional so pre-existing rows keep
+    // validating and so an event without artwork simply omits the band.
+    posterId: v.optional(v.id("_storage")),
 
     // Featured artists / speakers / companies shown on the event flyer.
     // Optional so pre-existing rows keep validating. Images live in Convex
@@ -48,7 +64,8 @@ export default defineSchema({
     ),
   })
     .index("by_status_and_date", ["status", "date"])
-    .index("by_legacyId", ["legacyId"]),
+    .index("by_legacyId", ["legacyId"])
+    .index("by_slug", ["slug"]),
 
   // RSVPs captured by our own hosted form (Phase 1).
   rsvps: defineTable({
@@ -147,4 +164,23 @@ export default defineSchema({
     expiresAt: v.number(),
   })
     .index("by_token", ["token"]),
+
+  // Failed-login counters for /api/admin/login. One shared ADMIN_PASSWORD guards
+  // every invite-link mutation and *.convex.site is a public origin, so without
+  // this the login route is an unlimited guessing oracle.
+  //
+  // Two kinds of row, same shape, told apart by `key`:
+  //   "ip:<x-forwarded-for>" — per-caller, the tight budget
+  //   "global"               — every failure everywhere, the backstop, because
+  //                            x-forwarded-for is spoofable and a spray across
+  //                            forged values would never fill one client bucket
+  // Rows are deleted on success and lazily pruned once their window lapses, so
+  // the table stays proportional to attackers rather than to traffic.
+  adminLoginAttempts: defineTable({
+    key: v.string(),
+    windowStart: v.number(), // ms epoch; the window this count belongs to
+    failures: v.number(),
+    lockedUntil: v.number(), // ms epoch; 0 when not locked
+  })
+    .index("by_key", ["key"]),
 });

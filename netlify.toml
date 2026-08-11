@@ -1,7 +1,8 @@
 # Static site — no build step. Publish the repo root.
+#
+# There is no [functions] block on purpose. All data lives in Convex
+# (good-labrador-980) and is reached over its HTTP API; the old
+# netlify/functions/events.mjs Blobs store was retired in the 2026-08-06
+# cutover and the directory no longer exists.
 [build]
   publish = "."
-
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"

@@ -3,10 +3,202 @@ import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
+// --- Hosted invite link ------------------------------------------------------
+// Every event gets a short public slug at creation, and the shareable invite URL
+// is that slug on the public site. Creating an event therefore mints a working
+// link; pasting an external URL is an override, not the only way to open RSVPs.
+//
+// URL SHAPE. The minted string is the product here: it gets texted, pasted into
+// a group chat, and rendered by link-preview bots. So it is a clean path on the
+// brand domain and carries no query string:
+//
+//     https://mixandgreet.com/i/mix-and-greet-vol-2-k7fq
+//
+// not `.../rsvp?event=<slug>`. A query string is what SMS clients and preview
+// cards truncate first, and it is the half of a URL people distrust.
+//
+// DEPLOY CONTRACT, and it is load-bearing: nothing in rsvp.html reads the path.
+// That page's only key reader is `new URLSearchParams(location.search).get(
+// 'event')`. `/i/<key>` therefore resolves for exactly one reason — the host
+// rewrites it to `/rsvp.html?event=<key>` before the page runs. That rewrite
+// lives in vercel.json and NOWHERE ELSE. A host without it serves 404 for every
+// invite link in circulation, so any change of hosting has to port the rewrite
+// first. (`netlify.toml` is still tracked in this repo and declares no
+// redirects at all; it is a leftover of the pre-Vercel deploy and would 404 the
+// whole `/i/` scheme if it were ever used again.) Links minted before this
+// change pointed straight at `/rsvp?event=<key>` and still work: same reader,
+// no rewrite needed.
+//
+// This shape is effectively permanent: the slug is deliberately immutable so
+// circulating links keep working, which means links already in the wild can
+// never be reshaped. Changing it later is not an option, so it is right now.
+const INVITE_PATH = "/i/";
+
+// Host to print in invite links. Deliberately its OWN env var, separate from
+// SITE_ORIGIN: SITE_ORIGIN is the CORS allow-origin (see lib/http.ts) and must
+// match the host the browser actually serves the site from, which today is
+// www.mixandgreet.com. The link we hand a human is the bare apex, which Vercel
+// 308s to www with the path intact. Tying the two together would mean choosing
+// between a pretty link and a working fetch. SITE_ORIGIN is still honoured as a
+// fallback so a single-variable setup keeps working.
+const DEFAULT_INVITE_ORIGIN = "https://mixandgreet.com";
+
+// The resolved origin AND where it came from. The second half matters: with
+// neither env var set this function still returns a confident, correct-looking
+// absolute URL, and the back office would render minted-but-dead links as if
+// nothing were wrong. `source: "fallback"` is what the back office raises a
+// warning on, so a misconfigured deployment is visible before a link is texted.
+export type InviteOriginInfo = {
+  origin: string;
+  source: "INVITE_ORIGIN" | "SITE_ORIGIN" | "fallback";
+};
+
+export function inviteOriginInfo(): InviteOriginInfo {
+  const candidates = [
+    ["INVITE_ORIGIN", process.env.INVITE_ORIGIN],
+    ["SITE_ORIGIN", process.env.SITE_ORIGIN],
+  ] as const;
+  for (const [name, candidate] of candidates) {
+    const raw = String(candidate ?? "").trim().replace(/\/+$/, "");
+    // "*" is a legitimate CORS value but not a URL, so it must not leak in here.
+    if (/^https?:\/\/[^\s*]+$/i.test(raw)) return { origin: raw, source: name };
+  }
+  return { origin: DEFAULT_INVITE_ORIGIN, source: "fallback" };
+}
+
+export function inviteOrigin(): string {
+  return inviteOriginInfo().origin;
+}
+
+// `key` is the slug when the event has one, otherwise its document id. Both
+// resolve, so links minted before slugs existed keep working forever.
+export function inviteUrl(key: string): string {
+  return `${inviteOrigin()}${INVITE_PATH}${encodeURIComponent(key)}`;
+}
+
+// Lowercase alphanumerics minus the glyphs that get misread aloud or in print
+// (0/o, 1/l/i). The slug is an identifier, not a secret: /api/events already
+// publishes every event, so it is generated for legibility plus collision
+// avoidance, and uniqueness is enforced against the by_slug index below.
+const SLUG_CHARS = "abcdefghjkmnpqrstuvwxyz23456789";
+const randomChars = (n: number) =>
+  Array.from(
+    { length: n },
+    () => SLUG_CHARS[Math.floor(Math.random() * SLUG_CHARS.length)],
+  ).join("");
+
+// "Mix & Greet Vol. 2" -> "mix-and-greet-vol-2"
+//
+// The stem is capped at 28 characters, and the cut lands on a word boundary.
+// A hard slice produces fragments: "Mix & Greet Vol. 3 — Spring Session" used
+// to mint `mix-and-greet-vol-3-spring-b`, and that dangling "-b" is not a
+// cosmetic problem — it is in the string that gets texted, read aloud and
+// rendered by link-preview bots. Trim back to the last "-" instead. A single
+// word longer than the cap has no boundary to fall back to, so it is still
+// sliced rather than dropped.
+//
+// Tag-shaped runs are removed first, for the same reason. Titles are rendered
+// as literal text everywhere (the back office builds every node with
+// textContent), so a title really can contain "<b>Session</b>" — and left in,
+// the angle brackets become separators and mint `...-b-session-b`. Two junk
+// one-letter tokens in a URL people read aloud. This only strips a run that has
+// both brackets, so a title like "Under <5 minutes" keeps its text.
+const SLUG_STEM_MAX = 28;
+
+// Accented Latin is FOLDED, not deleted, and that is the same bug as the
+// dangling "-b" rather than a nicety. `[^a-z0-9]+` on its own does not strip an
+// accent, it strips the letter: "Sesión de Verano · Año Nuevo" minted
+// `sesi-n-de-verano-a-o-nuevo`, "Mixtape Café" minted `mixtape-caf`, and the
+// word-boundary logic below never gets a chance because the damage happens
+// character by character before it runs. Unlike a bad truncation this one is
+// permanent — the slug is minted once and NEVER rewritten (see `update`), so
+// the event carries that URL for life. This venue is in Los Angeles.
+//
+// NFD splits "é" into "e" plus a combining accent; dropping the combining
+// marks keeps the letter. The short table below covers the handful of Latin
+// letters NFD does not decompose at all (ß, æ, ø, ...), which would otherwise
+// still vanish. Anything outside Latin (Cyrillic, Greek, CJK, emoji) has no
+// meaningful ASCII fold, so it still washes out and `mintSlug` falls back to a
+// pure random token — a short opaque slug, never a mangled one.
+const COMBINING_MARKS = /[\u0300-\u036f]/g;
+const LATIN_DIGRAPHS: Record<string, string> = {
+  "æ": "ae", "œ": "oe", "ø": "o", "ß": "ss", "þ": "th",
+  "đ": "d", "ð": "d", "ł": "l", "ħ": "h", "ŧ": "t", "ı": "i",
+};
+
+export function foldLatin(lowercased: string): string {
+  return lowercased
+    .normalize("NFD")
+    .replace(COMBINING_MARKS, "")
+    .replace(/[æœøßþđðłħŧı]/g, (c) => LATIN_DIGRAPHS[c] ?? c);
+}
+
+function slugifyTitle(title: string): string {
+  const full = foldLatin(title.toLowerCase())
+    .replace(/<[^<>]*>/g, " ")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (full.length <= SLUG_STEM_MAX) return full;
+
+  const cut = full.slice(0, SLUG_STEM_MAX);
+  // The cut already landed on a boundary — the next character is the separator,
+  // so every word in `cut` is whole and trimming back would lose one for free.
+  if (full[SLUG_STEM_MAX] === "-") return cut.replace(/-+$/g, "");
+
+  const lastDash = cut.lastIndexOf("-");
+  return (lastDash > 0 ? cut.slice(0, lastDash) : cut).replace(/-+$/g, "");
+}
+
+async function slugTaken(ctx: MutationCtx, slug: string): Promise<boolean> {
+  const hit = await ctx.db
+    .query("events")
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
+    .first();
+  return hit !== null;
+}
+
+// Readable stem plus a random suffix, retried until the index says it is free.
+// A title with no usable characters (emoji-only, non-Latin) falls back to a
+// pure random token, so minting can never fail for lack of a stem.
+async function mintSlug(ctx: MutationCtx, title: string): Promise<string> {
+  const stem = slugifyTitle(title);
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const candidate = stem ? `${stem}-${randomChars(4)}` : randomChars(10);
+    if (!(await slugTaken(ctx, candidate))) return candidate;
+  }
+  // Six collisions on a table this size is not realistic; widen rather than throw.
+  let wide = randomChars(16);
+  while (await slugTaken(ctx, wide)) wide = randomChars(16);
+  return wide;
+}
+
+// Rows created before the slug field existed get one the first time the back
+// office touches them, so no migration script is needed and nothing breaks in
+// the meantime (reads fall back to the document id).
+//
+// This adds a slug and NOTHING ELSE. It is deliberately not allowed to change
+// how an event behaves. An earlier draft also flipped closed-with-no-URL rows
+// to "hosted", on the reasoning that nobody could have meant to close an event
+// before the UI offered the choice. That reasoning was wrong: the old admin
+// field was labelled `RSVP link (leave empty to show "RSVP Opens Soon")`, so
+// leaving it blank was the documented way to park an event. Repairing those
+// rows automatically would silently re-open a parked event, as an unconfirmed
+// production write fired by nothing more than someone loading the back office.
+//
+// Reopening is now an explicit, per-row, confirmed operator action:
+// `setRsvpMode` below -> the `openRsvps` action in http.ts -> the "Open RSVPs"
+// button rendered on every closed row by `linkCell` in admin.html.
+async function backfillRow(ctx: MutationCtx, e: Doc<"events">): Promise<void> {
+  if (e.slug) return;
+  await ctx.db.patch(e._id, { slug: await mintSlug(ctx, e.title) });
+}
+
 // --- Output shape -----------------------------------------------------------
 // Deliberately mirrors the old Netlify Blobs record (`id`, `rsvp`, `createdAt`)
 // so the public page keeps working, plus the new fields the back office needs
-// (`status`, `featured`). Storage ids are resolved to URLs at read time.
+// (`status`, `featured`, `slug`, `inviteUrl`). Storage ids are resolved to URLs
+// at read time.
 async function shape(ctx: QueryCtx | MutationCtx, e: Doc<"events">) {
   const featured = await Promise.all(
     (e.featured ?? []).map(async (f) => ({
@@ -19,8 +211,12 @@ async function shape(ctx: QueryCtx | MutationCtx, e: Doc<"events">) {
       imageUrl: f.imageId ? await ctx.storage.getUrl(f.imageId) : null,
     })),
   );
+  // Slug when we have one, document id otherwise — /api/rsvp accepts either.
+  const key = e.slug || e._id;
+  const hosted = inviteUrl(key);
   return {
     id: e._id,
+    slug: e.slug ?? "",
     title: e.title,
     subtitle: e.subtitle ?? "",
     date: e.date,
@@ -29,7 +225,23 @@ async function shape(ctx: QueryCtx | MutationCtx, e: Doc<"events">) {
     location: e.location ?? "",
     parking: e.parking ?? "",
     notes: e.notes ?? "",
-    rsvp: e.rsvpUrl ?? "", // legacy field name the public page reads
+    // The canonical shareable link. Always present and always absolute, even
+    // for external/closed events, so the back office can show it either way.
+    inviteUrl: hosted,
+    // The operator's own pasted override, kept separate so the edit form can
+    // round-trip it without ever mistaking our own link for an external one.
+    rsvpExternalUrl: e.rsvpUrl ?? "",
+    // Legacy field name the public page reads to build its RSVP button. A
+    // hosted event points it at our invite page; an external one keeps the
+    // pasted URL; a closed one stays empty and the page shows "Opens Soon".
+    // Driven by the mode, never by the mere presence of a URL, so a closed
+    // event cannot hand the public page a live button through a stale field.
+    rsvp:
+      e.rsvpMode === "hosted"
+        ? hosted
+        : e.rsvpMode === "external"
+          ? (e.rsvpUrl ?? "")
+          : "",
     rsvpMode: e.rsvpMode,
     inviteOnly: e.inviteOnly,
     capacity: e.capacity ?? null,
@@ -37,6 +249,13 @@ async function shape(ctx: QueryCtx | MutationCtx, e: Doc<"events">) {
     createdAt: e.legacyCreatedAt ?? new Date(e._creationTime).toISOString(),
     featured,
   };
+}
+
+// Re-read after a write so the returned copy carries whatever the mutation
+// actually persisted (slug included) rather than the caller's input.
+async function shapeById(ctx: MutationCtx, id: Id<"events">) {
+  const e = await ctx.db.get(id);
+  return e ? await shape(ctx, e) : null;
 }
 
 async function sortedPublished(ctx: QueryCtx | MutationCtx) {
@@ -49,7 +268,11 @@ async function sortedPublished(ctx: QueryCtx | MutationCtx) {
 }
 
 // Everything the back office sees: published (date ascending) and archived
-// (most recent first, since that list reads as a history).
+// (most recent first, since that list reads as a history), plus the host every
+// invite link on the page was built from. `linkOrigin` rides along on EVERY
+// admin response — list, create, update, mode change, archive, delete — because
+// the moment it says "fallback" every link in both tables is suspect, and the
+// operator has to learn that from the page rather than from a guest.
 async function adminLists(ctx: QueryCtx | MutationCtx) {
   const all = await ctx.db.query("events").collect();
   const published = all
@@ -61,6 +284,7 @@ async function adminLists(ctx: QueryCtx | MutationCtx) {
   return {
     published: await Promise.all(published.map((e) => shape(ctx, e))),
     archived: await Promise.all(archived.map((e) => shape(ctx, e))),
+    linkOrigin: inviteOriginInfo(),
   };
 }
 
@@ -69,9 +293,51 @@ export const listPublished = internalQuery({
   handler: async (ctx) => sortedPublished(ctx),
 });
 
-export const listAll = internalQuery({
+// What the back office calls. Same lists as `adminLists`, but it first mints
+// slugs for any pre-slug rows, so simply opening the office backfills every
+// invite link. Idempotent: once every event has a slug this writes nothing.
+export const listAllAndBackfill = internalMutation({
   args: {},
-  handler: async (ctx) => adminLists(ctx),
+  handler: async (ctx) => {
+    for (const e of await ctx.db.query("events").collect()) {
+      await backfillRow(ctx, e);
+    }
+    return await adminLists(ctx);
+  },
+});
+
+// Look one event up by public key: its invite slug, or a raw document id from a
+// link minted before slugs existed. The single place that mapping lives.
+async function findByKey(
+  ctx: QueryCtx | MutationCtx,
+  key: string,
+): Promise<Doc<"events"> | null> {
+  const k = key.trim().slice(0, 120);
+  if (!k) return null;
+  const bySlug = await ctx.db
+    .query("events")
+    .withIndex("by_slug", (q) => q.eq("slug", k))
+    .first();
+  if (bySlug) return bySlug;
+  const id = ctx.db.normalizeId("events", k);
+  return id ? await ctx.db.get(id) : null;
+}
+
+// Resolve a public key to an event id. Returns null when it matches nothing.
+export const resolveKey = internalQuery({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => (await findByKey(ctx, key))?._id ?? null,
+});
+
+// One published event by slug or id, shaped exactly like a list entry. Backs
+// the invite page so it does not have to download and scan every event.
+export const getPublicByKey = internalQuery({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    const event = await findByKey(ctx, key);
+    if (!event || event.status !== "published") return null;
+    return await shape(ctx, event);
+  },
 });
 
 // --- Input ------------------------------------------------------------------
@@ -156,9 +422,22 @@ function validate(title: string, date: string) {
   }
 }
 
+// Explicit mode wins. Otherwise a pasted link means external and a blank field
+// means hosted — creating an event mints a working invite rather than a dead
+// "closed" one. "closed" is now only ever chosen deliberately.
+function resolveMode(
+  requested: "external" | "hosted" | "closed" | undefined,
+  rsvpUrl: string | undefined,
+): "external" | "hosted" | "closed" {
+  if (requested === "external") return rsvpUrl ? "external" : "hosted";
+  if (requested) return requested;
+  return rsvpUrl ? "external" : "hosted";
+}
+
 // --- Mutations --------------------------------------------------------------
 // Every admin mutation returns the refreshed back-office lists so the UI can
-// re-render from one round trip.
+// re-render from one round trip. Create/update additionally return `saved`: the
+// shaped event that was just written, which is how the UI gets its invite link.
 export const create = internalMutation({
   args: { event: eventInput },
   handler: async (ctx, { event }) => {
@@ -166,8 +445,9 @@ export const create = internalMutation({
     const date = clamp(event.date, 10);
     validate(title, date);
     const rsvpUrl = httpUrl(event.rsvpUrl);
-    await ctx.db.insert("events", {
+    const id = await ctx.db.insert("events", {
       title,
+      slug: await mintSlug(ctx, title),
       subtitle: clamp(event.subtitle, 160) || undefined,
       date,
       start: clamp(event.start, 20) || undefined,
@@ -176,14 +456,13 @@ export const create = internalMutation({
       parking: clamp(event.parking, 300) || undefined,
       notes: clamp(event.notes, 500) || undefined,
       rsvpUrl,
-      // Explicit mode wins; otherwise a Canva link means external, none means closed.
-      rsvpMode: event.rsvpMode ?? (rsvpUrl ? "external" : "closed"),
+      rsvpMode: resolveMode(event.rsvpMode, rsvpUrl),
       inviteOnly: !!event.inviteOnly,
       capacity: event.capacity,
       status: "published",
       featured: normalizeFeatured(event.featured) ?? [],
     });
-    return await adminLists(ctx);
+    return { ...(await adminLists(ctx)), saved: await shapeById(ctx, id) };
   },
 });
 
@@ -204,6 +483,9 @@ export const update = internalMutation({
 
     await ctx.db.patch(id, {
       title,
+      // The slug is minted once and never rewritten — a retitled event must not
+      // break links that are already out in the world. Pre-slug rows get one here.
+      slug: existing.slug ?? (await mintSlug(ctx, title)),
       subtitle: clamp(event.subtitle, 160) || undefined,
       date,
       start: clamp(event.start, 20) || undefined,
@@ -212,12 +494,60 @@ export const update = internalMutation({
       parking: clamp(event.parking, 300) || undefined,
       notes: clamp(event.notes, 500) || undefined,
       rsvpUrl,
-      rsvpMode: event.rsvpMode ?? (rsvpUrl ? "external" : "closed"),
+      rsvpMode: resolveMode(event.rsvpMode, rsvpUrl),
       inviteOnly: !!event.inviteOnly,
       capacity: event.capacity,
       ...(featured ? { featured } : {}),
     });
-    return await adminLists(ctx);
+    return { ...(await adminLists(ctx)), saved: await shapeById(ctx, id) };
+  },
+});
+
+// Open or park RSVPs on one event, deliberately and one row at a time.
+//
+// This is the safe replacement for the automatic "repair" the backfill used to
+// do. Events that predate the hosted-invite change are parked as "closed" with
+// no external URL, and most of them want to be open — but that is a judgement
+// call about a live event, so it is an operator's click with a confirm, not a
+// side effect of loading a page.
+//
+// All three modes are reachable, and "external" has to be, because parking is
+// not a one-way door. An earlier version accepted only hosted|closed and
+// claimed in this comment that "`rsvpUrl` is left untouched, so parking an
+// external event and reopening it later restores the same link" — untrue twice
+// over: reopening could only ever produce "hosted", which quietly moves every
+// guest off the operator's Eventbrite page and onto our form; and the only way
+// to park an external event was the edit form, which used to send an empty
+// `rsvpUrl` and delete the saved link on the way through.
+//
+// Both halves are fixed: the caller now names the mode it wants, the back
+// office offers "Close RSVPs" directly on an external row, and the edit form
+// only clears `rsvpUrl` when the operator explicitly chooses the hosted page.
+// "external" is refused unless the row still carries a link to send guests to,
+// so this can never mint a mode with nowhere to go.
+export const setRsvpMode = internalMutation({
+  args: {
+    id: v.id("events"),
+    mode: v.union(
+      v.literal("hosted"),
+      v.literal("closed"),
+      v.literal("external"),
+    ),
+  },
+  handler: async (ctx, { id, mode }) => {
+    const existing = await ctx.db.get(id);
+    if (!existing) throw new Error("event not found");
+    if (mode === "external" && !httpUrl(existing.rsvpUrl)) {
+      throw new Error(
+        "no external RSVP link is saved on this event — edit it and paste one",
+      );
+    }
+    await ctx.db.patch(id, {
+      rsvpMode: mode,
+      // A pre-slug row opened from here needs its invite link to exist now.
+      slug: existing.slug ?? (await mintSlug(ctx, existing.title)),
+    });
+    return { ...(await adminLists(ctx)), saved: await shapeById(ctx, id) };
   },
 });
 

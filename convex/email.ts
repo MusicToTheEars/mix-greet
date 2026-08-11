@@ -8,7 +8,13 @@ import type { MutationCtx } from "./_generated/server";
 import { components, internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { renderRsvpConfirmation } from "./emails/rsvpConfirmation";
+import {
+  buildRsvpIcs,
+  renderRsvpConfirmation,
+  VENUE_FALLBACK,
+  type ConfirmationVars,
+} from "./emails/rsvpConfirmation";
+import { inviteUrl } from "./events";
 import { unsubToken } from "./lib/unsub";
 
 // The Resend component: durable queueing, batching, retries, idempotency, and
@@ -57,8 +63,11 @@ function formatWhenLine(date: string, start?: string, end?: string): string {
   return line;
 }
 
-const VENUE_FALLBACK =
-  "Academix BEAT Lab, 1933 S. Broadway, Suite 1202, Los Angeles, CA 90007";
+// VENUE_FALLBACK is imported, not redeclared. A local copy of it lived here and
+// led with the venue NAME while the template's own default led with the street,
+// and the template's waitlist redaction had been written against the street-
+// first shape. The result was a street address printed to every waitlisted
+// guest on the fallback path. One exported constant, one shape, one redactor.
 
 export const confirmationData = internalQuery({
   args: { rsvpId: v.id("rsvps") },
@@ -67,7 +76,22 @@ export const confirmationData = internalQuery({
     if (!rsvp) return null;
     const event = await ctx.db.get(rsvp.eventId);
     if (!event) return null;
-    return { rsvp, event };
+    // Resolve the poster and the headshot/logo storage ids here so the email
+    // renderer only ever sees plain URLs (it runs in an action, which has no
+    // storage access).
+    const posterUrl = event.posterId
+      ? await ctx.storage.getUrl(event.posterId)
+      : null;
+    const featured = await Promise.all(
+      (event.featured ?? []).map(async (f) => ({
+        name: f.name,
+        role: f.role,
+        kind: f.kind,
+        link: f.link,
+        imageUrl: f.imageId ? await ctx.storage.getUrl(f.imageId) : null,
+      })),
+    );
+    return { rsvp, event, featured, posterUrl };
   },
 });
 
@@ -80,17 +104,20 @@ export const sendRsvpConfirmation = internalAction({
   handler: async (ctx, { rsvpId }) => {
     const data = await ctx.runQuery(internal.email.confirmationData, { rsvpId });
     if (!data) return;
-    const { rsvp, event } = data;
+    const { rsvp, event, featured, posterUrl } = data;
 
     let unsubUrl: string | undefined;
     const secret = process.env.UNSUB_SECRET;
     const siteUrl = process.env.CONVEX_SITE_URL;
-    if (secret && siteUrl) {
+    // The same string is rendered as an href AND copied into the
+    // List-Unsubscribe header below, so the scheme is checked once here rather
+    // than trusted at either point of use.
+    if (secret && siteUrl && /^https?:\/\//i.test(siteUrl)) {
       const token = await unsubToken(secret, rsvp.email);
       unsubUrl = `${siteUrl}/unsubscribe?e=${encodeURIComponent(rsvp.email)}&t=${token}`;
     }
 
-    const rendered = renderRsvpConfirmation({
+    const vars: ConfirmationVars = {
       name: rsvp.name,
       eventTitle: event.title,
       whenLine: formatWhenLine(event.date, event.start, event.end),
@@ -99,17 +126,93 @@ export const sendRsvpConfirmation = internalAction({
       parking: event.parking,
       notes: event.notes,
       unsubUrl,
-    });
+      // Everything below is optional in the template; a missing value just
+      // drops its row rather than breaking the layout.
+      subtitle: event.subtitle,
+      guests: rsvp.guests,
+      date: event.date,
+      start: event.start,
+      end: event.end,
+      // An external RSVP url is an explicit override; otherwise link to the
+      // hosted invite minted with the event, so the email points at the same
+      // url that gets texted around. inviteUrl() keys off the slug and falls
+      // back to the document id for rows created before slugs existed —
+      // rsvp.html resolves either, so old links keep working.
+      eventUrl:
+        event.rsvpMode === "external" && event.rsvpUrl
+          ? event.rsvpUrl
+          : inviteUrl(event.slug || event._id),
+      // The event's flyer. Absent -> the poster band is omitted entirely and
+      // the layout closes up, so an event with no artwork still renders.
+      posterUrl,
+      featured,
+    };
 
-    await ctx.runMutation(internal.email.recordAndEnqueue, {
-      rsvpId,
-      toEmail: rsvp.email,
-      subject: rendered.subject,
-      html: rendered.html,
-      text: rendered.text,
-      dedupeKey: `rsvp_confirmation:${rsvpId}`,
-      unsubUrl,
-    });
+    // ADD TO CALENDAR has to work for a guest who does not use Google. A
+    // `calendar.google.com` template link puts a Google sign-in wall in front
+    // of every iCloud, Outlook and Proton recipient, so the real calendar
+    // entry is built here as an iCalendar file, parked in Convex file storage
+    // (which serves it back with its own `text/calendar` content type) and
+    // handed to the template as `icsUrl`. Apple Mail, Outlook and Fastmail
+    // then add the event in one tap, exactly like an attachment would.
+    //
+    // The file is small (well under 1KB) and immutable, and a failure here is
+    // never allowed to block a confirmation: the template falls back to the
+    // Google link plus the Outlook web link on its own.
+    let icsUrl: string | undefined;
+    let icsStorageId: Id<"_storage"> | undefined;
+    try {
+      const ics = buildRsvpIcs(vars);
+      if (ics) {
+        icsStorageId = await ctx.storage.store(
+          new Blob([ics], { type: "text/calendar; charset=utf-8" }),
+        );
+        icsUrl = (await ctx.storage.getUrl(icsStorageId)) ?? undefined;
+      }
+    } catch {
+      icsUrl = undefined;
+    }
+
+    // The file has to be written here, before the dedupe and suppression checks
+    // run, because only an action can write to storage and only a mutation can
+    // make those checks atomic. So the action cleans up after itself: without
+    // this, a retried action, a duplicate invocation or a send to a suppressed
+    // address each leaves behind a permanent, never-referenced,
+    // publicly-reachable file carrying the guest's event and venue address.
+    // Nothing links to a file whose send was skipped, so deleting it is safe,
+    // and a failed delete is never allowed to fail the send.
+    const discardIcs = async () => {
+      const id = icsStorageId;
+      if (!id) return;
+      icsStorageId = undefined;
+      try {
+        await ctx.storage.delete(id);
+      } catch {
+        // best effort: an undeleted file is a wasted byte, not a broken send
+      }
+    };
+
+    const rendered = renderRsvpConfirmation({ ...vars, icsUrl });
+
+    let enqueued = false;
+    try {
+      const result = await ctx.runMutation(internal.email.recordAndEnqueue, {
+        rsvpId,
+        toEmail: rsvp.email,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+        dedupeKey: `rsvp_confirmation:${rsvpId}`,
+        unsubUrl,
+      });
+      enqueued = (result as { enqueued?: boolean } | null)?.enqueued === true;
+    } catch (err) {
+      // A throwing mutation rolled its transaction back, so nothing references
+      // the file and the scheduler is about to run this action again.
+      await discardIcs();
+      throw err;
+    }
+    if (!enqueued) await discardIcs();
   },
 });
 
