@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/i/:key", "destination": "/rsvp.html?event=:key" }
+    { "source": "/i/:key", "destination": "/rsvp?event=:key" }
   ]
 }
