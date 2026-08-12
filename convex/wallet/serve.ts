@@ -72,6 +72,9 @@ export const buildForToken = internalAction({
       subtitle: ev.subtitle || undefined,
       artists: billed.map((f: any) => String(f.name)),
       whenIso: relevantIso(ev.date, ev.start),
+      // Gives the lock-screen hint an end as well as a start, so the pass
+      // stops surfacing once the event is over instead of lingering all day.
+      endIso: ev.end ? relevantIso(ev.date, ev.end) : undefined,
       whenLabel,
       dateShort,
       timeShort: ev.start || undefined,

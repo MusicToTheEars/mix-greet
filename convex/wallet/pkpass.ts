@@ -11,6 +11,62 @@
 //
 // "use node" is required: the signature needs node-forge, which does not run
 // in Convex's default V8 isolate.
+//
+// ---------------------------------------------------------------------------
+// WHY THE DOOR WAS DARK, AND WHAT IT WAS NOT
+//
+// For five commits this pass generated cleanly and printed no QR, and the
+// hunt went after the layout: the style key was flipped to `generic`,
+// background.png was abandoned, thumbnail.png was deleted, headerFields were
+// stripped, relevantDate was dropped. None of that was the cause.
+//
+// The cause was one string. The barcode format was written
+// `PKBARCODE_FORMAT_QR`. Apple's constant is `PKBarcodeFormatQR` — camel case,
+// no underscores. That spelling appears in no Apple document and in none of
+// Apple's sample passes; it has been wrong since the first wallet commit. iOS
+// does not reject a pass over it and shows no error: it does not recognise the
+// format, so it drops the barcode and draws the card without one. Every A/B on
+// device was therefore comparing two passes that could not print a code either
+// way, and the style key took the blame for a typo.
+//
+// The two beliefs recorded in the old comments here are also false, and the
+// proof is in Apple's own documentation and shipped samples:
+//
+//   * "none of the classic layouts support background.png" — backwards.
+//     Apple's Table 4-1 gives eventTicket "logo, icon, strip, background,
+//     thumbnail", and gives `generic` only "logo, icon, thumbnail". Apple's own
+//     Event.pass sample is a classic eventTicket shipping background.png and
+//     background@2x.png. So the switch to `generic` did not work around a
+//     limitation of eventTicket — it moved to the one style that genuinely
+//     cannot show a background, and threw the artwork away to do it.
+//
+//   * "eventTicket hides the barcode" — not the style. That behaviour belongs
+//     to the iOS 18 POSTER layout, which a pass cannot enter by accident: it
+//     requires preferredStyleSchemes to name `posterEventTicket` AND all four
+//     required semantic tags to validate. A plain eventTicket renders the
+//     classic card with the barcode on the face, exactly as it always did.
+//
+// ---------------------------------------------------------------------------
+// WHY THIS IS NOT THE POSTER LAYOUT
+//
+// The obvious next move is the iOS 18 poster ticket — full-bleed unblurred
+// artwork, the modern Wallet event card. Apple rules it out for this pass, in
+// as many words:
+//
+//   "Poster event tickets aren't compatible with tickets that require a QR
+//    code or barcode for entry."
+//   — Creating an event pass using semantic tags
+//
+// That layout is built around NFC entry, which needs an entitlement this team
+// does not have. A door that cannot scan is the whole problem being fixed, so
+// the barcode wins and the pass stays a classic eventTicket.
+//
+// The artwork still lands: on a classic event ticket Apple scales background.png
+// to fill the card and blurs it, so the invite's poster becomes the ground the
+// fields sit on rather than a flat colour block. artwork.png at 1x/2x/3x ships
+// alongside it so that flipping WALLET_STYLE_SCHEMES to the poster scheme — the
+// day an NFC entitlement exists, or for a pass that does not need a door — is a
+// config change and not a rebuild.
 
 import forge from "node-forge";
 import JSZip from "jszip";
@@ -33,6 +89,7 @@ export type PassInput = {
   // have several and they are printed as a column.
   artists?: string[];
   whenIso?: string; // ISO 8601 with offset; drives the lock-screen relevance
+  endIso?: string;
   whenLabel: string;
   dateShort?: string; // "AUG 15" — the header stamp
   timeShort?: string; // "1:00 PM"
@@ -46,30 +103,29 @@ export type PassInput = {
 
 // Brand values, matching brand.css. Wallet takes CSS-style rgb() only.
 //
-// A deep Academix crimson card, white type, soft-pink labels.
-//
-// This is how the reference ticket gets its richness: the card is a saturated
-// colour, not a photograph. That matters, because the only Wallet layouts that
-// print a barcode on the face are the classic ones, and none of them support
-// background.png — proven on device, where an identical pass showed the QR as
-// `generic` and hid it as `eventTicket`. Colour gives the depth an image
-// cannot here, and the QR survives.
-//
-// #A81219 is the brand red carried down so white type clears 5.9:1 on it;
-// #EC1C24 at full strength leaves white at roughly 3.4:1.
-const INK = "rgb(255, 255, 255)";
-const BG = "rgb(168, 18, 25)";
-const BRAND = "rgb(255, 197, 197)";
+// The card's ground is now the poster artwork, so these colours dress the type
+// and the classic-layout fallback rather than carrying the whole design: near
+// black from the invite page, cream ink, and the Academix red on labels.
+const INK = "rgb(237, 234, 227)"; // #EDEAE3, the invite page's cream
+const BG = "rgb(11, 11, 13)"; // #0B0B0D, the invite page's ground
+const BRAND = "rgb(236, 28, 36)"; // #EC1C24
+
+// Apple's constant, verbatim. See the note at the top of this file: the
+// underscored spelling is not a PassKit format and costs you the whole barcode.
+const QR_FORMAT = "PKBarcodeFormatQR";
 
 function buildPassJson(p: PassInput) {
+  const artistLabel =
+    p.artists && p.artists.length > 1 ? "SPECIAL GUESTS" : "SPECIAL GUEST";
+
   const fields = {
-    // No headerFields. The one pass that rendered a QR on this device had none,
-    // and the date is already carried by STARTS below. Restore only after the
-    // barcode is confirmed working.
-    // Printed OVER the strip image, so it stays short and high-contrast.
-    primaryFields: [
-      { key: "event", label: "", value: p.eventTitle },
-    ],
+    // Over the poster art. The date is the one thing a guest checks at a
+    // glance, and the header is the only slot Wallet keeps visible when the
+    // pass is stacked behind others in the wallet.
+    headerFields: p.dateShort
+      ? [{ key: "date", label: "", value: p.dateShort }]
+      : [],
+    primaryFields: [{ key: "event", label: "", value: p.eventTitle }],
     // Wallet lays each group out as a horizontal ROW, so a field only gets the
     // full width when it is alone in its group. The guests need that width to
     // stack, which is why they own auxiliaryFields outright and the venue moved
@@ -83,7 +139,7 @@ function buildPassJson(p: PassInput) {
         ? [
             {
               key: "artists",
-              label: p.artists.length > 1 ? "SPECIAL GUESTS" : "SPECIAL GUEST",
+              label: artistLabel,
               // Newline-joined so several names read as a column, one under the
               // next, rather than running together on one line.
               value: p.artists.join("\n"),
@@ -112,6 +168,48 @@ function buildPassJson(p: PassInput) {
     ],
   };
 
+  // Structured meaning, not decoration. iOS reads these to put the ticket on
+  // the lock screen at the right moment, to offer directions to the right
+  // place, and to let Siri answer "when do doors open". Apple restricts the
+  // richer event handling to sports and live performance, which is what a
+  // Mix & Greet is.
+  //
+  // eventName, venueName, venueRegionName and venueRoom are the four Apple
+  // requires; a pass that omits any of them is silently demoted to the plain
+  // layout. They are filled here so the pass is complete on its own terms, and
+  // so enabling WALLET_STYLE_SCHEMES later does not also require a data change.
+  const address = (p.location || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const semantics: Record<string, unknown> = {
+    eventType: "PKEventTypeLivePerformance",
+    eventName: p.eventTitle,
+    attendeeName: p.guestName,
+    admissionLevel: p.status === "waitlist" ? "Waitlist" : "Guest",
+    // "1933 S. Broadway, Suite 1202, Los Angeles, CA 90007" reads as
+    // street / room / city, which is exactly the three tags Apple wants.
+    venueName: p.venueLine || address[0] || p.location || "",
+    venueRoom: address[1] || "",
+    venueRegionName: address[2] || "",
+  };
+  if (p.artists && p.artists.length) semantics.performerNames = p.artists;
+  if (p.location) semantics.venueEntranceDescription = p.location;
+  if (p.whenIso) {
+    semantics.eventStartDate = p.whenIso;
+    semantics.venueDoorsOpenDate = p.whenIso;
+  }
+  if (p.endIso) semantics.eventEndDate = p.endIso;
+
+  const barcode = {
+    format: QR_FORMAT,
+    message: p.authToken,
+    messageEncoding: "iso-8859-1",
+    // Printed under the code for a human to read out when a scanner will not
+    // cooperate. It must therefore be the payload itself, not the serial: the
+    // serial is `mg-<id>`, and the hyphen makes it fail /api/admin/checkin's
+    // own /^[a-z0-9]{20,40}$/ test, so a door typing what it saw would be told
+    // the code was unrecognised.
+    altText: p.authToken,
+  };
+
   return {
     formatVersion: 1,
     passTypeIdentifier: process.env.PASS_TYPE_ID,
@@ -119,6 +217,9 @@ function buildPassJson(p: PassInput) {
     organizationName: "Academix BEAT Lab",
     description: `${p.eventTitle}, Mix & Greet`,
     serialNumber: p.serial,
+    // Groups every Mix & Greet ticket under one stack in Wallet instead of
+    // scattering them, which is what a guest with three events wants.
+    groupingIdentifier: "mix-and-greet",
     // No authenticationToken here on purpose: Apple only accepts it paired with
     // a webServiceURL, and there is no update endpoint yet. Setting one without
     // the other leaves the pass in a half-configured state. The token still
@@ -129,38 +230,44 @@ function buildPassJson(p: PassInput) {
     // No logoText: Wallet draws it to the RIGHT of the logo with no option to
     // place it below, so "MIX & GREET" is baked into logo.png as the second
     // line of the lockup. Setting it here too would print the name twice.
-    // Surfaces the pass on the lock screen as the event approaches.
-    // relevantDate omitted for the same reason: it is a lock-screen nicety and
-    // it was one of the few keys the working diagnostic did not carry.
-    // NOTE: this pass is deliberately `generic`, not `eventTicket`.
     //
-    // iOS 18 renders eventTicket in a poster layout that keeps the barcode
-    // behind a tap — the same behaviour a Ticketmaster ticket shows. Proven on
-    // device with two passes identical but for the style key: the generic one
-    // printed the QR on the face, the eventTicket one printed nothing.
-    // preferredStyleSchemes did not override it.
+    // The card is an eventTicket, which is both what it is and the one classic
+    // style that takes background.png.
     //
-    // A door cannot afford a gesture between the guest and the code, so the
-    // functional layout wins over the semantic style name. The cost is
-    // background.png, which only eventTicket supports; the poster overlay now
-    // rides in thumbnail.png instead.
-    barcodes: [
-      {
-        format: "PKBARCODE_FORMAT_QR",
-        message: p.authToken,
-        messageEncoding: "iso-8859-1",
-        altText: p.serial,
-      },
-    ],
-    // Deprecated singular form, still read by older iOS. Harmless on modern
-    // versions, which prefer `barcodes`.
-    barcode: {
-      format: "PKBARCODE_FORMAT_QR",
-      message: p.authToken,
-      messageEncoding: "iso-8859-1",
-      altText: p.serial,
-    },
-    generic: fields,
+    // preferredStyleSchemes is deliberately ABSENT by default. Naming
+    // `posterEventTicket` here is what opts a pass into the iOS 18 poster
+    // layout, and that layout is the one Apple says is "not compatible with
+    // tickets that require a QR code or barcode for entry". Omitting the key
+    // keeps the classic card, which prints the code on the face.
+    //
+    // The env var exists so the poster layout can be switched on the day this
+    // pass no longer depends on a barcode — set
+    // WALLET_STYLE_SCHEMES=posterEventTicket,eventTicket. The artwork is
+    // already in the bundle for it. Do not set it while the door scans.
+    ...(process.env.WALLET_STYLE_SCHEMES
+      ? {
+          preferredStyleSchemes: process.env.WALLET_STYLE_SCHEMES.split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        }
+      : {}),
+    eventTicket: fields,
+    semantics,
+    // Surfaces the pass on the lock screen as the event approaches. The array
+    // form is what iOS 18 reads; the singular relevantDate stays for older
+    // versions, which ignore the array.
+    ...(p.whenIso
+      ? {
+          relevantDate: p.whenIso,
+          relevantDates: [
+            { startDate: p.whenIso, ...(p.endIso ? { endDate: p.endIso } : {}) },
+          ],
+        }
+      : {}),
+    barcodes: [barcode],
+    // Deprecated singular form, still read by iOS 8 and earlier. Apple's own
+    // current samples still carry both.
+    barcode,
   };
 }
 
@@ -198,17 +305,13 @@ export async function buildPkpass(p: PassInput): Promise<Uint8Array> {
   const files: Record<string, Buffer> = {};
 
   files["pass.json"] = Buffer.from(JSON.stringify(buildPassJson(p)), "utf8");
+  // Every asset in the set ships. artwork.* is the poster layout's ground,
+  // background.* the classic layout's; Wallet picks whichever its scheme uses
+  // and ignores the other. There is deliberately no thumbnail and no guest
+  // photograph: the names are the billing, the artwork is the background.
   for (const [name, b64] of Object.entries(PASS_IMAGES)) {
-    // No thumbnail. In `generic` the thumbnail occupies the right-hand slot and
-    // was the one thing the working diagnostic did not carry; with it present
-    // the barcode never rendered. The card gets its richness from colour
-    // instead, which is exactly how the reference ticket does it.
-    if (name.startsWith("thumbnail")) continue;
     files[name] = Buffer.from(b64, "base64");
   }
-  // No thumbnail: the card carries no special-guest photograph. The names are
-  // the billing; the artwork is the background. This also keeps the pass small
-  // — embedding a headshot took it to 891KB.
 
   // manifest.json hashes every file EXCEPT itself and the signature.
   const manifest: Record<string, string> = {};
