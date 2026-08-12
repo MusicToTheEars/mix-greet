@@ -1545,6 +1545,11 @@ $('rsvpForm').addEventListener('submit', async (e) => {
     const out = await res.json().catch(() => ({}));
     if (res.ok && out.ok) {
       SUBMITTED = true;
+      // Remember the signed manage token for this event on this device, so a
+      // guest who comes back to the same link is offered "edit or cancel"
+      // rather than an RSVP form that would just tell them they are a
+      // duplicate. Only the token is stored — never an id or an email.
+      if (out.manageToken) rememberRsvp(out.manageToken);
       $('stickyBar').classList.remove('up');
       document.body.classList.remove('has-sticky');
       hide('formWrap');
@@ -1703,6 +1708,64 @@ function ambient(){
   }
 }
 
+/* ---------- returning guest ----------
+   The invite link is the same URL before and after someone books, and it gets
+   reopened from a text thread days later. Without this the page offers to take
+   an RSVP that already exists, which reads as if the first one did not land. */
+const RSVP_STORE = 'mg_rsvp_v1';
+function rememberRsvp(token){
+  try {
+    const all = JSON.parse(localStorage.getItem(RSVP_STORE) || '{}');
+    all[eventKey] = token;
+    localStorage.setItem(RSVP_STORE, JSON.stringify(all));
+  } catch (_) {}
+}
+function rememberedRsvp(){
+  try {
+    return (JSON.parse(localStorage.getItem(RSVP_STORE) || '{}'))[eventKey] || '';
+  } catch (_) { return ''; }
+}
+
+// Swap the RSVP call to action for an edit one when this device already booked.
+async function offerEdit(token){
+  let live = null;
+  try {
+    const r = await fetch(API + '/api/rsvp/manage?t=' + encodeURIComponent(token));
+    if (r.ok) live = await r.json();
+  } catch (_) {}
+  // Cancelled or unrecognised: drop the memory and let them RSVP again.
+  if (!live || live.status === 'cancelled') {
+    try {
+      const all = JSON.parse(localStorage.getItem(RSVP_STORE) || '{}');
+      delete all[eventKey];
+      localStorage.setItem(RSVP_STORE, JSON.stringify(all));
+    } catch (_) {}
+    return false;
+  }
+  const href = '?manage=' + encodeURIComponent(token);
+  const label = live.status === 'waitlist' ? "You're on the waitlist" : "You're going";
+  const panelLead = $('panelLead');
+  if (panelLead) panelLead.textContent = label + ' · ' + (live.guests > 1 ? live.guests + ' guests' : 'just you');
+  hide('formWrap');
+  [['heroRsvp','Edit your RSVP'],['stickyRsvp','Edit your RSVP']].forEach(([id,text]) => {
+    const b = $(id);
+    if (!b) return;
+    b.textContent = text;
+    b.setAttribute('href', href);
+    b.onclick = null;
+  });
+  const panel = $('rsvp-panel');
+  if (panel && !$('editCta')) {
+    const a = el('a', 'btn block');
+    a.id = 'editCta';
+    a.href = href;
+    a.textContent = 'Edit or cancel your RSVP';
+    a.style.color = '#FFFFFF';
+    panel.appendChild(a);
+  }
+  return true;
+}
+
 /* ---------- manage: change party size or cancel ----------
    The confirmation email links here as /rsvp?manage=<signed token>. The token
    is the only credential; a guest never handles an id, and a tampered token
@@ -1784,7 +1847,14 @@ if (manageToken) {
   });
 }
 
-if (manageToken) { mgLoad(); } else { load(); }
+if (manageToken) {
+  mgLoad();
+} else {
+  load().then(() => {
+    const t = rememberedRsvp();
+    if (t && !SUBMITTED) offerEdit(t);
+  });
+}
 ambient();
 </script>
 </body>

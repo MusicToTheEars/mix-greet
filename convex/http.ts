@@ -6,7 +6,7 @@ import { checkPassword } from "./auth";
 import { inviteOrigin } from "./events";
 import { resend } from "./email";
 import { verifyUnsubToken } from "./lib/unsub";
-import { verifyRsvpToken } from "./lib/rsvpToken";
+import { rsvpToken, verifyRsvpToken } from "./lib/rsvpToken";
 import { json, preflight, clean, corsHeaders, csvCell, htmlPage } from "./lib/http";
 
 const http = httpRouter();
@@ -266,6 +266,14 @@ const rsvp = httpAction(async (ctx, req) => {
     guests: Number(body.guests) || 1,
     notes: clean(body.notes, 500) || undefined,
   });
+  // Hand back a signed manage token on success so the page that just took the
+  // RSVP can offer "edit or cancel" instead of a second RSVP form. The rsvpId
+  // itself is never exposed — only the signed token, same as the email link.
+  if (result?.ok && (result as any).rsvpId && process.env.UNSUB_SECRET) {
+    const t = await rsvpToken(process.env.UNSUB_SECRET, String((result as any).rsvpId));
+    const { rsvpId: _drop, ...rest } = result as any;
+    return json({ ...rest, manageToken: t }, 200);
+  }
   return json(result, result.ok ? 200 : 400);
 });
 

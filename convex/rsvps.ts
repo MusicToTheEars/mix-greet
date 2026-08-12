@@ -45,7 +45,7 @@ export const submit = internalMutation({
       .first();
     if (existing) {
       await ctx.db.patch(existing._id, { name, phone, guests, notes });
-      return { ok: true as const, status: existing.status, duplicate: true };
+      return { ok: true as const, status: existing.status, duplicate: true, rsvpId: existing._id };
     }
 
     // Capacity: seats taken = sum of guests across confirmed/checked-in RSVPs.
@@ -110,7 +110,7 @@ export const submit = internalMutation({
     await ctx.scheduler.runAfter(0, internal.email.sendRsvpConfirmation, {
       rsvpId,
     });
-    return { ok: true as const, status, duplicate: false };
+    return { ok: true as const, status, duplicate: false, rsvpId };
   },
 });
 

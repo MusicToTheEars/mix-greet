@@ -103,6 +103,12 @@ function buildPassJson(p: PassInput) {
     // line of the lockup. Setting it here too would print the name twice.
     // Surfaces the pass on the lock screen as the event approaches.
     ...(p.whenIso ? { relevantDate: p.whenIso } : {}),
+    // iOS 18 gave eventTicket a second, poster-style layout where the barcode
+    // is behind a tap rather than on the card face — the same behaviour a
+    // Ticketmaster ticket shows. A door needs the QR without an extra gesture,
+    // so ask for the classic rectangular scheme explicitly. Older iOS ignores
+    // the key, which is why it is safe to send unconditionally.
+    preferredStyleSchemes: ["eventTicket"],
     barcodes: [
       {
         format: "PKBARCODE_FORMAT_QR",
