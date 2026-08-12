@@ -560,4 +560,23 @@ http.route({
   handler: httpAction(async () => preflight()),
 });
 
+
+// GET /api/qr?t=<token> -> the door QR as a PNG, for guests without Wallet.
+const doorQr = httpAction(async (ctx, req) => {
+  const t = clean(new URL(req.url).searchParams.get("t"), 200);
+  const out: any = await ctx.runAction(internal.wallet.qr.renderForToken, { token: t });
+  if (!out?.ok) return json({ error: out?.error || "not found" }, 404);
+  const body = Uint8Array.from(atob(out.b64), (c) => c.charCodeAt(0));
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "content-type": "image/png",
+      // A guest's own code: never cached by a shared proxy.
+      "cache-control": "private, max-age=300",
+      "access-control-allow-origin": process.env.SITE_ORIGIN || "*",
+    },
+  });
+});
+http.route({ path: "/api/qr", method: "GET", handler: doorQr });
+
 export default http;
