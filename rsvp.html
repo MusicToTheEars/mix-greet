@@ -1746,6 +1746,11 @@ async function offerEdit(token){
   const label = live.status === 'waitlist' ? "You're on the waitlist" : "You're going";
   const panelLead = $('panelLead');
   if (panelLead) panelLead.textContent = label + ' · ' + (live.guests > 1 ? live.guests + ' guests' : 'just you');
+  // "Two fields, about twenty seconds" describes filling the form. Once this
+  // device has already booked there is no form to fill, so the caption has to
+  // describe what the button now does instead of promising a signup again.
+  const heroNote = $('heroNote');
+  if (heroNote) heroNote.textContent = 'Change your party size or cancel';
   hide('formWrap');
   [['heroRsvp','Edit your RSVP'],['stickyRsvp','Edit your RSVP']].forEach(([id,text]) => {
     const b = $(id);

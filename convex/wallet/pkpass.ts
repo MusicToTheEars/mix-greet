@@ -42,23 +42,21 @@ export type PassInput = {
   status: "confirmed" | "waitlist";
   inviteUrl?: string;
   venueLine?: string; // street only — the full address is on the back
-  // The headliner's photograph, fetched at build time. This is the one thing
-  // that makes a pass look like THIS party rather than a template, which is
-  // exactly what the reference tickets do with their event artwork.
-  thumbnail?: Uint8Array | null;
 };
 
 // Brand values, matching brand.css. Wallet takes CSS-style rgb() only.
 //
-// The card is the site's LIGHT content column, not its dark zone: bone surface,
-// near-black type, and red reserved for the field labels. A light face is also
-// what makes the QR read cleanly — Wallet draws the code on white, and a white
-// block on a black card is a hole, while on bone it belongs.
-// Red here is --brand-ink #C8151C, the deepened variant that survives on a
-// light surface; plain #EC1C24 is only 4.0:1 on bone.
-const INK = "rgb(22, 22, 26)";
-const BG = "rgb(245, 244, 241)";
-const BRAND = "rgb(200, 21, 28)";
+// The card matches the invite page's dark band: near-black ground, cream type,
+// red labels — the same palette a guest just saw when they RSVP'd, so the pass
+// reads as the same object rather than a second design.
+//
+// background.png carries the poster's overlay with the photograph removed:
+// the ramp, the 45rpm rings and disc, the arcs and grain. Wallet blurs that
+// image and prints fields over it, so it is pitched dark and knocked back on
+// purpose. It is a ground, not a picture.
+const INK = "rgb(237, 234, 227)";
+const BG = "rgb(11, 11, 13)";
+const BRAND = "rgb(236, 28, 36)";
 
 function buildPassJson(p: PassInput) {
   const fields = {
@@ -195,17 +193,9 @@ export async function buildPkpass(p: PassInput): Promise<Uint8Array> {
   for (const [name, b64] of Object.entries(PASS_IMAGES)) {
     files[name] = Buffer.from(b64, "base64");
   }
-  // A real headliner photo replaces the fallback disc. Written ONCE, at the 1x
-  // key only: there is no image resizer in this runtime, so writing the same
-  // file to all three densities tripled an 843KB headshot into a 2.5MB pass.
-  // Wallet scales a single thumbnail perfectly well, and the @2x/@3x keys are
-  // optional. The bundled fallback art is dropped so the manifest carries one
-  // thumbnail rather than a mismatched set.
-  if (p.thumbnail && p.thumbnail.length > 0) {
-    delete files["thumbnail@2x.png"];
-    delete files["thumbnail@3x.png"];
-    files["thumbnail.png"] = Buffer.from(p.thumbnail);
-  }
+  // No thumbnail: the card carries no special-guest photograph. The names are
+  // the billing; the artwork is the background. This also keeps the pass small
+  // — embedding a headshot took it to 891KB.
 
   // manifest.json hashes every file EXCEPT itself and the signature.
   const manifest: Record<string, string> = {};
