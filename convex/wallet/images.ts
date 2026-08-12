@@ -13,11 +13,23 @@
 // scales it to fill the card, so it is composed at its own aspect rather than
 // squashed out of the portrait frame.
 //
-// The poster prints no title, no date, no venue and no barcode: Wallet draws
-// all of those as real fields over the top, so the centre and the bottom strip
-// are left deliberately calm. The only baked type is the MM.DD.YY stamp
-// top-left and the headliner's name low in the frame — the same two strings the
-// invite page prints.
+// Neither prints a title, a date, a venue or a barcode: Wallet draws all of
+// those as real fields over the top, so the centre and the bottom strip are
+// left deliberately calm.
+//
+// artwork.* keeps the invite's two baked strings — the MM.DD.YY stamp top-left
+// and the headliner's name low in the frame — because nothing blurs it.
+//
+// background.* carries NO type at all, and that is the whole difference between
+// the two. Apple blurs this one, and blur does not soften type, it smears it:
+// the name lockup came back as an illegible grey-and-red band lying exactly
+// where Wallet puts its own fields and the white QR tile, which reads as a
+// rendering fault rather than as art. So background.* drops the type, drops the
+// 7px halftone and the 1px hairlines (all of which blur to flat haze), keeps
+// only what survives at low frequency — the red duotone face mass, the bloom
+// off the top right, a heavier ring stack — pushes the face into the top half,
+// and lets the bottom third fall to near-flat #0B0B0D so cream type and a white
+// tile have something clean to sit on.
 //
 // logo.png stacks the cream academix wordmark over MIX & GREET: Wallet draws
 // logoText to the RIGHT of the logo with no way to place it below, and at full
