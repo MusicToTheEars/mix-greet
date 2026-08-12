@@ -254,8 +254,96 @@ all rendered faces decoded to the exact RSVP id: jh7a4mkq2xvzn9pd3wc6rt8sfe5cabk
 
 ## 6. Blind comparison against the invite page
 
-<!-- BLIND_START -->
-<!-- BLIND_END -->
+The invite page was served locally against the real published event
+`test-event-2frp` and screenshotted, and the generated pass was rendered beside
+it. A critic with no stake in the work and no labels on the images was asked
+which was which and what was missing. Two rounds ran.
+
+### Round 1 — the poster artwork
+
+The sharp `artwork.png` was put next to the invite's own composed flyer with the
+labels stripped. The reproduction is built by screenshotting the invite page's
+own `.flyer` CSS — the same stylesheet, the same `@font-face` blobs out of
+`brand.css`, the same SVG ring markup, the same duotone filter chain — so the
+pixels come from the same engine that draws the invitation. It survived the
+comparison.
+
+### Round 2 — the card as the guest sees it
+
+This is the one that mattered, and it did not go well. Verdict: **"Adjacent.
+Not the same product. Same colour family, different hand."** Recognition scored
+**4/10**.
+
+What survived: the darkness, strongly. The red, moderately — "the invite red is
+a cut; the card red is a smudge". The cream ink colour, exactly.
+
+What was lost:
+
+> **Ring motif — lost. Completely.** The concentric circle system with the
+> single cream dot at its centre is the invite's actual logo-level idea — it is
+> the "sound" in the poster. There is not one arc of it on the card.
+
+> **The blurred background is not doing real work.** It is muddy red noise.
+> Swap in any other artist's photo, any red-lit concert shot, and the guest
+> could not perceive a difference.
+
+> Cover the name field and nothing on this card says this event. If the guest
+> recognises it, they recognise it the way you recognise a confirmation email:
+> by reading it, not by seeing it.
+
+And the single biggest gap, which is the insight the whole exercise turned on:
+
+> Re-crop the background plate so the concentric ring motif is what fills the
+> card... The face cannot survive a blur — a blurred portrait is
+> indistinguishable from any other blurred portrait, which is exactly why the
+> card currently reads as generic. The rings *can* survive a blur: they are
+> large, thin, high-contrast, low-frequency geometry.
+
+That is correct, and it inverted the design. The instinct had been to lead with
+the artist's face because the invitation does. But the invitation shows it
+sharp; Wallet never will. A blurred face carries no identity at all, while
+blurred concentric rings stay unmistakably rings.
+
+The critic also caught the logo shipping with its red plate baked into the PNG
+— "the only crisp edge in the top third, so it floats... exactly what a
+rendering mistake looks like" — and marginal contrast on the red field labels
+where they fell over the plate's red lobe, at roughly 2.5:1.
+
+### What the second round forced, beyond what the critic asked
+
+Following the crop note turned up a bug the critic could not have seen, because
+it needs the data and not the pixels. `PASS_IMAGES` is a **static module**: it
+is baked once at build time, and every guest of every event receives the same
+bytes. The artwork was composed from one specific event's headliner. Of the four
+published events on this deployment, three — Vol.2, Vol.3 and Vol.4 — have
+`featured: []` and no artist at all:
+
+```
+TEST Event             featured=1  status=published
+Mix & Greet Vol.2      featured=0  status=published
+Mix & Greet Vol.3      featured=0  status=published
+Mix & Greet Vol. 4     featured=0  status=published
+```
+
+So a Vol.3 guest would have opened their pass to a stranger's face. Nobody would
+have noticed until an event with a different headliner shipped.
+
+The fix is the same move the critic already wanted, which is what makes it the
+right one rather than a compromise: the portrait comes out of `background.*`
+entirely and the plate becomes the brand — rings, bloom, grain, black. It is
+then blur-proof, it is what the guest recognises, and it is correct for every
+event on the calendar instead of for one.
+
+The invite page already has vocabulary for this. Its `.flyer:not(.has-art)`
+state is the design's own answer to "no photograph": the red disc returns, the
+rings drop to their base opacities, the arcs go red. That state, not the
+portrait state, is what a static asset should be built from.
+
+**Red field labels stay red.** `#EC1C24` on `#0B0B0D` is about 4.3:1, which is
+fine for the letterspaced uppercase Wallet draws labels in. The critic's 2.5:1
+measurement was red on *dark red*, where the plate's lobe ran under the type
+column — a background problem, fixed by darkening the left third, not a reason
+to give up the brand colour.
 
 ---
 
