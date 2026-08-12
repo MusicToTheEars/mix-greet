@@ -6,7 +6,8 @@ import { checkPassword } from "./auth";
 import { inviteOrigin } from "./events";
 import { resend } from "./email";
 import { verifyUnsubToken } from "./lib/unsub";
-import { json, preflight, clean, corsHeaders, csvCell } from "./lib/http";
+import { verifyRsvpToken } from "./lib/rsvpToken";
+import { json, preflight, clean, corsHeaders, csvCell, htmlPage } from "./lib/http";
 
 const http = httpRouter();
 
@@ -388,5 +389,149 @@ const unsubscribe = httpAction(async (ctx, req) => {
 
 http.route({ path: "/unsubscribe", method: "GET", handler: unsubscribe });
 http.route({ path: "/unsubscribe", method: "POST", handler: unsubscribe });
+
+
+// --- guest self-service ------------------------------------------------------
+// One signed token (lib/rsvpToken.ts) opens all of this: the Wallet pass, the
+// QR the door scans, and the ability to cancel or resize a booking. A guest who
+// cannot come has to have a way to say so, or the door list quietly rots.
+
+// GET /api/pass?t=<token> -> the .pkpass, served with Apple's MIME type so iOS
+// offers "Add to Apple Wallet" rather than downloading a zip.
+const walletPass = httpAction(async (ctx, req) => {
+  const url = new URL(req.url);
+  const token = clean(url.searchParams.get("t"), 200);
+  const out: any = await ctx.runAction(internal.wallet.serve.buildForToken, { token });
+  if (!out?.ok) {
+    return htmlPage(
+      "Pass unavailable",
+      out?.error === "cancelled"
+        ? "This RSVP was cancelled, so its pass is no longer valid."
+        : "That pass link is not valid. Open the link from your confirmation email.",
+      404,
+    );
+  }
+  const body = Uint8Array.from(atob(out.b64), (c) => c.charCodeAt(0));
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "content-type": "application/vnd.apple.pkpass",
+      "content-disposition": 'attachment; filename="MixAndGreet.pkpass"',
+      "cache-control": "no-store",
+    },
+  });
+});
+http.route({ path: "/api/pass", method: "GET", handler: walletPass });
+
+// GET  /api/rsvp/manage?t=  -> the guest's current booking
+// POST /api/rsvp/manage     -> { t, action: "cancel" | "guests", guests? }
+const manageRsvp = httpAction(async (ctx, req) => {
+  const secret = process.env.UNSUB_SECRET;
+  if (!secret) return json({ error: "server not configured" }, 500);
+
+  let token = "";
+  let action = "";
+  let guests = 1;
+  if (req.method === "GET") {
+    token = clean(new URL(req.url).searchParams.get("t"), 200);
+  } else {
+    const body = await req.json().catch(() => ({}) as any);
+    token = clean(body.t, 200);
+    action = clean(body.action, 20);
+    guests = Number(body.guests) || 1;
+  }
+
+  const rsvpId = await verifyRsvpToken(secret, token);
+  // Same response for a bad signature and a missing row: a valid-looking token
+  // must not be distinguishable from an invalid one.
+  if (!rsvpId) return json({ error: "not found" }, 404);
+  const data: any = await ctx.runQuery(internal.rsvps.getForToken, { rsvpId });
+  if (!data) return json({ error: "not found" }, 404);
+
+  if (req.method === "GET") {
+    return json({
+      ok: true,
+      name: data.rsvp.name,
+      email: data.rsvp.email,
+      guests: data.rsvp.guests,
+      status: data.rsvp.status,
+      event: {
+        title: data.event.title,
+        subtitle: data.event.subtitle,
+        date: data.event.date,
+        start: data.event.start,
+        end: data.event.end,
+        location: data.event.location,
+        slug: data.event.slug,
+      },
+    });
+  }
+
+  if (action !== "cancel" && action !== "guests") {
+    return json({ error: "unknown action" }, 400);
+  }
+  const res: any = await ctx.runMutation(internal.rsvps.updateByGuest, {
+    rsvpId,
+    action: action as "cancel" | "guests",
+    guests,
+  });
+  if (!res?.ok) return json({ error: res?.error || "failed" }, 400);
+  return json({ ok: true, status: res.status, guests: res.guests });
+});
+http.route({ path: "/api/rsvp/manage", method: "GET", handler: manageRsvp });
+http.route({ path: "/api/rsvp/manage", method: "POST", handler: manageRsvp });
+http.route({
+  path: "/api/rsvp/manage",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
+
+
+// --- door check-in -----------------------------------------------------------
+// Admin-token gated: this is staff-operated, and it mutates attendance.
+// Accepts either a scanned pass token or a raw rsvp id, because a Bluetooth
+// scanner in HID mode types whatever is encoded and staff may also pick a name
+// off the list by hand.
+const checkin = httpAction(async (ctx, req) => {
+  if (!(await isAdmin(ctx, req))) return json({ error: "unauthorized" }, 401);
+  const secret = process.env.UNSUB_SECRET;
+  if (!secret) return json({ error: "server not configured" }, 500);
+
+  const body = await req.json().catch(() => ({}) as any);
+  const scanned = clean(body.code, 200);
+  const undo = body.undo === true;
+
+  // A scan carries "<rsvpId>.<hmac>"; only a verified signature is trusted.
+  // Falling back to a bare id keeps manual entry working for staff.
+  let rsvpId = await verifyRsvpToken(secret, scanned);
+  if (!rsvpId && /^[a-z0-9]{20,40}$/i.test(scanned)) rsvpId = scanned;
+  if (!rsvpId) return json({ error: "unrecognised code" }, 404);
+
+  const res: any = await ctx.runMutation(internal.rsvps.checkIn, { rsvpId, undo });
+  if (!res?.ok) return json({ error: res?.error || "failed" }, 404);
+  return json(res);
+});
+http.route({ path: "/api/admin/checkin", method: "POST", handler: checkin });
+http.route({
+  path: "/api/admin/checkin",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
+
+// Live door numbers: expected heads against heads actually through.
+const doorStats = httpAction(async (ctx, req) => {
+  if (!(await isAdmin(ctx, req))) return json({ error: "unauthorized" }, 401);
+  const url = new URL(req.url);
+  const eventId = await resolveEventKey(ctx, clean(url.searchParams.get("eventId"), 120));
+  const out = await ctx.runQuery(internal.rsvps.doorStats, { eventId });
+  if (!out) return json({ error: "event not found" }, 404);
+  return json(out);
+});
+http.route({ path: "/api/admin/door", method: "GET", handler: doorStats });
+http.route({
+  path: "/api/admin/door",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
 
 export default http;

@@ -187,6 +187,8 @@ export type ConfirmationVars = {
   end?: string;
   timezone?: string; // IANA zone for the calendar entry (default America/Los_Angeles)
   eventUrl?: string; // hosted invite link — the primary CTA
+  walletUrl?: string; // signed /api/pass link: Add to Apple Wallet
+  manageUrl?: string; // signed /rsvp/manage link: change party size or cancel
   mapUrl?: string; // overrides the derived Google Maps search link
   // The event's own flyer, resolved from events.posterId in convex/email.ts.
   // This is the only thing in the message that changes shape between events,
@@ -1088,6 +1090,11 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   if (!isWait && mapUrl) actions.push({ href: mapUrl, label: "GET DIRECTIONS" });
   if (!actions.length && mapUrl)
     actions.push({ href: mapUrl, label: "GET DIRECTIONS" });
+  // Both of these are in the HTML as their own rows; adding them to `actions`
+  // is what carries them into the plain-text alternative, so the two halves
+  // offer a guest the same things.
+  if (v.walletUrl) actions.push({ href: v.walletUrl, label: "ADD TO APPLE WALLET" });
+  if (v.manageUrl) actions.push({ href: v.manageUrl, label: "CHANGE OR CANCEL YOUR RSVP" });
 
   // An event with no invite link, no date and no linkable venue has nothing to
   // point at; the block collapses rather than rendering an empty button.
@@ -1115,6 +1122,21 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   if (googleCalUrl && calPrimary !== googleCalUrl)
     calAlts.push({ href: googleCalUrl, label: "GOOGLE" });
   if (outlookCalUrl) calAlts.push({ href: outlookCalUrl, label: "OUTLOOK" });
+  // Add to Apple Wallet, offered under the calendar row. Deliberately not the
+  // primary button: on Android and desktop it is a dead end, so it sits as a
+  // secondary the way "also add it to" does.
+  const walletLine = v.walletUrl
+    ? `<tr><td style="padding:14px 0 0 0;text-align:center;">
+         <a href="${esc(v.walletUrl)}" target="_blank" rel="noopener" style="display:inline-block;border:2px solid ${BRAND.text};background:${BRAND.text};color:${BRAND.white};text-decoration:none;font-family:${MONO};font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;padding:12px 22px;">Add to Apple Wallet</a>
+       </td></tr>`
+    : "";
+
+  // The way out. A guest whose plans change has to be able to say so, or the
+  // door list is fiction by the time the event runs.
+  const manageLine = v.manageUrl
+    ? `<tr><td style="padding:12px 0 0 0;text-align:center;font-family:${MONO};font-size:11px;line-height:16px;mso-line-height-rule:exactly;letter-spacing:.12em;text-transform:uppercase;color:${BRAND.textMuted};" class="mg-quiet">CAN'T MAKE IT? <a href="${esc(v.manageUrl)}" target="_blank" rel="noopener" class="mg-accent" style="color:${BRAND.brandInk};font-weight:700;text-decoration:none;">CHANGE OR CANCEL</a></td></tr>`
+    : "";
+
   const calAltLine = calAlts.length
     ? `<tr><td style="padding:12px 0 0 0;text-align:center;font-family:${MONO};font-size:11px;line-height:16px;mso-line-height-rule:exactly;letter-spacing:.12em;text-transform:uppercase;color:${BRAND.textMuted};" class="mg-quiet">ALSO ADD IT TO ${calAlts
         .map(
@@ -1295,7 +1317,7 @@ ${posterHtml}  <!-- ============ LIGHT PANEL ============ -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
           ${primary}
           ${ghosts}
-          ${calAltLine}
+          ${calAltLine}${walletLine}${manageLine}
           ${lineupHtml}
         </table>
 

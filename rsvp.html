@@ -745,6 +745,34 @@ body.has-sticky{padding-bottom:84px}
           </div>
         </div>
 
+        <!-- Reached from the confirmation email's "change or cancel" link,
+             which carries a signed token. Everything here acts on that token;
+             the page never sees or needs an rsvp id. -->
+        <div id="manageState" class="state hidden">
+          <h2 id="mgHead">Your RSVP</h2>
+          <p id="mgLead"></p>
+          <div class="recap" id="mgRecap"></div>
+          <label for="mgGuests">Party size</label>
+          <select id="mgGuests">
+            <option value="1">Just me</option>
+            <option value="2">2 people</option>
+            <option value="3">3 people</option>
+            <option value="4">4 people</option>
+            <option value="5">5 people</option>
+          </select>
+          <div class="acts-row">
+            <button class="cal-btn" id="mgSave" type="button">Save party size</button>
+            <button class="cal-btn" id="mgCancel" type="button">Cancel my RSVP</button>
+          </div>
+          <p class="msg" id="mgMsg" hidden></p>
+          <div class="acts-row" style="margin-top:14px">
+            <a class="back-btn" href="/">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5l-5 5 5 5"/><path d="M6 10h9"/></svg>
+              Back to Mix &amp; Greet
+            </a>
+          </div>
+        </div>
+
         <div id="closedState" class="state shut hidden">
           <h2 id="closedHead">RSVPs are closed</h2>
           <p id="closedCopy">This event isn't taking RSVPs right now. Keep an eye on the Mix &amp; Greet page for the next one.</p>
@@ -1097,10 +1125,12 @@ function renderHero(ev){
    the composed flyer only after the image has decoded, so a slow, missing or
    dead storage URL can never blank the column or shift the layout. */
 function renderFlyer(ev){
-  const key = ev.slug || ev.id || '';
-  // Strip the separators first: "mix-greet-vol-2".slice(-4) printed "OL-2".
-  const serial = key.replace(/[^a-z0-9]/gi, '').slice(-4).toUpperCase();
-  $('tkNo').textContent = serial ? 'No. ' + serial : '';
+  // The stub used to print the last four characters of the slug, which on real
+  // events read as noise: NO. 2FRP, NO. OPIX, NO. OSED. A serial nobody can act
+  // on is worse than none, and it was one of only two text elements up there.
+  // The date is the thing a poster actually stamps.
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ev.date || ''));
+  $('tkNo').textContent = dm ? `${dm[2]}.${dm[3]}.${dm[1].slice(2)}` : '';
 
   const flyer = $('ticket');
 
@@ -1673,7 +1703,88 @@ function ambient(){
   }
 }
 
-load();
+/* ---------- manage: change party size or cancel ----------
+   The confirmation email links here as /rsvp?manage=<signed token>. The token
+   is the only credential; a guest never handles an id, and a tampered token
+   returns the same 404 as a missing one. */
+const manageToken = (qs.get('manage') || '').trim();
+
+function mgShow(msg, cls){
+  const m = $('mgMsg');
+  m.textContent = msg; m.className = 'msg ' + (cls || ''); m.hidden = false;
+}
+
+async function mgLoad(){
+  // Collapse the invitation: someone arriving to cancel is not being sold the
+  // event again, and leaving the RSVP form up invites a duplicate booking.
+  // NOT deadLink() — manageState lives inside #rsvp-panel, so hiding the panel
+  // would hide the very thing this page came to show.
+  ['hero','ticket','stickyBar','lineupBlock','formWrap','evChips','heroCta']
+    .forEach(id => { const n = $(id); if (n) n.classList.add('hidden'); });
+  ['icsBtn','icsBtn2','shareBtn3','heroRsvp','stickyRsvp']
+    .forEach(id => { const n = $(id); if (n) n.hidden = true; });
+  // eventBlock is deliberately NOT hidden: manageState is nested inside it, so
+  // hiding it takes this panel down too. #formWrap already suppresses the form.
+  ['notfound','closedState','externalState','confirmed','waitlisted','loading']
+    .forEach(id => { const n = $(id); if (n) n.classList.add('hidden'); });
+  const eb = $('eventBlock'); if (eb) eb.classList.remove('hidden');
+  show('manageState');
+  try {
+    const r = await fetch(API + '/api/rsvp/manage?t=' + encodeURIComponent(manageToken));
+    if (!r.ok) throw new Error('bad');
+    const d = await r.json();
+    document.title = 'Your RSVP · ' + (d.event?.title || 'Mix & Greet');
+    $('mgHead').textContent = d.status === 'cancelled' ? 'RSVP cancelled' : 'Your RSVP';
+    $('mgLead').textContent = d.status === 'cancelled'
+      ? 'This RSVP is cancelled. If you want back in, RSVP again from the invitation.'
+      : 'You are on the list for ' + (d.event?.title || 'this event') + '. Change your party size or cancel below.';
+    const rows = [
+      ['EVENT', d.event?.title || ''],
+      ['WHEN', [d.event?.date, d.event?.start].filter(Boolean).join(' · ')],
+      ['NAME', d.name || ''],
+      ['STATUS', d.status === 'checked_in' ? 'Checked in' : (d.status || '')],
+    ].filter(r => r[1]);
+    $('mgRecap').innerHTML = rows
+      .map(([k, v2]) => '<div class="rr"><span>' + k + '</span><b></b></div>')
+      .join('');
+    [...$('mgRecap').querySelectorAll('.rr b')].forEach((b, i) => { b.textContent = rows[i][1]; });
+    $('mgGuests').value = String(Math.min(5, Math.max(1, d.guests || 1)));
+    const done = d.status === 'cancelled';
+    $('mgSave').hidden = done; $('mgCancel').hidden = done; $('mgGuests').disabled = done;
+  } catch (_) {
+    $('mgHead').textContent = 'Link not valid';
+    $('mgLead').textContent = 'That link has expired or was mistyped. Open the most recent confirmation email.';
+    $('mgSave').hidden = true; $('mgCancel').hidden = true; $('mgGuests').hidden = true;
+  }
+}
+
+async function mgPost(action, guests){
+  try {
+    const r = await fetch(API + '/api/rsvp/manage', {
+      method: 'POST', headers: {'content-type':'application/json'},
+      body: JSON.stringify({ t: manageToken, action, guests })
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) { mgShow('That did not go through. Try again.', 'err'); return; }
+    if (action === 'cancel') {
+      $('mgHead').textContent = 'RSVP cancelled';
+      $('mgLead').textContent = 'You are off the list. Thanks for telling us — it frees the spot for someone else.';
+      $('mgSave').hidden = true; $('mgCancel').hidden = true; $('mgGuests').disabled = true;
+      mgShow('Cancelled.', 'ok');
+    } else {
+      mgShow('Party size updated.', 'ok');
+    }
+  } catch (_) { mgShow('Network error. Try again.', 'err'); }
+}
+
+if (manageToken) {
+  $('mgSave').addEventListener('click', () => mgPost('guests', Number($('mgGuests').value) || 1));
+  $('mgCancel').addEventListener('click', () => {
+    if (confirm('Cancel your RSVP for this event?')) mgPost('cancel');
+  });
+}
+
+if (manageToken) { mgLoad(); } else { load(); }
 ambient();
 </script>
 </body>

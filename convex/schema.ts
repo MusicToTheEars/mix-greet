@@ -89,6 +89,10 @@ export default defineSchema({
     notes: v.optional(v.string()),
     dedupeKey: v.string(), // `${eventId}:${email}`
     confirmationSentAt: v.optional(v.number()),
+    // When the guest was scanned through the door. Optional so every existing
+    // row keeps validating; its presence is what separates "said they'd come"
+    // from "actually showed up".
+    checkedInAt: v.optional(v.number()),
   })
     .index("by_event", ["eventId"])
     .index("by_dedupeKey", ["dedupeKey"])

@@ -6,6 +6,8 @@ import {
 } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { components, internal } from "./_generated/api";
+import { rsvpToken } from "./lib/rsvpToken";
+import { inviteOrigin } from "./events";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -193,7 +195,17 @@ export const sendRsvpConfirmation = internalAction({
       }
     };
 
-    const rendered = renderRsvpConfirmation({ ...vars, icsUrl });
+    // One signed token opens the pass, the QR at the door, and the change or
+    // cancel page. Minted here so an old email keeps working without a lookup
+    // table to maintain. `secret` and `siteUrl` are the ones resolved above for
+    // the unsubscribe link.
+    const mgTok = secret ? await rsvpToken(secret, rsvpId) : "";
+    // The pass is served by this deployment's HTTP router, not by the site.
+    const apiOrigin = siteUrl || "https://good-labrador-980.convex.site";
+    const walletUrl = mgTok ? `${apiOrigin}/api/pass?t=${encodeURIComponent(mgTok)}` : undefined;
+    const manageUrl = mgTok ? `${inviteOrigin()}/rsvp?manage=${encodeURIComponent(mgTok)}` : undefined;
+
+    const rendered = renderRsvpConfirmation({ ...vars, icsUrl, walletUrl, manageUrl });
 
     let enqueued = false;
     try {
