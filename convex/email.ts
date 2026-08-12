@@ -88,6 +88,7 @@ export const confirmationData = internalQuery({
         role: f.role,
         kind: f.kind,
         link: f.link,
+        bio: f.bio,
         imageUrl: f.imageId ? await ctx.storage.getUrl(f.imageId) : null,
       })),
     );

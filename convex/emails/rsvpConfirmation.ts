@@ -158,6 +158,10 @@ export type ConfirmationFeatured = {
   kind?: "artist" | "speaker" | "company";
   imageUrl?: string | null;
   link?: string;
+  // The one line that says why this person is worth showing up for. It exists
+  // on the event and renders on the invite page, and its absence here was the
+  // only event content the confirmation dropped.
+  bio?: string;
 };
 
 export type ConfirmationVars = {
@@ -1043,7 +1047,12 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
           <td width="16" style="width:16px;font-size:0;line-height:0;">&nbsp;</td>
           <td valign="middle" style="padding:${i ? "14px" : "0"} 0 0 0;font-family:${MONO};">
             <div class="mg-ink" style="font-size:15px;font-weight:700;color:${BRAND.text};line-height:1.3;overflow-wrap:break-word;word-break:break-word;">${nameHtml}</div>
-            <div class="mg-accent" style="margin-top:4px;font-size:11px;line-height:15px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${BRAND.brandInk};">${escUp(roleText)}</div>
+            <div class="mg-accent" style="margin-top:4px;font-size:11px;line-height:15px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${BRAND.brandInk};">${escUp(roleText)}</div>${
+              (a.bio || "").trim()
+                ? `
+            <div class="mg-soft" style="margin-top:7px;font-size:13px;line-height:19px;mso-line-height-rule:exactly;color:${BRAND.textSoft};overflow-wrap:break-word;word-break:break-word;">${esc((a.bio || "").trim())}</div>`
+                : ""
+            }
           </td>
         </tr>`;
           })
@@ -1339,7 +1348,9 @@ ${posterHtml}  <!-- ============ LIGHT PANEL ============ -->
     // carry the human line too, or the two formats disagree about who is
     // speaking.
     quoteBlock(noteBody),
-    `| ${noteSignature}`,
+    // noteSignature is empty unless a real host note was supplied, and an
+    // unconditional "| " left a bare pipe dangling under the quote.
+    noteSignature ? `| ${noteSignature}` : "",
     "",
     `WHEN   ${whenTop}${timeLine ? `\n       ${timeLine}` : ""}`,
     // The waitlist variant withholds street and suite here exactly as the
@@ -1373,8 +1384,18 @@ ${posterHtml}  <!-- ============ LIGHT PANEL ============ -->
           : a.kind === "company"
             ? "Partner"
             : "Artist");
+      // Wrap the bio so the text alternative stays readable in a client that
+      // does not soft-wrap; the HTML half already carries it under the role.
+      const bioLines = (a.bio || "").trim()
+        ? "\n" +
+          (a.bio || "")
+            .trim()
+            .replace(/\s+/g, " ")
+            .replace(/(.{1,66})(\s|$)/g, (_m, chunk) => `  ${chunk.trim()}\n`)
+            .replace(/\n$/, "")
+        : "";
       textLines.push(
-        `· ${a.name} · ${role}${safeUrl(a.link) ? `\n  ${safeUrl(a.link)}` : ""}`,
+        `· ${a.name} · ${role}${bioLines}${safeUrl(a.link) ? `\n  ${safeUrl(a.link)}` : ""}`,
       );
     }
   }
