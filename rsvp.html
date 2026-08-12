@@ -771,7 +771,19 @@ const API = 'https://good-labrador-980.convex.site';
 const qs = new URLSearchParams(location.search);
 // The invite link carries either the minted slug or the Convex document id.
 // /i/<key> is rewritten to ?event=<key> at the edge (vercel.json).
-const eventKey = (qs.get('event') || '').trim();
+// The invite key arrives one of two ways:
+//   /rsvp?event=<key>  — the raw form the back office links to
+//   /i/<key>           — the pretty form that gets texted around
+// The second is a Vercel REWRITE, not a redirect: it changes which file is
+// served, but the browser URL stays /i/<key>, so location.search is empty.
+// Reading only ?event= made every pretty link fall through to the dead-link
+// branch and tell the guest the invitation had expired.
+function keyFromPath(){
+  const m = /^\/i\/([^/?#]+)/.exec(location.pathname || '');
+  if (!m) return '';
+  try { return decodeURIComponent(m[1]); } catch (_) { return m[1]; }
+}
+const eventKey = (qs.get('event') || keyFromPath() || '').trim();
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');

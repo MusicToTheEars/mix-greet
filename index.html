@@ -319,7 +319,7 @@ footer .bar{border:0;border-top:4px solid var(--line)}
 
       <article class="event-card" data-date="2026-07-11" data-static>
         <span class="flag">Invite Only</span>
-        <p class="when">Sat · July 11 · 2026 · 1:00 PM – 4:00 PM</p>
+        <p class="when">07.11.2026 · 1:00 PM – 4:00 PM</p>
         <h3>Mix<span class="amp">&amp;</span>Greet</h3>
         <p class="sub2">Beat Lab Open House</p>
         <ul class="facts">
@@ -517,6 +517,17 @@ function evWhen(e){
   if (e.start) s += ' · ' + e.start + (e.end ? ' – ' + e.end : '');
   return s;
 }
+// Tiles get the numeric date; the flyer keeps the written-out one above.
+// Split the "YYYY-MM-DD" string rather than building a Date: the tile only
+// needs the stored digits, and parsing would reintroduce the timezone shift
+// the 'T12:00:00' above exists to dodge.
+function evWhenShort(e){
+  let s = e.date;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(e.date || ''));
+  if (m) s = m[2] + '.' + m[3] + '.' + m[1];
+  if (e.start) s += ' · ' + e.start + (e.end ? ' – ' + e.end : '');
+  return s;
+}
 function evTitle(t){
   const h = evEl('h3');
   String(t).split('&').forEach((part, i) => {
@@ -626,7 +637,7 @@ function evCard(e){
   const card = evEl('article', 'event-card');
   card.dataset.date = e.date || '';
   if (e.inviteOnly) card.appendChild(evEl('span', 'flag', 'Invite Only'));
-  card.appendChild(evEl('p', 'when', evWhen(e)));
+  card.appendChild(evEl('p', 'when', evWhenShort(e)));
   card.appendChild(evTitle(e.title || ''));
   if (e.subtitle) card.appendChild(evEl('p', 'sub2', e.subtitle));
 
