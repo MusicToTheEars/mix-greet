@@ -953,13 +953,14 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   // words and is byte-identical on every send, which a guest attending twice
   // reads as a form letter — worse than no note at all. So the signature is
   // attached ONLY to a real note. House copy stays unsigned and honest.
-  const realNote = (v.hostNote || "").trim();
-  const noteBody =
-    realNote ||
-    (isWait
-      ? "Straight with you: we're full right now. Keep the date loose. Spots come back more often than you'd think, and you're the first person we call when one does."
-      : "Come early if you can. The best conversations happen before the first beat drops, and the coffee is usually still hot.");
-  const noteSignature = realNote ? `THE CREW AT ${HOST}` : "";
+  // The box carries a HOST's words or it does not appear. There is no events
+  // column and no back-office field for `hostNote` yet, so the old fallbacks
+  // ("the first beat drops", "the coffee is usually still hot") were invented
+  // atmosphere the venue never promised, identical on every send, and telling
+  // a guest nothing the message does not already say. An empty box beats a
+  // fabricated one, so the whole block is omitted when there is no real note.
+  const noteBody = (v.hostNote || "").trim();
+  const noteSignature = noteBody ? `THE CREW AT ${HOST}` : "";
 
   const acts = (v.featured ?? []).filter((f) => f && f.name).slice(0, 6);
 
@@ -1272,13 +1273,19 @@ ${posterHtml}  <!-- ============ LIGHT PANEL ============ -->
         <p class="mg-soft" style="margin:18px 0 0 0;font-family:${MONO};font-size:14px;line-height:1.7;color:${BRAND.textSoft};">${esc(lead)}</p>
 
         <!-- the note from the host: a person's words, in their own box, above
-             anything transactional -->
+             anything transactional. Omitted entirely without one, rather than
+             printing an empty bordered box. -->
+        ${
+          noteBody
+            ? `
         <table role="presentation" class="mg-field" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.white}" style="width:100%;margin-top:22px;background-color:${BRAND.white};border:2px solid ${BRAND.surfaceLine};">
           <tr><td style="padding:18px 18px 16px 18px;">
             <p class="mg-soft" style="margin:0;font-family:${MONO};font-size:14px;line-height:1.7;color:${BRAND.textSoft};">${esc(noteBody)}</p>
             <div class="mg-quiet" style="margin-top:12px;font-family:${MONO};font-size:11px;line-height:15px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:${BRAND.textMuted};">${escUp(noteSignature)}</div>
           </td></tr>
-        </table>
+        </table>`
+            : ""
+        }
 
         <!-- the ticket: what a confirmation owes a guest at the door -->
         <table role="presentation" class="mg-field" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.white}" style="width:100%;margin-top:24px;background-color:${BRAND.white};border:2px solid ${BRAND.surfaceLine};">
@@ -1347,11 +1354,9 @@ ${posterHtml}  <!-- ============ LIGHT PANEL ============ -->
     // The bordered note box, as a quoted block: the text alternative has to
     // carry the human line too, or the two formats disagree about who is
     // speaking.
-    quoteBlock(noteBody),
-    // noteSignature is empty unless a real host note was supplied, and an
-    // unconditional "| " left a bare pipe dangling under the quote.
-    noteSignature ? `| ${noteSignature}` : "",
-    "",
+    ...(noteBody
+      ? [quoteBlock(noteBody), noteSignature ? `| ${noteSignature}` : "", ""]
+      : []),
     `WHEN   ${whenTop}${timeLine ? `\n       ${timeLine}` : ""}`,
     // The waitlist variant withholds street and suite here exactly as the
     // HTML does; the two formats must never disagree about what a guest is
