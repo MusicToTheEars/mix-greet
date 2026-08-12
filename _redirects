@@ -1,0 +1,9 @@
+# Netlify redirect rules. This file lives in the publish root (netlify.toml sets
+# publish = "."), which is deliberate: redirects declared in netlify.toml have
+# been dropped silently on this account before, while _redirects is reliable.
+#
+# Hosted invite links. convex/events.ts mints https://mixandgreet.com/i/<slug>
+# and rsvp.html resolves the key from either the path or ?event=. The 200 makes
+# this a REWRITE rather than a redirect, so the pretty URL stays in the address
+# bar and in link previews. Without this rule every minted invite link 404s.
+/i/*    /rsvp.html?event=:splat    200
