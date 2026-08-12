@@ -19,7 +19,22 @@ are, on anything else). It needs no Convex login, no deploy key, and it cannot
 reach production: `CONVEX_AGENT_MODE=anonymous` never talks to the cloud.
 
 Baseline on entry to this work: **33 passed, 11 failed**.
-After: see the run at the bottom.
+After the work, with harder assertions added on top: **59 passed, 0 failed**.
+
+The eleven original failures were, in the order they would have cost a real
+night: a pass from any event opened any door; no guest without an Apple device
+ever received a scannable code; a guest who cancelled and RSVPed again was told
+they were on the list and then refused at the door; an undo after a mis-scan
+promoted a waitlisted guest onto the confirmed list; the guest list and the CSV
+could not say who actually came; the door's "expected" number shrank every time
+somebody arrived; a missing Wallet certificate reached the guest as an unstyled
+500; and the raw rsvp id, which is exactly what the door QR encodes, was
+returned to the browser whenever `UNSUB_SECRET` was unset.
+
+Three more were found by raising the bar after those were fixed: a guest already
+inside the room could erase their own attendance from the link in their
+confirmation email; a confirmed party could grow past the room's capacity from a
+phone; and a cancelled RSVP could still be resized.
 
 ---
 
@@ -38,6 +53,7 @@ After: see the run at the bottom.
 | 9 | Check-in write | **was broken** | any pass opened any door; undo corrupted the list |
 | 10 | Duplicate guard | works | nothing |
 | 11 | Admin view of attendance | **was broken** | nothing showed who actually came |
+| 12 | The guest's own page | **was broken** | never showed the code; said untrue things |
 
 ---
 
@@ -153,7 +169,59 @@ QR is carrying the whole door until it is fixed.
 
 ## 8. The scanner UI
 
-See `checkin.html`.
+`checkin.html`. **Was broken in five ways**, all of them things a stranger
+running the door would have hit within the first hour.
+
+*The event picker was decorative.* Staff chose tonight's event and the page
+never sent it. It is sent on every call now, including the undo, and every scan
+held in the offline queue carries the event it was taken for, so a replay hours
+later is still scoped to the right night. `wrong_event` renders as a red
+full-screen refusal naming the event the pass is really for, so the person on
+the door can say it out loud.
+
+*No signal meant the door stopped.* The venue is a basement suite. A failed
+scan now goes into a `localStorage` queue, the guest is told they are in, and
+the queue replays on the `online` event and when the network returns. A
+persistent count shows how many scans are still unsynced. The copy is honest
+about what an offline scan cannot know: it does not print a name that was never
+fetched, and a queued scan the server later refuses comes back as its own
+"Let in offline" verdict for review rather than being silently swallowed.
+
+*The session died mid-queue.* The admin token lived in `sessionStorage`, so a
+closed tab meant hunting for the door password with people waiting, and any 401
+called `location.reload()`, which threw away the queue and the camera. The
+token now lives where a reopened tab finds it, and an expired session asks for
+the password in place.
+
+*Backgrounding froze the scanner.* The wake lock was requested once and never
+reacquired, which is not how the API works: it is released on visibility change
+and must be re-requested. Fixed, and returning to the foreground restarts
+scanning rather than leaving a frozen video element.
+
+*`BarcodeDetector` does not exist on iOS Safari or Firefox*, which is every
+iPhone and iPad. Those browsers used to get one line of grey text over a camera
+that could never detect anything. There is now a real path for them.
+
+Every branch the API can answer with produces a full-screen verdict, including
+an explicit "Unclear" for a shape the page does not recognise, so nobody is ever
+left looking at a blank screen wondering whether to admit someone.
+
+## 8b. How the three static pages were verified
+
+Stated plainly because it is a real limit on this audit. The backend is proved
+by `npm run test:e2e`, which drives the actual routes. `checkin.html`,
+`rsvp.html` and `admin.html` are static pages with no build step, and they were
+verified three ways: their extracted scripts parse (`node --check`), their calls
+were checked against the live routes' real responses, and the contracts were
+read line by line (every scan sends `eventId`; every queued scan stores its own
+`eventId`; the QR is rendered in all four guest states; the back office reads
+`expected` with a fallback and `checkedInAt` per row).
+
+They were NOT clicked through in a live browser as part of this work. Before the
+next event, somebody should open `checkin.html` on the actual door iPad, scan one
+real pass, put the iPad in aeroplane mode, scan a second, and watch the queue
+drain when signal returns. That is fifteen minutes and it is the last thing
+standing between this and "a stranger could run the door".
 
 ## 9. Check-in write
 
@@ -190,7 +258,38 @@ door screen shows it as a distinct amber verdict rather than a green one.
 
 ## 11. Admin view of attendance
 
-See `admin.html`.
+`admin.html`. **Was broken:** guests were being scanned in and nothing in the
+back office showed it. The host could see who was invited and not who came,
+which is the one number that decides how big the next room needs to be.
+
+The guest list now shows arrival per row off the `checkedInAt` stamp, and a
+live door band shows heads through against heads still expected. It reads
+`expected` from `/api/admin/door` with a local fallback, and deliberately does
+NOT label the old `confirmed` field as "expected": that field counts only rows
+still sitting in status `confirmed`, so it drops by a party every time somebody
+is scanned, and a host reading it would watch their event appear to drain away
+over the evening it is filling up. The CSV carries the arrival column too.
+
+## 12. The guest's own page
+
+`rsvp.html`. **Was broken:** the guest never saw their code anywhere on the
+site, and the page could tell them something untrue.
+
+The QR now renders in all four states a guest can reach it from: after a
+confirmed submission, after a waitlisted one, on the manage page, and on the
+"you already RSVPed on this device" return path. The image has a visible
+fallback with a retry rather than a broken-image icon, and one line under it
+asks the guest to screenshot it before they travel, which is the whole of the
+offline story on the guest side and is deliberately not a service worker.
+
+The page also handles the refusals the backend now returns (HTTP 409 with a
+`reason` of `checked_in`, `cancelled` or `full`) by printing the server's own
+sentence rather than a generic "that did not go through", and it stops offering
+the cancel button at all once it knows the guest is already checked in.
+
+The manage page's old error copy said the link had "expired or was mistyped".
+These tokens are stateless HMACs with no timestamp in them, so they do not
+expire; that sentence was never true. It says something true now.
 
 ---
 
@@ -205,7 +304,15 @@ Listed so nobody thinks these were missed.
   128-bit HMACs so brute force is not the risk; volume is. Not touched.
 - **The door has no way to look a guest up by name** when a phone is dead and the
   guest has no code at all. That is a real door scenario and the current answer
-  is "use the back office on another device".
+  is "use the back office on another device". It is the largest remaining hole
+  in the door experience and it is a deliberate omission, not an oversight: the
+  scanner is built around "nothing on screen but the camera" and a search field
+  is a different product decision for Lawrence to make.
+- **A waitlisted guest can still set their party to 10.** They hold no seats, and
+  the promotion path re-tests the room before they ever do, so it harms nobody
+  today. It would matter if promotion ever became automatic.
+- **The three static pages have not been clicked through in a live browser.**
+  See section 8b. This is the one verification gap in the work.
 
 ## Needs Lawrence's hands
 

@@ -11,7 +11,7 @@
 #
 #   E2E_KEEP=1   leave the deployment up and print its URLs (for poking at it)
 #
-# Requires Node 20, 22 or 24 somewhere on the machine — the local backend
+# Requires Node 20, 22 or 24 somewhere on the machine. The local backend
 # refuses to run "use node" actions (the Wallet pass and the QR renderer) on
 # anything else. The repo's own npm install is not reused because node_modules
 # inside Dropbox is a known source of phantom I/O errors.

@@ -13,14 +13,19 @@
 <link rel="stylesheet" href="/brand.css">
 <style>
 /* ============================================================
-   /checkin — one job: scan a pass, say yes or no.
+   /checkin: one job, scan a pass, say yes or no.
 
    Someone working a door is holding an iPad in one hand and a
    guest is waiting. So there is nothing on screen but the camera
    and a frame to aim at, and the answer arrives as a full-screen
    colour anyone can read at arm's length without stopping to
-   parse it. Counts, logs and manual entry were noise at the door
-   and are gone; the back office already has the numbers.
+   parse it. Counts and logs were noise at the door and are gone;
+   the back office already has the numbers.
+
+   Two things do earn a place on top of that camera, because
+   without them the door stops: a count of scans still waiting to
+   reach the server, and a way in for a browser that cannot read
+   a QR code at all. Both stay out of the way until they matter.
    ============================================================ */
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
@@ -30,6 +35,7 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
 .setup .lede{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:6px}
 .setup select{margin-top:6px}
 .setup .btn{width:100%;text-align:center;margin-top:22px;padding:18px}
+.setup .note{font-size:13px;line-height:1.65;color:var(--muted);margin-top:16px}
 
 /* ---------- scanner: the whole screen ---------- */
 #scanner{position:fixed;inset:0;background:#000;display:none}
@@ -56,8 +62,22 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
   background:linear-gradient(180deg,rgba(6,6,8,.86),rgba(6,6,8,0));pointer-events:none}
 .topbar .ev{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink);
   text-shadow:0 1px 6px rgba(0,0,0,.9);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .acts{display:flex;gap:8px;flex:none}
 .topbar button{pointer-events:auto;background:none;border:2px solid rgba(237,234,227,.5);
   color:var(--ink);padding:8px 14px;font-size:11px;letter-spacing:.18em}
+
+/* ---------- typed entry: the path for a browser that cannot scan ----------
+   Not a second door screen, the same one with the camera taken out. It sits
+   over the scanner so the camera keeps running underneath when it does work. */
+#manual{position:fixed;inset:0;z-index:3;background:var(--bg);display:none;overflow:auto}
+#manual.on{display:block}
+#manual .why{border-left:2px solid var(--brand);padding-left:12px;color:var(--ink);
+  font-size:13px;line-height:1.6;margin-top:18px}
+#manual input{font-family:'Plex Mono',ui-monospace,monospace;letter-spacing:.06em}
+.mrow{display:flex;gap:10px;margin-top:18px}
+.mrow button{flex:1;background:none;border:2px solid var(--line);color:var(--muted);
+  padding:12px;font-size:11px;letter-spacing:.18em}
+.mrow button:hover{border-color:var(--ink);color:var(--ink)}
 
 /* ---------- the verdict: the whole screen, one colour ---------- */
 #verdict{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
@@ -75,13 +95,33 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
   font-size:clamp(44px,11vw,92px);line-height:.92;margin-top:22px}
 #verdict .nm{font-size:clamp(17px,3.4vw,26px);letter-spacing:.05em;color:var(--ink);margin-top:10px}
 #verdict .sub{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:14px}
+#verdict .act{margin-top:26px}
+#verdict .act[hidden]{display:none}
+#verdict .act button{background:none;border:2px solid rgba(237,234,227,.45);color:var(--ink);
+  padding:11px 22px;font-size:11px;letter-spacing:.2em}
+
+/* ---------- scans still owed to the server ----------
+   Small, always in the same corner, and it sits under the verdict so it never
+   crowds the one thing the door is reading. */
+#qchip{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:4;
+  display:none;align-items:center;gap:8px;padding:9px 13px;background:rgba(6,6,8,.9);
+  border:2px solid var(--line);color:var(--ink);font-size:11px;letter-spacing:.18em;
+  font-family:'Plex Mono',ui-monospace,monospace}
+#qchip.on{display:flex}
+#qchip.warn{border-color:var(--red);color:var(--red)}
+#qchip.done{border-color:var(--green);color:var(--green)}
+
+/* ---------- the session ran out: ask again, in place ---------- */
+#relock{position:fixed;inset:0;z-index:8;background:rgba(6,6,8,.95);display:none;overflow:auto}
+#relock.on{display:block}
+#relock .inner{max-width:520px;margin:0 auto;padding:clamp(24px,10vh,90px) 20px}
 
 #hid{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
 </style>
 </head>
 <body>
 
-<input id="hid" autocomplete="off" aria-hidden="true" tabindex="-1">
+<input id="hid" autocomplete="off" inputmode="none" aria-hidden="true" tabindex="-1">
 
 <!-- 1. door staff sign in -->
 <main class="wrap narrow" id="gateWrap">
@@ -112,7 +152,30 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
   <p class="hint" id="hint">Hold the QR code in the frame</p>
   <div class="topbar">
     <span class="ev" id="evName"></span>
-    <button id="stop" type="button">Done</button>
+    <span class="acts">
+      <button id="typeBtn" type="button">Type</button>
+      <button id="stop" type="button">Done</button>
+    </span>
+  </div>
+</div>
+
+<!-- 3b. typed entry, for a browser with no QR reader or a blocked camera -->
+<div id="manual">
+  <div class="setup">
+    <h1 class="masthead" style="font-size:clamp(30px,7vw,46px)">Type&nbsp;a&nbsp;code</h1>
+    <p class="lede" id="m-ev"></p>
+    <p class="why" id="m-why" hidden></p>
+    <p class="note">A Bluetooth scanner gun types straight into this field, so pair one, pull the
+      trigger at the guest's QR code and it checks them in by itself. A code can also be typed or
+      pasted in by hand.</p>
+    <label for="m-code">Pass code</label>
+    <input id="m-code" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button class="btn" id="m-go" type="button">Check in</button>
+    <p class="msg err" id="m-msg" hidden></p>
+    <div class="mrow">
+      <button id="m-back" type="button" hidden>Use the camera</button>
+      <button id="m-done" type="button">Done</button>
+    </div>
   </div>
 </div>
 
@@ -122,174 +185,628 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
   <div class="big" id="v-big"></div>
   <div class="nm" id="v-nm"></div>
   <div class="sub" id="v-sub"></div>
+  <div class="act" id="v-act" hidden><button id="v-undo" type="button">Undo</button></div>
+</div>
+
+<!-- 5. scans not yet through to the server -->
+<button id="qchip" type="button"></button>
+
+<!-- 6. the twelve hour session ran out mid-queue -->
+<div id="relock">
+  <div class="inner">
+    <div class="panel accent">
+      <h2>Session expired</h2>
+      <p class="msg">The door password again, and the queue carries on where it stopped. Nothing
+        scanned has been lost.</p>
+      <label for="r-pass">Password</label>
+      <input type="password" id="r-pass" autocomplete="current-password">
+      <button class="btn" id="r-go" type="button">Back to the door</button>
+      <p class="msg err" id="r-msg" hidden></p>
+    </div>
+  </div>
 </div>
 
 <script>
 const API = 'https://good-labrador-980.convex.site';
 const $ = id => document.getElementById(id);
-let TOKEN = sessionStorage.getItem('mg_token') || '';
-let EVENTS = [], busy = false, stream = null, ticking = false;
 
-/* ---------- sign in ---------- */
-async function login(pw){
-  const m = $('gate-msg'); m.hidden = true;
+/* The token used to live in sessionStorage, which an iPad throws away the
+   moment the tab is closed and which a browser is free to drop while the screen
+   is asleep. The token is good for twelve hours, which is the length of a door
+   shift, so it belongs in localStorage: reopening the tab in the middle of a
+   queue has to land back on the scanner, not on a password prompt. */
+const TOKEN_KEY = 'mg_token';
+const QUEUE_KEY = 'mg_queue';   /* scans taken while the door had no signal */
+const EVENT_KEY_STORE = 'mg_event';
+const REPEAT_MS = 4000;         /* how long the same code is treated as one guest */
+
+let TOKEN = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('mg_token') || '';
+if (TOKEN) localStorage.setItem(TOKEN_KEY, TOKEN);   // carry a live session over from the old home
+
+let EVENTS = [], EVENT_ID = '', EVENT_LABEL = '';
+let stream = null, detector = null, wakeLock = null;
+let scanning = false;   // true from "Start check-in" until "Done"
+let camReady = false;   // false whenever the door is running on typed entry
+let ticking = false, inFlight = false, pending = null;
+const recent = new Map();   // code to timestamp, so one pass is one check-in
+
+/* ---------- storage helpers ---------- */
+function readJSON(key, fallback){
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
+  catch(_) { return fallback; }
+}
+function writeJSON(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch(_) {} }
+
+let QUEUE = readJSON(QUEUE_KEY, []) || [];
+let REVIEW = [];       // queued scans the server refused once it could finally see them
+let syncing = false, hadQueue = false, chipTimer = null;
+
+/* ---------- sign in ----------
+   One function mints the token, because the door asks for the password in two
+   places: at the start of the night, and again if the session runs out while
+   the scanner is live. */
+async function requestToken(pw){
   try {
     const r = await fetch(API + '/api/admin/login', {
       method:'POST', headers:{'content-type':'application/json'},
       body: JSON.stringify({ password: pw })
     });
-    if (!r.ok) {
-      m.textContent = r.status === 429 ? 'Too many attempts. Wait a few minutes.' : 'Wrong password.';
-      m.hidden = false; return;
-    }
-    TOKEN = (await r.json()).token;
-    sessionStorage.setItem('mg_token', TOKEN);
-    toSetup();
-  } catch(_) { m.textContent = 'Could not reach the door service.'; m.hidden = false; }
+    if (!r.ok) return { msg: r.status === 429 ? 'Too many attempts. Wait a few minutes.' : 'Wrong password.' };
+    const t = (await r.json().catch(() => ({}))).token;
+    if (!t) return { msg: 'The door service did not hand back a session.' };
+    TOKEN = t;
+    localStorage.setItem(TOKEN_KEY, TOKEN);
+    return { ok: true };
+  } catch(_) { return { msg: 'Could not reach the door service.' }; }
 }
-$('enter').addEventListener('click', () => login($('pass').value));
-$('pass').addEventListener('keydown', e => { if (e.key === 'Enter') login($('pass').value); });
+
+async function gateSubmit(){
+  const m = $('gate-msg'), btn = $('enter');
+  m.hidden = true; btn.disabled = true;
+  const res = await requestToken($('pass').value);
+  btn.disabled = false;
+  if (!res.ok) { m.textContent = res.msg; m.hidden = false; return; }
+  $('pass').value = '';
+  toSetup();
+  syncQueue();
+}
+$('enter').addEventListener('click', gateSubmit);
+$('pass').addEventListener('keydown', e => { if (e.key === 'Enter') gateSubmit(); });
+
+function toGate(msg){
+  $('setup').classList.add('hidden');
+  $('gateWrap').classList.remove('hidden');
+  if (msg) { $('gate-msg').textContent = msg; $('gate-msg').hidden = false; }
+}
+
+/* A 401 used to call location.reload(), which threw away the camera and, far
+   worse, every scan still sitting in the offline queue. Only the session
+   expired, so only the session is asked for again, over the top of a door that
+   otherwise keeps its place. */
+function relock(){
+  $('r-msg').hidden = true;
+  $('relock').classList.add('on');
+  setTimeout(() => { try { $('r-pass').focus(); } catch(_) {} }, 60);
+}
+async function relockSubmit(){
+  const m = $('r-msg'), btn = $('r-go');
+  m.hidden = true; btn.disabled = true;
+  const res = await requestToken($('r-pass').value);
+  btn.disabled = false;
+  if (!res.ok) { m.textContent = res.msg; m.hidden = false; return; }
+  $('r-pass').value = '';
+  $('relock').classList.remove('on');
+  if ($('manual').classList.contains('on')) { try { $('m-code').focus(); } catch(_) {} } else grab();
+  syncQueue();
+}
+$('r-go').addEventListener('click', relockSubmit);
+$('r-pass').addEventListener('keydown', e => { if (e.key === 'Enter') relockSubmit(); });
+
+function onAuthExpired(){
+  TOKEN = '';
+  localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem('mg_token');
+  if (scanning) relock(); else toGate('That session ran out. Sign in again.');
+}
 
 async function api(path, opts){
   const r = await fetch(API + path, Object.assign({
     headers: { 'content-type':'application/json', 'x-admin-token': TOKEN }
   }, opts || {}));
-  if (r.status === 401) { sessionStorage.removeItem('mg_token'); location.reload(); throw new Error('auth'); }
-  return r.json();
+  if (r.status === 401) { const e = new Error('auth'); e.auth = true; throw e; }
+  // A 404 or a 400 still carries a readable { error }, so only a body that is
+  // not JSON at all is a surprise, and that is reported rather than swallowed.
+  return r.json().catch(() => ({ error: 'unreadable reply' }));
 }
 
 /* ---------- pick the event ---------- */
 async function toSetup(){
   $('gateWrap').classList.add('hidden');
   $('setup').classList.remove('hidden');
+  const sel = $('ev'), msg = $('setup-msg');
+  msg.hidden = true;
   try {
     const list = await api('/api/events', { method:'POST', body: JSON.stringify({ action:'list' }) });
+    if (list && list.error) throw new Error(list.error);
     EVENTS = list.published || [];
-    const sel = $('ev'); sel.textContent = '';
+    sel.textContent = '';
     EVENTS.forEach(e => {
       const o = document.createElement('option');
       o.value = e.slug || e.id;
       o.textContent = e.date + ' · ' + e.title;
       sel.appendChild(o);
     });
-    // Default to the soonest event that has not passed — at a door that is
-    // always the one being run.
+    // Default to the soonest event that has not passed, because at a door that
+    // is always the one being run.
     const today = new Date().toISOString().slice(0,10);
     const next = EVENTS.find(e => e.date >= today);
     if (next) sel.value = next.slug || next.id;
-    if (!EVENTS.length) {
-      $('setup-msg').textContent = 'No published events to check in to.';
-      $('setup-msg').hidden = false;
+    $('start').disabled = !EVENTS.length;
+    if (!EVENTS.length) { msg.textContent = 'No published events to check in to.'; msg.hidden = false; }
+  } catch(e) {
+    if (e && e.auth) { onAuthExpired(); return; }
+    // The list lives on the same network that just failed, so fall back to the
+    // event this iPad was last run against. A door with no signal still has to
+    // open, and every queued scan carries the event it was taken for.
+    const last = readJSON(EVENT_KEY_STORE, null);
+    if (last && last.key) {
+      sel.textContent = '';
+      const o = document.createElement('option');
+      o.value = last.key; o.textContent = last.label || last.key;
+      sel.appendChild(o);
+      $('start').disabled = false;
+      msg.textContent = 'Could not load events. Using the last one this iPad ran, scans will queue.';
+    } else {
       $('start').disabled = true;
+      msg.textContent = 'Could not load events.';
     }
-  } catch(_) {
-    $('setup-msg').textContent = 'Could not load events.';
-    $('setup-msg').hidden = false;
+    msg.hidden = false;
   }
 }
 $('start').addEventListener('click', startScanning);
 
-/* ---------- scan ---------- */
+/* ---------- start, stop ---------- */
 async function startScanning(){
-  const sel = $('ev');
-  $('evName').textContent = sel.options[sel.selectedIndex]?.textContent || '';
+  const sel = $('ev'), opt = sel.options[sel.selectedIndex];
+  EVENT_ID = sel.value || '';
+  EVENT_LABEL = opt ? opt.textContent : '';
+  if (!EVENT_ID) { $('setup-msg').textContent = 'Pick an event first.'; $('setup-msg').hidden = false; return; }
+  writeJSON(EVENT_KEY_STORE, { key: EVENT_ID, label: EVENT_LABEL });
+  $('evName').textContent = EVENT_LABEL;
+  $('m-ev').textContent = EVENT_LABEL;
   $('setup').classList.add('hidden');
-  $('scanner').classList.add('on');
-  grab();
+  scanning = true;
+  camReady = false;
   // Keep the screen awake: a door session is long and a sleeping iPad mid-queue
   // is the fastest way to lose the room.
-  try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch(_) {}
-  await camera();
+  await keepAwake();
+  if (await canRead()) {
+    $('scanner').classList.add('on');
+    await camera();
+  } else {
+    // No BarcodeDetector, which is every iPhone and iPad, every browser on iOS
+    // and Firefox everywhere. A live camera that can never detect anything is
+    // worse than no camera at all, so that browser never sees one and gets the
+    // path that does work instead.
+    openManual('This browser cannot read a QR code from the camera. Use a scanner gun, or type the code.');
+  }
+  syncQueue();
 }
 
-$('stop').addEventListener('click', () => {
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  ticking = false;
+function stopDoor(){
+  scanning = false; camReady = false; ticking = false;
+  stopStream();
+  releaseWake();
   $('scanner').classList.remove('on');
+  $('manual').classList.remove('on');
   $('setup').classList.remove('hidden');
-});
+  clearVerdict();
+}
+$('stop').addEventListener('click', stopDoor);
+$('m-done').addEventListener('click', stopDoor);
+
+function stopStream(){
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  const v = $('cam');
+  if (v) v.srcObject = null;
+}
+
+/* ---------- the camera ---------- */
+async function canRead(){
+  if (!('BarcodeDetector' in window)) return false;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
+  // Some builds ship the constructor without the QR format, which would detect
+  // nothing forever, so ask before putting a camera in front of anybody.
+  try {
+    const f = await window.BarcodeDetector.getSupportedFormats();
+    if (f && f.indexOf && f.indexOf('qr_code') === -1) return false;
+  } catch(_) {}
+  return true;
+}
 
 async function camera(){
-  if (!('BarcodeDetector' in window)) {
-    $('hint').textContent = 'This browser cannot scan — use a Bluetooth scanner';
-    return;
-  }
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' } }, audio: false
     });
-    const v = $('cam');
-    v.srcObject = stream;
-    await v.play();
-    const det = new window.BarcodeDetector({ formats: ['qr_code'] });
-    ticking = true;
-    const tick = async () => {
-      if (!ticking) return;
-      if (!document.hidden && v.readyState >= 2 && !busy) {
-        try {
-          const hits = await det.detect(v);
-          if (hits && hits.length) scan(hits[0].rawValue);
-        } catch(_) {}
-      }
-      setTimeout(tick, 300);
-    };
-    tick();
   } catch(_) {
-    $('hint').textContent = 'Camera blocked — allow access in Settings, or use a scanner';
+    camReady = false;
+    openManual('The camera is blocked. Allow it in Settings, or use a scanner gun, or type the code.');
+    return;
   }
+  const v = $('cam');
+  v.srcObject = stream;
+  try { await v.play(); } catch(_) {}
+  try { detector = detector || new window.BarcodeDetector({ formats: ['qr_code'] }); }
+  catch(_) { stopStream(); camReady = false; openManual('This browser cannot read a QR code. Use a scanner gun, or type the code.'); return; }
+  // The OS takes the camera away for a call or a sleep and ends the track. The
+  // video element keeps showing its last frame, which looks like a working
+  // scanner that has stopped answering, so take the hint and start again.
+  const track = stream.getVideoTracks()[0];
+  if (track) track.addEventListener('ended', () => { if (scanning) camera(); });
+  camReady = true;
+  $('hint').textContent = 'Hold the QR code in the frame';
+  grab();
+  startTick();
 }
+
+function startTick(){
+  if (ticking || !camReady) return;
+  ticking = true;
+  const v = $('cam');
+  const loop = async () => {
+    if (!ticking) return;
+    if (!document.hidden && camReady && detector && v.readyState >= 2 && !inFlight) {
+      try {
+        const hits = await detector.detect(v);
+        if (hits && hits.length) scan(hits[0].rawValue);
+      } catch(_) {}
+    }
+    setTimeout(loop, 300);
+  };
+  loop();
+}
+
+/* A wake lock is released every time the page is hidden and it does not come
+   back on its own, which is why asking once at the start let the iPad sleep
+   anyway. It has to be asked for again on every return to the foreground. */
+async function keepAwake(){
+  if (!('wakeLock' in navigator) || !scanning) return;
+  if (wakeLock && !wakeLock.released) return;
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch(_) { wakeLock = null; }
+}
+function releaseWake(){
+  if (wakeLock) { try { wakeLock.release(); } catch(_) {} wakeLock = null; }
+}
+
+/* Coming back to the foreground used to leave a frozen video with a loop that
+   had quietly skipped every frame. Prove the camera is alive, or rebuild it. */
+async function resume(){
+  if (!scanning) return;
+  keepAwake();
+  syncQueue();
+  if (!camReady) { if ($('manual').classList.contains('on')) { try { $('m-code').focus(); } catch(_) {} } return; }
+  const v = $('cam');
+  const track = stream && stream.getVideoTracks()[0];
+  if (!stream || !track || track.readyState === 'ended') { ticking = false; await camera(); return; }
+  if (v.paused || v.readyState < 2) {
+    try { await v.play(); } catch(_) { ticking = false; await camera(); return; }
+  }
+  startTick();
+  grab();
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) resume(); });
+window.addEventListener('focus', () => { if (scanning) resume(); });
+
+/* ---------- typed entry ---------- */
+function openManual(why){
+  $('m-why').textContent = why || '';
+  $('m-why').hidden = !why;
+  $('m-back').hidden = !camReady;
+  $('m-msg').hidden = true;
+  $('manual').classList.add('on');
+  setTimeout(() => { try { $('m-code').focus(); } catch(_) {} }, 60);
+}
+function closeManual(){
+  $('manual').classList.remove('on');
+  $('m-code').value = '';
+  grab();
+}
+$('typeBtn').addEventListener('click', () => openManual(''));
+$('m-back').addEventListener('click', closeManual);
+
+function manualSubmit(){
+  const val = $('m-code').value.trim();
+  $('m-code').value = '';
+  if (!val) { $('m-msg').textContent = 'Nothing to check in.'; $('m-msg').hidden = false; return; }
+  $('m-msg').hidden = true;
+  scan(val, { force: true });
+  try { $('m-code').focus(); } catch(_) {}
+}
+$('m-go').addEventListener('click', manualSubmit);
+$('m-code').addEventListener('keydown', e => {
+  // A gun aimed at this field ends its payload with whatever it was configured
+  // to send, and a person ends it with Enter. Take any of them.
+  if (e.key === 'Enter' || e.key === 'Tab' || e.keyCode === 13 || e.keyCode === 9) {
+    e.preventDefault(); manualSubmit();
+  }
+});
+
+/* ---------- Bluetooth and HID scanners ----------
+   A scanner gun in keyboard mode types the payload then a terminator, so a
+   hidden focused input picks it up with no UI at all. Focus is only taken while
+   the camera path is live: on the typed path the visible field is the target,
+   and the old every-1500ms grab both fought the operator for it and popped the
+   iOS keyboard over the camera. */
+const hid = $('hid');
+function grab(){
+  if (!scanning || !camReady) return;
+  if ($('relock').classList.contains('on') || $('manual').classList.contains('on')) return;
+  try { hid.focus({ preventScroll: true }); } catch(_) {}
+}
+$('scanner').addEventListener('click', grab);
+
+let hidTimer = null;
+function hidSubmit(){
+  clearTimeout(hidTimer);
+  const val = hid.value; hid.value = '';
+  if (val.trim()) scan(val.trim(), { force: true });
+}
+hid.addEventListener('keydown', e => {
+  // Guns are configured with all sorts of suffixes: Enter, a carriage return, a
+  // Tab, or nothing at all. Reading only Enter dropped the other three, so take
+  // any terminator, and treat a pause in machine-speed typing as the end of a
+  // payload that arrived with no terminator at all.
+  if (e.key === 'Enter' || e.key === 'Tab' || e.keyCode === 13 || e.keyCode === 9) {
+    e.preventDefault(); hidSubmit(); return;
+  }
+  clearTimeout(hidTimer);
+  hidTimer = setTimeout(hidSubmit, 160);
+});
 
 /* ---------- the answer ---------- */
 let hideTimer = null;
-function verdict(cls, mark, big, nm, sub){
+function verdict(cls, mark, big, nm, sub, undoCode){
   const v = $('verdict');
   v.className = 'on ' + cls;
   $('v-mark').textContent = mark;
   $('v-big').textContent = big;
   $('v-nm').textContent = nm || '';
   $('v-sub').textContent = sub || '';
+  const act = $('v-act');
+  act.hidden = !undoCode;
+  act.dataset.code = undoCode || '';
   if (navigator.vibrate) navigator.vibrate(cls === 'in' ? 40 : cls === 'bad' ? [60,50,60] : 25);
   clearTimeout(hideTimer);
   // Clears itself: nobody at a door should have to tap to get back to scanning.
-  hideTimer = setTimeout(() => { v.className = ''; }, cls === 'in' ? 2200 : 3000);
+  hideTimer = setTimeout(clearVerdict, cls === 'in' ? 2200 : 3000);
 }
-
-async function scan(code){
-  code = String(code || '').trim();
-  if (!code || busy) return;
-  busy = true;
-  try {
-    const r = await api('/api/admin/checkin', {
-      method:'POST', body: JSON.stringify({ code })
-    });
-    if (r.error)                        verdict('bad','✕','Not valid','', 'That code is not a pass for this event');
-    else if (r.state === 'in')          verdict('in','✓','Checked in', r.name, party(r.guests));
-    else if (r.state === 'waitlist_in') verdict('in','✓','Checked in', r.name, 'Was on the waitlist · ' + party(r.guests));
-    else if (r.state === 'already')     verdict('already','!','Already in', r.name, 'Scanned earlier');
-    else if (r.state === 'cancelled')   verdict('bad','✕','Cancelled', r.name, 'This RSVP was cancelled');
-  } catch(_) {
-    verdict('bad','✕','Offline','', 'Could not reach the service');
-  } finally {
-    // One pass, one check-in: a QR sits in frame for many frames, and a scanner
-    // trigger repeats. Without this pause a single guest fires several times.
-    setTimeout(() => { busy = false; }, 2400);
-  }
+function clearVerdict(){
+  clearTimeout(hideTimer);
+  $('verdict').className = '';
+  $('v-act').hidden = true;
+  if ($('manual').classList.contains('on')) { try { $('m-code').focus(); } catch(_) {} } else grab();
 }
-const party = n => (n > 1 ? n + ' guests' : 'Just them');
-
-/* ---------- Bluetooth / HID scanners ----------
-   A scanner gun in keyboard mode types the payload then Enter, so a hidden
-   focused input picks it up with no UI at all. */
-const hid = $('hid');
-function grab(){ hid.focus({ preventScroll: true }); }
-document.addEventListener('click', grab);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) grab(); });
-setInterval(() => { if ($('scanner').classList.contains('on')) grab(); }, 1500);
-hid.addEventListener('keydown', e => {
-  if (e.key === 'Enter') { scan(hid.value); hid.value = ''; e.preventDefault(); }
+// A tap anywhere on the verdict clears it early, which is what a queue wants.
+$('verdict').addEventListener('click', e => {
+  if (e.target && e.target.closest && e.target.closest('#v-act')) return;
+  clearVerdict();
+});
+// The wrong pass gets scanned at every door. Undo is offered for as long as the
+// verdict is up, and a pass scanned again answers "already in" and offers it
+// once more, so a mis-scan is always recoverable without leaving this screen.
+$('v-undo').addEventListener('click', () => {
+  const code = $('v-act').dataset.code;
+  clearVerdict();
+  if (code) scan(code, { undo: true, force: true });
 });
 
-if (TOKEN) toSetup();
+const party = n => (n > 1 ? n + ' guests' : 'Just them');
+function clock(iso){
+  try { return new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }); }
+  catch(_) { return ''; }
+}
+
+/* Every answer the service can give ends on a full-screen colour. Anything that
+   falls through this used to show nothing at all, which left the person at the
+   door with no idea whether to let the guest in. Green walks in, amber is a
+   look at this, red stops. */
+function render(r, code){
+  if (!r || typeof r !== 'object') {
+    verdict('bad','✕','No answer','', 'The door service said nothing, scan again'); return;
+  }
+  if (r.error) {
+    const e = String(r.error);
+    const known = (e === 'unrecognised code' || e === 'not found' || e === 'failed');
+    verdict('bad','✕','Not valid','', known ? 'This code is not a pass we issued' : e);
+    return;
+  }
+  switch (r.state) {
+    case 'in':
+      verdict('in','✓','Checked in', r.name, party(r.guests), code); break;
+    case 'waitlist_in':
+      verdict('in','✓','Checked in', r.name, 'Was on the waitlist · ' + party(r.guests), code); break;
+    case 'already':
+      verdict('already','!','Already in', r.name, r.at ? 'Scanned at ' + clock(r.at) : 'Scanned earlier', code); break;
+    case 'cancelled':
+      verdict('bad','✕','Cancelled', r.name, 'This RSVP was cancelled, do not admit'); break;
+    case 'wrong_event':
+      // Name the night the pass is really for, out loud, because that is the
+      // sentence the person at the door has to say to the guest.
+      verdict('bad','✕','Wrong event', r.event || 'Another night',
+        'This pass is not for tonight' + (r.name ? ' · ' + r.name : '')); break;
+    case 'undone':
+      verdict('bad','↺','Undone', r.name, 'Check-in reversed, they are not in'); break;
+    default:
+      verdict('bad','?','Unclear', r.name || '',
+        'Unexpected answer' + (r.state ? ' (' + String(r.state) + ')' : '') + ', use the back office');
+  }
+}
+
+/* The event is sent on every call, including the undo, so a pass for another
+   night is refused instead of quietly let in. */
+function post(code, eventId, undo){
+  const body = { code: code, eventId: eventId };
+  if (undo) body.undo = true;
+  return api('/api/admin/checkin', { method:'POST', body: JSON.stringify(body) });
+}
+
+async function scan(code, opts){
+  code = String(code || '').trim();
+  if (!code) return;
+  const undo = !!(opts && opts.undo);
+  const forced = !!(opts && opts.force);
+  const now = Date.now();
+  if (!undo && !forced) {
+    // A QR sits in frame for many frames and a scanner trigger repeats, so the
+    // same code counts once for a few seconds. The old fixed 2400ms lock also
+    // ignored the next guest in the queue; a different code is a different
+    // person and goes through the moment the last request lands.
+    const last = recent.get(code);
+    if (last && now - last < REPEAT_MS) return;
+  }
+  if (!undo) recent.set(code, now);
+  if (inFlight) {
+    // A gun can fire while the last request is still out. Dropping that scan
+    // would lose a guest, so the newest code waits its turn.
+    pending = { code: code, opts: { undo: undo, force: true } };
+    return;
+  }
+  inFlight = true;
+  try {
+    const r = await post(code, EVENT_ID, undo);
+    if (undo && r && r.state === 'undone') recent.delete(code);   // let them be scanned straight back in
+    render(r, undo ? '' : code);
+  } catch(e) {
+    if (e && e.auth) {
+      // The session died, not the network. The guest is still standing there,
+      // so the scan is kept and replayed the moment somebody signs back in.
+      if (undo) verdict('bad','✕','Not undone','', 'Sign in again, then scan the pass');
+      else { queueScan(code); savedVerdict(); }
+      onAuthExpired();
+    } else if (undo) {
+      verdict('bad','✕','Not undone','', 'No signal, try again when it comes back');
+    } else {
+      queueScan(code);
+      savedVerdict();
+    }
+  } finally {
+    inFlight = false;
+    prune();
+    if (pending) {
+      const p = pending; pending = null;
+      setTimeout(() => scan(p.code, p.opts), 0);
+    }
+  }
+}
+
+/* Deliberately nameless. Nothing was fetched, so this screen cannot tell the
+   guest apart from a stranger holding any QR code at all, and printing a name
+   that was never looked up would be the one lie the door cannot afford. */
+function savedVerdict(){
+  verdict('in','↑','Saved','', 'No signal · syncs when it returns');
+}
+
+function prune(){
+  const cut = Date.now() - 60000;
+  recent.forEach((t, k) => { if (t < cut) recent.delete(k); });
+}
+
+/* ---------- the offline queue ----------
+   The venue is a basement suite. When fetch fails the guest still walks in, the
+   scan is written to localStorage, not sessionStorage, so closing the tab does
+   not lose the night, and the queue is replayed the moment the network is back. */
+function queueScan(code){
+  // The same pass held in frame queues once. Two people cannot produce the same
+  // code, so this cannot swallow a real guest.
+  if (!QUEUE.some(q => q.code === code && q.eventId === EVENT_ID)) {
+    QUEUE.push({ code: code, eventId: EVENT_ID, at: new Date().toISOString() });
+    writeJSON(QUEUE_KEY, QUEUE);
+  }
+  paintQueue();
+}
+
+function paintQueue(){
+  const chip = $('qchip');
+  clearTimeout(chipTimer);
+  if (REVIEW.length) {
+    hadQueue = true;
+    chip.className = 'on warn';
+    chip.textContent = REVIEW.length + ' to check';
+    return;
+  }
+  if (QUEUE.length) {
+    hadQueue = true;
+    chip.className = 'on';
+    chip.textContent = QUEUE.length + ' unsynced';
+    return;
+  }
+  if (hadQueue) {
+    // Make the drain obvious: staff need to know the night is fully recorded.
+    hadQueue = false;
+    chip.className = 'on done';
+    chip.textContent = 'All synced';
+    chipTimer = setTimeout(() => { chip.className = ''; }, 4000);
+    return;
+  }
+  chip.className = '';
+}
+
+function reasonFor(r){
+  if (!r) return 'No answer from the door service';
+  if (r.error) return (r.error === 'unrecognised code' || r.error === 'not found')
+    ? 'That code is not a pass we issued' : String(r.error);
+  if (r.state === 'cancelled') return 'That RSVP was cancelled';
+  if (r.state === 'wrong_event') return 'That pass is for ' + (r.event || 'another night');
+  return 'Unexpected answer: ' + String(r.state || '');
+}
+
+async function syncQueue(){
+  if (syncing || !QUEUE.length || !TOKEN) return;
+  syncing = true;
+  try {
+    while (QUEUE.length) {
+      const item = QUEUE[0];
+      let r;
+      try { r = await post(item.code, item.eventId, false); }
+      catch(e) {
+        if (e && e.auth) { onAuthExpired(); return; }   // keep the queue, ask for the password
+        return;                                        // still no signal, try again later
+      }
+      QUEUE.shift();
+      writeJSON(QUEUE_KEY, QUEUE);
+      const st = r && r.state;
+      // A queued scan that lands as "already" is not a problem, it is the same
+      // guest arriving twice in the record: they were let in at the door and
+      // the server now agrees. Interrupting the night for that would be noise.
+      // A refusal is the opposite: somebody was let in who should not have
+      // been, and the door has to be told while they are still in the room.
+      const fine = !!r && !r.error && (st === 'in' || st === 'waitlist_in' || st === 'already' || st === 'undone');
+      if (!fine) REVIEW.push({ name: (r && r.name) || '', reason: reasonFor(r) });
+      paintQueue();
+    }
+  } finally {
+    syncing = false;
+    paintQueue();
+  }
+}
+
+$('qchip').addEventListener('click', () => {
+  if (!REVIEW.length) return;
+  const p = REVIEW.shift();
+  verdict('bad','!','Let in offline', p.name || 'Unknown pass', p.reason);
+  paintQueue();
+});
+
+window.addEventListener('online', () => { paintQueue(); syncQueue(); });
+window.addEventListener('offline', paintQueue);
+// A door can sit offline for a while, and the online event does not fire for a
+// captive portal that starts answering again, so keep checking quietly.
+setInterval(() => { if (QUEUE.length && navigator.onLine !== false) syncQueue(); }, 15000);
+
+/* ---------- boot ---------- */
+paintQueue();
+if (TOKEN) { toSetup(); syncQueue(); }
 </script>
 </body>
 </html>
