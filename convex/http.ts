@@ -542,4 +542,22 @@ http.route({
   handler: httpAction(async () => preflight()),
 });
 
+
+// Remove an RSVP outright. Cancelling is what a guest does; this is the
+// operator's eraser for test rows and mistakes.
+const deleteRsvp = httpAction(async (ctx, req) => {
+  if (!(await isAdmin(ctx, req))) return json({ error: "unauthorized" }, 401);
+  const body = await req.json().catch(() => ({}) as any);
+  const res: any = await ctx.runMutation(internal.rsvps.removeByAdmin, {
+    rsvpId: clean(body.rsvpId, 120),
+  });
+  return json(res, res?.ok ? 200 : 404);
+});
+http.route({ path: "/api/admin/rsvp/delete", method: "POST", handler: deleteRsvp });
+http.route({
+  path: "/api/admin/rsvp/delete",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
+
 export default http;

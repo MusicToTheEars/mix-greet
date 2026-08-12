@@ -126,6 +126,24 @@ export const listForEvent = internalQuery({
       .withIndex("by_event", (q) => q.eq("eventId", eventId))
       .collect();
     rsvps.sort((a, b) => a._creationTime - b._creationTime);
+
+    // Invite status per guest. The ledger already records every send and the
+    // Resend webhook already patches it to delivered/bounced/complained, so the
+    // back office can show whether the confirmation actually landed rather than
+    // only that we tried. A bounced invite is the one a host needs to chase.
+    const sends = await Promise.all(
+      rsvps.map((r) =>
+        ctx.db
+          .query("emailSends")
+          .withIndex("by_dedupeKey", (q) =>
+            q.eq("dedupeKey", `rsvp_confirmation:${r._id}`),
+          )
+          .first(),
+      ),
+    );
+    const inviteByRsvp = new Map(
+      rsvps.map((r, i) => [r._id, sends[i]] as const),
+    );
     return {
       event: {
         id: eventId,
@@ -146,6 +164,9 @@ export const listForEvent = internalQuery({
         confirmationSentAt: r.confirmationSentAt
           ? new Date(r.confirmationSentAt).toISOString()
           : "",
+        // "" when nothing was ever enqueued for this guest.
+        inviteStatus: inviteByRsvp.get(r._id)?.status ?? "",
+        inviteError: inviteByRsvp.get(r._id)?.error ?? "",
       })),
     };
   },
@@ -338,5 +359,27 @@ export const doorStats = internalQuery({
         checkedIn: rows.filter((r) => r.status === "checked_in").length,
       },
     };
+  },
+});
+
+// Hard-delete one RSVP. Cancelling is the guest-facing action and keeps the
+// record; this is for an operator removing a test row or a mistake outright.
+export const removeByAdmin = internalMutation({
+  args: { rsvpId: v.string() },
+  handler: async (ctx, args) => {
+    const id = ctx.db.normalizeId("rsvps", args.rsvpId);
+    const rsvp = id ? await ctx.db.get(id) : null;
+    if (!id || !rsvp) return { ok: false as const, error: "not found" };
+    // Drop the send ledger row too, or a re-RSVP by the same person is deduped
+    // against a confirmation that no longer has an RSVP to belong to.
+    const send = await ctx.db
+      .query("emailSends")
+      .withIndex("by_dedupeKey", (q) =>
+        q.eq("dedupeKey", `rsvp_confirmation:${id}`),
+      )
+      .first();
+    if (send) await ctx.db.delete(send._id);
+    await ctx.db.delete(id);
+    return { ok: true as const, email: rsvp.email };
   },
 });

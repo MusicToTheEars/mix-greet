@@ -260,7 +260,7 @@
     <div class="panel" id="guests-panel" hidden>
       <div class="head"><h2 id="guests-title">Who&rsquo;s coming</h2><span class="count" id="guests-count"></span></div>
       <table class="stack">
-        <thead><tr><th>Guest</th><th>Party</th><th>Status</th><th>Responded</th></tr></thead>
+        <thead><tr><th>Guest</th><th>Party</th><th>Status</th><th>Invite email</th><th>Responded</th></tr></thead>
         <tbody id="guests-list"></tbody>
       </table>
       <p class="msg" id="guests-msg" hidden></p>
@@ -957,6 +957,28 @@ function guestRow(r){
   st.appendChild(el('span', r.status === 'waitlist' ? 'g-wait' : null,
     STATUS_LABEL[r.status] || r.status));
   tr.appendChild(st);
+
+  // What actually happened to the confirmation. Resend's webhook patches the
+  // ledger, so "delivered" here is the provider's word, not ours. A bounce is a
+  // guest holding no pass and no address, and it is invisible without this.
+  const invite = el('td');
+  invite.dataset.label = 'Invite email';
+  const INV = {
+    '': ['Not sent', ''],
+    queued: ['Queued', 'soon'],
+    sent: ['Sent', 'soon'],
+    delivered: ['Delivered', 'live'],
+    bounced: ['Bounced', 'danger'],
+    complained: ['Spam report', 'danger'],
+    failed: ['Failed', 'danger'],
+    suppressed_skip: ['Suppressed', 'danger'],
+  };
+  const [lab, cls] = INV[r.inviteStatus || ''] || [r.inviteStatus, ''];
+  invite.appendChild(el('span', 'badge ' + cls, lab));
+  if (r.inviteError) {
+    invite.appendChild(el('div', 'g-mail', String(r.inviteError).slice(0, 70)));
+  }
+  tr.appendChild(invite);
 
   const when = el('td', 'muted', (r.createdAt || '').slice(0, 10));
   when.dataset.label = 'Responded';
