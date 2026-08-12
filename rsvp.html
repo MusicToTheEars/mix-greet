@@ -108,6 +108,9 @@ body{--text-muted:#5F5F68}
   grid-template-rows:max-content 1fr;
   gap:0 clamp(24px,3.6vw,56px);align-items:start;
 }
+/* No poster to sit beside: one column, so the invitation does not leave a
+   404px hole where the artwork would have been. */
+.hero-grid.solo{grid-template-columns:minmax(0,1fr)}
 .hero-head{grid-column:1;grid-row:1;min-width:0}
 .hero-info{grid-column:1;grid-row:2;min-width:0}
 /* the flyer and, beneath it, the single lozenge the transaction hides behind.
@@ -1099,9 +1102,18 @@ function renderFlyer(ev){
   const serial = key.replace(/[^a-z0-9]/gi, '').slice(-4).toUpperCase();
   $('tkNo').textContent = serial ? 'No. ' + serial : '';
 
-  const title = ev.title || 'Mix & Greet';
   const flyer = $('ticket');
-  flyer.setAttribute('aria-label', 'Poster for ' + title);
+
+  // The plate is the poster's subject, so it names the poster. With a
+  // headliner's photograph up there the lockup is the ARTIST — repeating the
+  // event title over their face says nothing the left column has not already
+  // said twice. With no photograph the poster falls back to the event.
+  const headliner = featuredOf(ev)
+    .filter(f => f.kind !== 'company' && safeUrl(f.imageUrl))[0] || null;
+  const title = (headliner && headliner.name) || ev.title || 'Mix & Greet';
+  flyer.setAttribute('aria-label', headliner
+    ? 'Poster for ' + (ev.title || 'the event') + ', featuring ' + headliner.name
+    : 'Poster for ' + title);
 
   // The lockup, printed twice a few pixels apart: a red plate under a cream
   // one, the way a screen print misregisters. Both halves are built with
@@ -1119,9 +1131,7 @@ function renderFlyer(ev){
   // in the lineup below.
   const art = $('plateArt');
   art.textContent = '';
-  const faces = featuredOf(ev)
-    .filter(f => f.kind !== 'company' && safeUrl(f.imageUrl))
-    .slice(0, 1);
+  const faces = headliner ? [headliner] : [];
   faces.forEach(f => {
     const img = el('img');
     img.src = safeUrl(f.imageUrl);
@@ -1136,6 +1146,16 @@ function renderFlyer(ev){
     art.appendChild(img);
   });
   flyer.classList.toggle('has-art', faces.length > 0);
+
+  // No headliner photograph means the composed poster has no subject: it would
+  // print the disc, the grain and a title over an empty field, which reads as a
+  // broken image rather than as a design. Drop the whole column and let the
+  // invitation run full width; tryArtwork() re-opens it if the event has its
+  // own uploaded flyer.
+  const col = document.querySelector('.poster-col');
+  const bare = faces.length === 0;
+  if (col) col.classList.toggle('hidden', bare);
+  document.querySelector('.hero-grid').classList.toggle('solo', bare);
 }
 
 function tryArtwork(ev){
@@ -1145,6 +1165,9 @@ function tryArtwork(ev){
   const wrap = $('posterWrap');
   img.alt = (ev.title || 'Mix & Greet') + ' — event flyer';
   img.addEventListener('load', () => {
+    const col = document.querySelector('.poster-col');
+    if (col) col.classList.remove('hidden');
+    document.querySelector('.hero-grid').classList.remove('solo');
     wrap.classList.remove('hidden');
     hide('ticket');
     requestAnimationFrame(() => wrap.classList.add('on'));
