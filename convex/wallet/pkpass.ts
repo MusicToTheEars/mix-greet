@@ -29,7 +29,9 @@ export type PassInput = {
   authToken: string; // also the QR payload the door scans
   eventTitle: string;
   subtitle?: string;
-  artist?: string;
+  // Every non-company name on the bill, in order. Plural because an event can
+  // have several and they are printed as a column.
+  artists?: string[];
   whenIso?: string; // ISO 8601 with offset; drives the lock-screen relevance
   whenLabel: string;
   dateShort?: string; // "AUG 15" — the header stamp
@@ -69,17 +71,31 @@ function buildPassJson(p: PassInput) {
     primaryFields: [
       { key: "event", label: "", value: p.eventTitle },
     ],
+    // Wallet lays each group out as a horizontal ROW, so a field only gets the
+    // full width when it is alone in its group. The guests need that width to
+    // stack, which is why they own auxiliaryFields outright and the venue moved
+    // to the back.
     secondaryFields: [
       { key: "when", label: "STARTS", value: p.whenLabel },
-      ...(p.venueLine ? [{ key: "venue", label: "VENUE", value: p.venueLine }] : []),
+      { key: "admit", label: "ADMIT", value: `${p.guestName} · ${p.partyLabel}` },
     ],
     auxiliaryFields: [
-      { key: "guest", label: "ADMIT", value: p.guestName },
-      { key: "party", label: "PARTY", value: p.partyLabel },
-      ...(p.artist ? [{ key: "artist", label: "ON THE BILL", value: p.artist }] : []),
+      ...(p.artists && p.artists.length
+        ? [
+            {
+              key: "artists",
+              label: p.artists.length > 1 ? "SPECIAL GUESTS" : "SPECIAL GUEST",
+              // Newline-joined so several names read as a column, one under the
+              // next, rather than running together on one line.
+              value: p.artists.join("\n"),
+            },
+          ]
+        : []),
     ],
     backFields: [
       ...(p.subtitle ? [{ key: "sub", label: "Session", value: p.subtitle }] : []),
+      ...(p.location ? [{ key: "where", label: "Venue", value: p.location }] : []),
+      { key: "party", label: "Party size", value: p.partyLabel },
       { key: "guest", label: "Guest", value: p.guestName },
       {
         key: "status",

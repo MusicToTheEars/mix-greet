@@ -48,9 +48,12 @@ export const buildForToken = internalAction({
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ev.date || "");
     const dateShort = m ? `${MONTHS[+m[2] - 1]} ${+m[3]}` : ev.date;
     const whenLabel = [dateShort, ev.start].filter(Boolean).join(" · ");
-    const headliner = (data.featured || []).find(
+    // Everyone billed, not just the first: partners are excluded because a
+    // logo is not a special guest, and the pass prints the people.
+    const billed = (data.featured || []).filter(
       (f: any) => f && f.kind !== "company" && f.name,
     );
+    const headliner = billed[0];
     const g = data.rsvp.guests || 1;
 
     // Pull the headliner's photo for the pass thumbnail. Best-effort on
@@ -80,7 +83,7 @@ export const buildForToken = internalAction({
       authToken: args.token,
       eventTitle: ev.title,
       subtitle: ev.subtitle || undefined,
-      artist: headliner?.name,
+      artists: billed.map((f: any) => String(f.name)),
       whenIso: relevantIso(ev.date, ev.start),
       whenLabel,
       dateShort,
