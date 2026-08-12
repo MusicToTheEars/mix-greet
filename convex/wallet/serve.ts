@@ -63,7 +63,11 @@ export const buildForToken = internalAction({
     const bytes = await buildPkpass({
       // Stable per RSVP: re-adding replaces the pass instead of stacking copies.
       serial: `mg-${data.rsvp.id}`,
-      authToken: args.token,
+      // The QR carries the bare rsvp id, not the signed token: 32 plain
+      // alphanumerics instead of 65 with a dot, which is a far coarser code to
+      // scan across a dark room. It is not a secret — /api/admin/checkin is
+      // gated by the staff admin token, so possessing an id grants nothing.
+      authToken: rsvpId,
       eventTitle: ev.title,
       subtitle: ev.subtitle || undefined,
       artists: billed.map((f: any) => String(f.name)),

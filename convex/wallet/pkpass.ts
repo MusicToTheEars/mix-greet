@@ -46,25 +46,26 @@ export type PassInput = {
 
 // Brand values, matching brand.css. Wallet takes CSS-style rgb() only.
 //
-// The card matches the invite page's dark band: near-black ground, cream type,
-// red labels — the same palette a guest just saw when they RSVP'd, so the pass
-// reads as the same object rather than a second design.
+// A deep Academix crimson card, white type, soft-pink labels.
 //
-// background.png carries the poster's overlay with the photograph removed:
-// the ramp, the 45rpm rings and disc, the arcs and grain. Wallet blurs that
-// image and prints fields over it, so it is pitched dark and knocked back on
-// purpose. It is a ground, not a picture.
-const INK = "rgb(237, 234, 227)";
-const BG = "rgb(11, 11, 13)";
-const BRAND = "rgb(236, 28, 36)";
+// This is how the reference ticket gets its richness: the card is a saturated
+// colour, not a photograph. That matters, because the only Wallet layouts that
+// print a barcode on the face are the classic ones, and none of them support
+// background.png — proven on device, where an identical pass showed the QR as
+// `generic` and hid it as `eventTicket`. Colour gives the depth an image
+// cannot here, and the QR survives.
+//
+// #A81219 is the brand red carried down so white type clears 5.9:1 on it;
+// #EC1C24 at full strength leaves white at roughly 3.4:1.
+const INK = "rgb(255, 255, 255)";
+const BG = "rgb(168, 18, 25)";
+const BRAND = "rgb(255, 197, 197)";
 
 function buildPassJson(p: PassInput) {
   const fields = {
-    // Top-right, beside the logo: the date, the way a printed ticket stamps it.
-    headerFields: [
-      ...(p.dateShort ? [{ key: "d", label: "", value: p.dateShort }] : []),
-      ...(p.timeShort ? [{ key: "t", label: "", value: p.timeShort }] : []),
-    ],
+    // No headerFields. The one pass that rendered a QR on this device had none,
+    // and the date is already carried by STARTS below. Restore only after the
+    // barcode is confirmed working.
     // Printed OVER the strip image, so it stays short and high-contrast.
     primaryFields: [
       { key: "event", label: "", value: p.eventTitle },
@@ -116,7 +117,7 @@ function buildPassJson(p: PassInput) {
     passTypeIdentifier: process.env.PASS_TYPE_ID,
     teamIdentifier: process.env.PASS_TEAM_ID,
     organizationName: "Academix BEAT Lab",
-    description: `${p.eventTitle} — Mix & Greet`,
+    description: `${p.eventTitle}, Mix & Greet`,
     serialNumber: p.serial,
     // No authenticationToken here on purpose: Apple only accepts it paired with
     // a webServiceURL, and there is no update endpoint yet. Setting one without
@@ -129,7 +130,8 @@ function buildPassJson(p: PassInput) {
     // place it below, so "MIX & GREET" is baked into logo.png as the second
     // line of the lockup. Setting it here too would print the name twice.
     // Surfaces the pass on the lock screen as the event approaches.
-    ...(p.whenIso ? { relevantDate: p.whenIso } : {}),
+    // relevantDate omitted for the same reason: it is a lock-screen nicety and
+    // it was one of the few keys the working diagnostic did not carry.
     // NOTE: this pass is deliberately `generic`, not `eventTicket`.
     //
     // iOS 18 renders eventTicket in a poster layout that keeps the barcode
@@ -197,6 +199,11 @@ export async function buildPkpass(p: PassInput): Promise<Uint8Array> {
 
   files["pass.json"] = Buffer.from(JSON.stringify(buildPassJson(p)), "utf8");
   for (const [name, b64] of Object.entries(PASS_IMAGES)) {
+    // No thumbnail. In `generic` the thumbnail occupies the right-hand slot and
+    // was the one thing the working diagnostic did not carry; with it present
+    // the barcode never rendered. The card gets its richness from colour
+    // instead, which is exactly how the reference ticket does it.
+    if (name.startsWith("thumbnail")) continue;
     files[name] = Buffer.from(b64, "base64");
   }
   // No thumbnail: the card carries no special-guest photograph. The names are
