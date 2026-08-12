@@ -318,15 +318,16 @@ body{--text-muted:#5F5F68}
 .facts a:hover,.facts a:focus-visible{background:var(--ink);color:#0B0B0D;border-bottom-color:var(--ink)}
 .facts a:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
 
-.cal-btn{
+.cal-btn,.back-btn{
   display:inline-flex;align-items:center;gap:10px;margin-top:clamp(20px,3vw,26px);
   background:transparent;border:2px solid var(--text);color:var(--text);
   font-family:'Plex Mono',ui-monospace,monospace;font-weight:700;font-size:12px;
   letter-spacing:.18em;padding:12px 18px;
 }
-.cal-btn svg{width:18px;height:18px;flex:none}
-.cal-btn:hover,.cal-btn:focus-visible{background:var(--text);color:var(--surface)}
-.cal-btn:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+.back-btn{text-decoration:none;color:var(--text);text-transform:uppercase}
+.cal-btn svg,.back-btn svg{width:18px;height:18px;flex:none}
+.cal-btn:hover,.cal-btn:focus-visible,.back-btn:hover,.back-btn:focus-visible{background:var(--text);color:var(--surface)}
+.cal-btn:focus-visible,.back-btn:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
 /* same control on the dark band */
 .hero-info .cal-btn{border-color:#4A4A56;color:var(--ink)}
 .hero-info .cal-btn:hover,.hero-info .cal-btn:focus-visible{background:var(--ink);color:#0B0B0D;border-color:var(--ink)}
@@ -448,7 +449,8 @@ body{--text-muted:#5F5F68}
 }
 .state .recap .rk{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-muted)}
 .state .recap .rv{font-size:14px;color:var(--text);font-weight:500;line-height:1.5;margin-top:2px}
-.state .acts-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.state .acts-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:20px}
+.state .acts-row .cal-btn,.state .acts-row .back-btn{margin-top:0}
 .state .acts-row .cal-btn,.state .acts-row .btn{margin-top:0}
 .state .acts-row .btn{
   padding:12px 22px;font-size:12px;
@@ -712,6 +714,10 @@ body.has-sticky{padding-bottom:84px}
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h14v12H3z"/><path d="M3 9h14M7 3v4M13 3v4"/></svg>
               Add to calendar
             </button>
+            <a class="back-btn" href="/">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5l-5 5 5 5"/><path d="M6 10h9"/></svg>
+              Back to Mix &amp; Greet
+            </a>
           </div>
         </div>
 
@@ -719,6 +725,12 @@ body.has-sticky{padding-bottom:84px}
           <h2>You're on the waitlist</h2>
           <p>This one is at capacity. We'll email <b id="waitEmail"></b> the moment a spot opens up — no need to check back.</p>
           <div class="recap" id="waitRecap"></div>
+          <div class="acts-row">
+            <a class="back-btn" href="/">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5l-5 5 5 5"/><path d="M6 10h9"/></svg>
+              Back to Mix &amp; Greet
+            </a>
+          </div>
         </div>
 
         <div id="externalState" class="state out hidden">
