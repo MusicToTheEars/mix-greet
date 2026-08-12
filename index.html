@@ -165,8 +165,8 @@ section{padding:clamp(8px,2vw,16px) 0}
 
 /* events */
 .events-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;margin-top:clamp(28px,4vw,40px)}
-.event-card{position:relative;border:2px solid var(--line-lt);background:#F5F4F1;padding:clamp(24px,3.5vw,34px);display:flex;flex-direction:column;align-items:flex-start;gap:12px}
-.event-card .flag{position:absolute;top:0;right:0;background:var(--red);color:#FFF;font-size:11px;letter-spacing:.2em;font-weight:700;padding:7px 12px;text-transform:uppercase}
+.event-card{border-radius:8px;position:relative;border:2px solid var(--line-lt);background:#F5F4F1;padding:clamp(24px,3.5vw,34px);display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.event-card .flag{border-radius:0 6px 0 6px;position:absolute;top:0;right:0;background:var(--red);color:#FFF;font-size:11px;letter-spacing:.2em;font-weight:700;padding:7px 12px;text-transform:uppercase}
 .event-card .when{color:var(--amber-ink);font-size:13px;letter-spacing:.16em;font-weight:600;text-transform:uppercase}
 /* Date and time each own a line. As one run they wrapped mid-phrase
    ("1:00 PM –" / "4:00 PM"), which broke the time range across the fold. */
@@ -212,7 +212,7 @@ section{padding:clamp(8px,2vw,16px) 0}
 .flyer .btn{margin-top:30px}
 body.no-scroll{overflow:hidden}
 @media(max-width:520px){.act img{width:58px;height:58px;flex:0 0 58px}.act .nm{font-size:20px}}
-.no-events{grid-column:1/-1;border:2px dashed var(--line-lt);padding:38px 24px;text-align:center;color:var(--muted-lt);font-size:14px;letter-spacing:.08em}
+.no-events{border-radius:8px;grid-column:1/-1;border:2px dashed var(--line-lt);padding:38px 24px;text-align:center;color:var(--muted-lt);font-size:14px;letter-spacing:.08em}
 .event-card .btn.soon{background:transparent;border-color:var(--line-lt);color:var(--muted-lt);pointer-events:none;cursor:default}
 
 /* partners carousel */
@@ -254,6 +254,10 @@ footer .bar{border:0;border-top:4px solid var(--line)}
 .light .details dt{color:var(--muted-lt)}
 .light .details dd{color:#16161A}
 .light .details .hl,.light .details a,.light a{color:var(--amber-ink)}
+/* The RSVP button is an <a>, so the rule above outranked .btn's own colour
+   (0,1,1 vs 0,1,0) and painted amber-ink text on the red fill — unreadable.
+   Hover stays red-on-transparent: .light .btn:hover is 0,3,0 and still wins. */
+.light a.btn{color:#FFFFFF}
 .light .details .sub{color:var(--muted-lt)}
 .light .rsvp-box{background:#F5F4F1;border-color:var(--line-lt)}
 .light .rsvp-box p.big{color:#16161A}

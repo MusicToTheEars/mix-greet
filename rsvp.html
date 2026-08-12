@@ -712,7 +712,6 @@ body.has-sticky{padding-bottom:84px}
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h14v12H3z"/><path d="M3 9h14M7 3v4M13 3v4"/></svg>
               Add to calendar
             </button>
-            <button class="copy-btn" id="shareBtn" type="button">Share invite</button>
           </div>
         </div>
 
@@ -720,9 +719,6 @@ body.has-sticky{padding-bottom:84px}
           <h2>You're on the waitlist</h2>
           <p>This one is at capacity. We'll email <b id="waitEmail"></b> the moment a spot opens up — no need to check back.</p>
           <div class="recap" id="waitRecap"></div>
-          <div class="acts-row">
-            <button class="copy-btn" id="shareBtn2" type="button">Share invite</button>
-          </div>
         </div>
 
         <div id="externalState" class="state out hidden">
@@ -1289,7 +1285,7 @@ async function fetchEvent(key){
 // on screen, pushing "This invitation has expired" below the fold.
 function deadLink(){
   show('notfound');
-  ['icsBtn','icsBtn2','shareBtn','shareBtn2','shareBtn3','heroRsvp','stickyRsvp'].forEach(id => {
+  ['icsBtn','icsBtn2','shareBtn3','heroRsvp','stickyRsvp'].forEach(id => {
     const n = $(id); if (n) n.hidden = true;
   });
   ['hero','ticket','rsvp-panel','stickyBar','lineupBlock','formWrap','evChips','heroCta']
@@ -1513,7 +1509,10 @@ $('rsvpForm').addEventListener('submit', async (e) => {
 
 $('icsBtn').addEventListener('click', downloadIcs);
 $('icsBtn2').addEventListener('click', downloadIcs);
-['shareBtn', 'shareBtn2', 'shareBtn3'].forEach(id => {
+// shareBtn/shareBtn2 were removed from the post-RSVP states: once someone has
+// committed, the page should not push them to recruit. shareBtn3 remains on the
+// external state, which is still pre-RSVP.
+['shareBtn3'].forEach(id => {
   $(id).addEventListener('click', (e) => shareInvite(e.currentTarget));
 });
 
