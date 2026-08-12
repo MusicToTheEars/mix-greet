@@ -250,7 +250,7 @@ const FRAMES = {
   // the invitation's flyer as it is. Only rendered if the poster scheme is
   // ever switched on, so it is the forward-compatible asset, not the shipping
   // one.
-  artwork: { w: 363, h: 510, css: 363, budgets: [80_000, 190_000, 430_000] },
+  artwork: { w: 363, h: 510, css: 363, budgets: [110_000, 260_000, 560_000] },
 
   // The classic eventTicket ground, and therefore the asset the guest actually
   // sees. Apple: "The image is cropped slightly on all sides and blurred."
@@ -276,17 +276,23 @@ const FRAMES = {
     h: 220,
     css: 363,
     heavy: true,
-    budgets: [22_000, 45_000, 105_000],
+    budgets: [26_000, 58_000, 130_000],
     extra: `
 .flyer.has-art .fl-wash::after{display:none}
-.flyer.has-art .fl-rings{opacity:.5}
-.flyer.has-art .fl-arcs{stroke:#EDEAE3;opacity:.3}
+.flyer.has-art .fl-rings{opacity:.34}
+.flyer.has-art .fl-arcs{stroke:#EDEAE3;opacity:.22}
 .fl-type{display:none}
+/* The headliner's shirt carries printed type of its own, which the blur turns
+   into a second illegible smear right where the barcode tile lands, and Wallet
+   crops a few percent off every edge on top of that. So the foot of the scrim
+   is brought forward to 63% and taken all the way to opaque by 90%: the face
+   keeps the top half, the bottom third goes to flat #0B0B0D, and the shirt —
+   printed type and all — is simply not in the picture any more. */
 .flyer.has-art .fl-scrim{
   background:linear-gradient(180deg,
     rgba(11,11,13,.88) 0%,rgba(11,11,13,.16) 22%,
-    rgba(11,11,13,.04) 42%,rgba(11,11,13,.62) 68%,
-    rgba(11,11,13,.93) 86%,rgba(11,11,13,.98) 100%);
+    rgba(11,11,13,.06) 44%,rgba(11,11,13,.58) 63%,
+    rgba(11,11,13,.94) 78%,rgba(11,11,13,1) 90%);
 }`,
   },
 };
@@ -317,9 +323,15 @@ async function render(browser, art, frame, scale) {
 // Two inks over black: a palette PNG is a fraction of the truecolour file and
 // the only visible cost is in the grain, which is noise anyway. Walk the
 // palette down until the frame fits its share of the 1.2MB the whole map gets.
+//
+// The ladder starts at 160 rather than 255 deliberately. A red duotone over
+// black is a one-dimensional ramp; past ~160 entries the extra colours are
+// spent describing the grain, which triples the file for a difference nobody
+// can see, and it lets every density in a family land on the same palette
+// depth so they are the same picture rather than three similar ones.
 async function pack(buf, budget) {
   let last = null;
-  for (const colours of [255, 192, 160, 128, 96, 64, 48]) {
+  for (const colours of [160, 128, 96, 64, 48]) {
     const out = await sharp(buf)
       .png({
         palette: true,

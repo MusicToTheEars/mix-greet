@@ -197,6 +197,57 @@ artwork, survives being looked at.
 ## 5. The decode test, verbatim
 
 <!-- DECODE_OUTPUT_START -->
+```
+$ ./scripts/wallet/gen-test-certs.sh
+test chain written to ./.wallet-test/certs
+./.wallet-test/certs/pass.pem: OK
+
+$ node --import ./scripts/wallet/convex-resolve.mjs scripts/wallet/verify-pass.mjs
+PASS  zip opens and is non-trivial                                       15 files, 538 KB
+PASS  carries the files Apple requires                                   artwork.png, artwork@2x.png, artwork@3x.png, background.png, background@2x.png, background@3x.png, icon.png, icon@2x.png, icon@3x.png, logo.png, logo@2x.png, logo@3x.png, manifest.json, pass.json, signature
+PASS  manifest hashes every file, and every hash matches                 13 files, all SHA-1 matched
+PASS  signature is a detached PKCS#7 that verifies against the manifest  openssl smime -verify: OK
+PASS  the signed content really is this manifest, not another one        tampered manifest rejected, as it must be
+PASS  pass.json declares exactly one style, with its field dictionary    eventTicket
+PASS  pass.json carries the required top-level keys                      formatVersion 1, ids and description present
+PASS  every barcode format is a constant Apple actually defines          PKBarcodeFormatQR, PKBarcodeFormatQR
+PASS  barcodes is a non-empty array of well-formed entries               PKBarcodeFormatQR/iso-8859-1
+PASS  the QR payload is EXACTLY the id /api/admin/checkin expects        jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd (32 chars, matches /^[a-z0-9]{20,40}$/i)
+PASS  the payload round-trips through a real QR encoder and zbarimg      zbarimg --raw -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+PASS  a second, independent decoder agrees                               jsQR -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+PASS  every image is a real PNG at the density its filename claims       artwork.png 363x510, artwork@2x.png 726x1020, artwork@3x.png 1089x1530, background.png 180x220, background@2x.png 360x440, background@3x.png 540x660, icon.png 29x29, icon@2x.png 58x58, icon@3x.png 87x87, logo.png 160x50, logo@2x.png 320x100, logo@3x.png 480x150
+PASS  the style can actually display every image the bundle ships        eventTicket: artwork, background, icon, logo
+PASS  the card has an artwork ground, not just a flat colour             background.png at 1x, 2x and 3x
+PASS  the poster layout is not silently switched on                      preferredStyleSchemes absent, classic card, barcode on the face
+PASS  the altText under the code is something the door would accept      jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+PASS  semantics carry the four tags Apple requires of an event pass      PKEventTypeLivePerformance, TEST Event @ 1933 S. Broadway
+
+pkpass:   ./.wallet-test/out/MixAndGreet.pkpass
+unzipped: ./.wallet-test/out/unzipped
+18/18 checks passed
+
+$ node scripts/wallet/render-face.mjs
+style: eventTicket   schemes: "(none)"
+payload in pass.json: jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+
+PASS  poster face  1125x1623px
+        zbarimg  -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+        jsQR     -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+        file     -> ./.wallet-test/out/faces/face-poster.png
+PASS  classic face  1125x1365px
+        zbarimg  -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+        jsQR     -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+        file     -> ./.wallet-test/out/faces/face-classic.png
+under door conditions:
+  PASS  poster @  420px  phone at arm's length            zbar:ok jsQR:ok
+  PASS  poster @  300px  further back, softer focus       zbar:ok jsQR:ok
+  PASS  poster @  240px  dim doorway, heavy compression   zbar:ok jsQR:ok
+  PASS  classic @  420px  phone at arm's length            zbar:ok jsQR:ok
+  PASS  classic @  300px  further back, softer focus       zbar:ok jsQR:ok
+  PASS  classic @  240px  dim doorway, heavy compression   zbar:ok jsQR:ok
+
+all rendered faces decoded to the exact RSVP id: jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+```
 <!-- DECODE_OUTPUT_END -->
 
 ---
@@ -210,5 +261,33 @@ artwork, survives being looked at.
 
 ## 7. Still needs Lawrence
 
-<!-- HANDOFF_START -->
-<!-- HANDOFF_END -->
+Nothing here was deployed. `npx convex deploy` and `scripts/deploy.sh` were not
+run, and this branch was not merged.
+
+**1. The one thing the rig cannot prove.** Everything above is verified against
+Apple's spec, Apple's samples, and real decoders — but on a self-signed chain,
+in a browser, not on an iPhone. The remaining unknown is not the barcode, which
+is now demonstrably a valid PassKit constant carrying the right payload; it is
+whether Wallet's own layout puts it where we expect. That takes one device:
+deploy the branch, open a real invite, add the pass, and look at it. If the
+code is on the face, this is done.
+
+**2. Env vars.** No new ones are required. `PASS_TYPE_ID`, `PASS_TEAM_ID`,
+`PASS_CERT_B64`, `PASS_KEY_B64` and `PASS_WWDR_B64` are unchanged, and the
+production certificate is untouched — the fix was a string, not a signing
+change.
+
+One new **optional** var exists, `WALLET_STYLE_SCHEMES`. Leave it unset. Setting
+it to `posterEventTicket,eventTicket` switches on the iOS 18 poster layout,
+which Apple documents as incompatible with barcode entry, and would take the QR
+off the door. It is there for the day this pass rides on NFC instead; the
+artwork and the semantic tags it needs are already in the bundle.
+
+**3. Certificates.** Untouched, and no cert or key is in this branch. The rig's
+throwaway chain lives in `.wallet-test/`, which is gitignored; `git diff` on the
+branch shows no `.pem`, no `.key`, nothing base64-encoded but the artwork.
+
+**4. Worth a look, not blocking.** The Android and no-Wallet path,
+`GET /api/qr`, is deliberately untouched — `git diff` against `e350fce` shows no
+change to `convex/wallet/qr.ts` or `convex/http.ts`. It encodes the same bare
+RSVP id the pass does, so both routes check in identically at the same door.

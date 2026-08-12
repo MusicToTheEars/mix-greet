@@ -233,9 +233,62 @@ for (const [name, file] of shots) {
   console.log(`        file     -> ${file}`);
 }
 
-console.log("");
+// --- the door, not the darkroom ---------------------------------------------
+//
+// The renders above are pristine. A door sees a phone held at arm's length in
+// bad light: the card is small in frame, slightly out of focus, and the camera
+// hands the decoder a compressed, noisy JPEG. A code that only survives perfect
+// conditions has not been proven, so the same faces get degraded and read
+// again.
+
+async function degrade(src, dest, { width, blur, quality, dark }) {
+  const sharp = (await import("sharp")).default;
+  let img = sharp(src).resize({ width });
+  if (blur) img = img.blur(blur);
+  // A phone screen at an angle, under a dim doorway, loses contrast and gains
+  // a warm cast from the room.
+  if (dark) img = img.modulate({ brightness: dark }).linear(0.88, 8);
+  await img.jpeg({ quality }).toFile(dest);
+  // zbarimg reads JPEG directly; jsQR needs raw pixels, so re-encode to PNG.
+  await sharp(dest).png().toFile(dest.replace(/\.jpg$/, ".png"));
+}
+
+const CONDITIONS = [
+  { name: "phone at arm's length", width: 420, blur: 0.6, quality: 72, dark: 0.92 },
+  { name: "further back, softer focus", width: 300, blur: 1.1, quality: 58, dark: 0.85 },
+  { name: "dim doorway, heavy compression", width: 240, blur: 1.4, quality: 40, dark: 0.72 },
+];
+
+let hasSharp = true;
+try {
+  await import("sharp");
+} catch {
+  hasSharp = false;
+}
+
+if (hasSharp) {
+  console.log("under door conditions:");
+  for (const [name, file] of shots) {
+    for (const c of CONDITIONS) {
+      const jpg = path.join(SHOTS, `door-${name}-${c.width}.jpg`);
+      await degrade(file, jpg, c);
+      const z = zbar(jpg);
+      const j = jsqr(jpg.replace(/\.jpg$/, ".png"));
+      const ok = z === qr.message || j === qr.message;
+      if (!ok) failed++;
+      console.log(
+        `  ${ok ? "PASS" : "FAIL"}  ${name} @ ${String(c.width).padStart(4)}px  ` +
+          `${c.name.padEnd(32)} zbar:${z === qr.message ? "ok" : "-"} jsQR:${
+            j === qr.message ? "ok" : "-"
+          }`,
+      );
+    }
+  }
+  console.log("");
+}
+
 if (failed) {
-  console.log(`${shots.length - failed}/${shots.length} rendered faces decoded`);
+  console.log(`${failed} decode(s) failed`);
   process.exit(1);
 }
-console.log(`${shots.length}/${shots.length} rendered faces decoded to the exact RSVP id`);
+console.log(`all rendered faces decoded to the exact RSVP id: ${qr.message}`);
