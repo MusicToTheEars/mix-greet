@@ -189,6 +189,11 @@ export type ConfirmationVars = {
   eventUrl?: string; // hosted invite link — the primary CTA
   walletUrl?: string; // signed /api/pass link: Add to Apple Wallet
   manageUrl?: string; // signed /rsvp/manage link: change party size or cancel
+  // Signed /api/qr link: the guest's door code as a PNG. Same token as the pass
+  // and the manage page, so the scan at the door records the same attendance
+  // whichever of the three the guest ends up holding. See the door code block
+  // in the renderer for why this is rendered as an image AND as a link.
+  qrUrl?: string;
   mapUrl?: string; // overrides the derived Google Maps search link
   // The event's own flyer, resolved from events.posterId in convex/email.ts.
   // This is the only thing in the message that changes shape between events,
@@ -1002,6 +1007,69 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   // whether they can come at all if a spot opens.
   if (v.notes) rows.push(ticketRow("GOOD TO KNOW", esc(v.notes)));
 
+  // --- the door code ---------------------------------------------------------
+  // The thing a guest is actually holding when they get to the door, put in the
+  // message itself. Until now the only scannable thing this email offered was
+  // the Apple Wallet pass, so an Android guest, a guest whose Wallet declined
+  // the pass, and a guest whose pass certificate had expired server side all
+  // arrived with an email that had no code in it. The same signed token that
+  // opens the pass also renders the code as a PNG at /api/qr, so the code goes
+  // to everybody and the pass goes back to being one way to carry it rather
+  // than the only one.
+  //
+  // TWO ROUTES, DELIBERATELY, because either one on its own strands somebody:
+  //
+  //  1. THE INLINE IMAGE IS A BONUS, NEVER THE ROUTE. Gmail proxies remote
+  //     images and Apple Mail and Outlook usually ask first, so this draws for
+  //     some guests and not for others, and which ones is not knowable from
+  //     here. Its `alt` therefore carries an instruction rather than a
+  //     description: a blocked image has to point at the link, the way the
+  //     lineup thumbnails carry their initial.
+  //
+  //  2. THE LINK IS THE ROUTE, and it points at the manage page rather than at
+  //     the bare PNG. The page draws the code at full size with the guest's name
+  //     and the event beside it, a phone browser can zoom and screenshot it, and
+  //     it is the same signed address the guest already keeps for changing or
+  //     cancelling, so there is one link in the message to hold on to instead of
+  //     two. The bare PNG carries no name, no event and nothing to say when a
+  //     scanner refuses it, so it is offered underneath as the last resort for a
+  //     client that mangles the page.
+  //
+  // Nothing here prints a location, so the waitlist redaction in `splitVenue`
+  // is untouched by this block: a token is not an address.
+  const qrImgUrl = safeUrl(v.qrUrl);
+  const codeUrl = safeUrl(v.manageUrl) || qrImgUrl;
+  // Status is stated once, in the eyebrow, so this block does not restate it.
+  // The waitlist line follows the WHERE row's precedent instead and says what
+  // the code is waiting on, not what the guest is.
+  const codeWaitNote = "It starts working the moment a spot opens.";
+  // The save-it-now line. One sentence, and it claims nothing about this venue's
+  // reception that could turn out to be false; it just refuses to bet on it.
+  const codeSaveNote =
+    "Screenshot it before you leave. Signal at the door is not a given.";
+  const codeBlock = codeUrl
+    ? `
+        <table role="presentation" class="mg-field" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.white}" style="width:100%;margin-top:14px;background-color:${BRAND.white};border:2px solid ${BRAND.surfaceLine};">
+          <tr><td align="center" style="padding:18px 18px 20px 18px;">
+            <div class="mg-quiet" style="font-family:${MONO};font-size:11px;line-height:15px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:${BRAND.textMuted};">YOUR DOOR CODE</div>${
+              qrImgUrl
+                ? `
+            <img src="${esc(qrImgUrl)}" width="180" height="180" alt="Your door code. The button below opens it." style="display:block;margin:14px auto 0 auto;width:180px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;background-color:${BRAND.white};font-family:${MONO};font-size:12px;line-height:18px;color:${BRAND.textSoft};text-align:center;">`
+                : ""
+            }
+            <div class="mg-soft" style="margin-top:14px;font-family:${MONO};font-size:13px;line-height:19px;mso-line-height-rule:exactly;color:${BRAND.textSoft};">${esc(codeSaveNote)}${isWait ? ` ${esc(codeWaitNote)}` : ""}</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+              <tr><td style="padding:14px 0 0 0;">${button(codeUrl, "OPEN YOUR CODE", false)}</td></tr>
+            </table>${
+              qrImgUrl && qrImgUrl !== codeUrl
+                ? `
+            <div class="mg-quiet" style="margin-top:12px;font-family:${MONO};font-size:11px;line-height:16px;mso-line-height-rule:exactly;letter-spacing:.12em;text-transform:uppercase;color:${BRAND.textMuted};">OR OPEN <a href="${esc(qrImgUrl)}" target="_blank" rel="noopener" class="mg-accent" style="color:${BRAND.brandInk};font-weight:700;text-decoration:none;">THE CODE AS AN IMAGE</a></div>`
+                : ""
+            }
+          </td></tr>
+        </table>`
+    : "";
+
   // --- featured lineup -------------------------------------------------------
   const lineupHtml = acts.length
     ? `<tr><td style="padding:34px 0 0 0;">${slab(
@@ -1093,7 +1161,10 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   // Both of these are in the HTML as their own rows; adding them to `actions`
   // is what carries them into the plain-text alternative, so the two halves
   // offer a guest the same things.
-  if (v.walletUrl) actions.push({ href: v.walletUrl, label: "ADD TO APPLE WALLET" });
+  // The phone is named in the label, not just in the HTML, because this line is
+  // the whole of what a plain-text reader is told about the pass.
+  if (v.walletUrl)
+    actions.push({ href: v.walletUrl, label: "ADD TO APPLE WALLET (IPHONE)" });
   if (v.manageUrl) actions.push({ href: v.manageUrl, label: "CHANGE OR CANCEL YOUR RSVP" });
 
   // An event with no invite link, no date and no linkable venue has nothing to
@@ -1125,9 +1196,23 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   // Add to Apple Wallet, offered under the calendar row. Deliberately not the
   // primary button: on Android and desktop it is a dead end, so it sits as a
   // secondary the way "also add it to" does.
+  //
+  // Two things changed when the door code above it arrived. The label is now
+  // uppercase in source, because rule 1 in the header applies to this button
+  // too and it had been reading "Add to Apple Wallet" in Outlook while every
+  // other button in the message shouted. And the line under it names the phone
+  // the button is for: a guest holding an Android should not have to work out
+  // on their own that the one scannable-looking thing in the email was aimed at
+  // somebody else. It is only printed when there IS a code above to send them
+  // to, so the sentence can never point at a block that did not render.
   const walletLine = v.walletUrl
     ? `<tr><td style="padding:14px 0 0 0;text-align:center;">
-         <a href="${esc(v.walletUrl)}" target="_blank" rel="noopener" style="display:inline-block;border:2px solid ${BRAND.text};background:${BRAND.text};color:${BRAND.white};text-decoration:none;font-family:${MONO};font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;padding:12px 22px;">Add to Apple Wallet</a>
+         <a href="${esc(v.walletUrl)}" target="_blank" rel="noopener" style="display:inline-block;border:2px solid ${BRAND.text};background:${BRAND.text};color:${BRAND.white};text-decoration:none;font-family:${MONO};font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;padding:12px 22px;">ADD TO APPLE WALLET</a>${
+           codeUrl
+             ? `
+         <div class="mg-quiet" style="margin-top:10px;font-family:${MONO};font-size:11px;line-height:16px;mso-line-height-rule:exactly;letter-spacing:.12em;text-transform:uppercase;color:${BRAND.textMuted};">IPHONE ONLY. THE CODE ABOVE WORKS ON ANY PHONE.</div>`
+             : ""
+         }
        </td></tr>`
     : "";
 
@@ -1313,6 +1398,9 @@ ${posterHtml}  <!-- ============ LIGHT PANEL ============ -->
         <table role="presentation" class="mg-field" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.white}" style="width:100%;margin-top:24px;background-color:${BRAND.white};border:2px solid ${BRAND.surfaceLine};">
           ${rows.join("")}
         </table>
+        <!-- the ticket stub: the code that gets scanned. It sits with the
+             ticket rather than with the actions because it is not something to
+             do later, it is the thing the guest hands over on arrival. -->${codeBlock}
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
           ${primary}
@@ -1390,6 +1478,18 @@ ${posterHtml}  <!-- ============ LIGHT PANEL ============ -->
     `PARTY  ${partyLine}`,
     v.parking && !isWait ? `PARK   ${v.parking}` : null,
     v.notes ? `NOTE   ${v.notes}` : null,
+    // The door code, in the half of the message a screen reader and a
+    // stripped-down client actually read. It sits with the ticket facts rather
+    // than down in the list of actions because it is the one line here a guest
+    // cannot get through the door without, and a url is the only form of it
+    // that survives with images off. Same address the HTML button points at,
+    // with the bare PNG under it for a reader that cannot follow a page.
+    codeUrl ? `CODE   ${codeUrl}` : null,
+    codeUrl && qrImgUrl && qrImgUrl !== codeUrl
+      ? `       The code as an image: ${qrImgUrl}`
+      : null,
+    codeUrl ? `       ${codeSaveNote}` : null,
+    codeUrl && isWait ? `       ${codeWaitNote}` : null,
     "",
     ...actions.map((a) => `${a.label}: ${a.href}`),
     ...calAlts.map((c) => `${calLabel} (${c.label}): ${c.href}`),
