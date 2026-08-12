@@ -130,12 +130,18 @@ function buildPassJson(p: PassInput) {
     // line of the lockup. Setting it here too would print the name twice.
     // Surfaces the pass on the lock screen as the event approaches.
     ...(p.whenIso ? { relevantDate: p.whenIso } : {}),
-    // iOS 18 gave eventTicket a second, poster-style layout where the barcode
-    // is behind a tap rather than on the card face — the same behaviour a
-    // Ticketmaster ticket shows. A door needs the QR without an extra gesture,
-    // so ask for the classic rectangular scheme explicitly. Older iOS ignores
-    // the key, which is why it is safe to send unconditionally.
-    preferredStyleSchemes: ["eventTicket"],
+    // NOTE: this pass is deliberately `generic`, not `eventTicket`.
+    //
+    // iOS 18 renders eventTicket in a poster layout that keeps the barcode
+    // behind a tap — the same behaviour a Ticketmaster ticket shows. Proven on
+    // device with two passes identical but for the style key: the generic one
+    // printed the QR on the face, the eventTicket one printed nothing.
+    // preferredStyleSchemes did not override it.
+    //
+    // A door cannot afford a gesture between the guest and the code, so the
+    // functional layout wins over the semantic style name. The cost is
+    // background.png, which only eventTicket supports; the poster overlay now
+    // rides in thumbnail.png instead.
     barcodes: [
       {
         format: "PKBARCODE_FORMAT_QR",
@@ -152,7 +158,7 @@ function buildPassJson(p: PassInput) {
       messageEncoding: "iso-8859-1",
       altText: p.serial,
     },
-    eventTicket: fields,
+    generic: fields,
   };
 }
 
