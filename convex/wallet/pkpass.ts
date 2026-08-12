@@ -39,12 +39,24 @@ export type PassInput = {
   partyLabel: string;
   status: "confirmed" | "waitlist";
   inviteUrl?: string;
+  venueLine?: string; // street only — the full address is on the back
+  // The headliner's photograph, fetched at build time. This is the one thing
+  // that makes a pass look like THIS party rather than a template, which is
+  // exactly what the reference tickets do with their event artwork.
+  thumbnail?: Uint8Array | null;
 };
 
 // Brand values, matching brand.css. Wallet takes CSS-style rgb() only.
-const INK = "rgb(237, 234, 227)";
-const BG = "rgb(11, 11, 13)";
-const BRAND = "rgb(236, 28, 36)";
+//
+// The card is the site's LIGHT content column, not its dark zone: bone surface,
+// near-black type, and red reserved for the field labels. A light face is also
+// what makes the QR read cleanly — Wallet draws the code on white, and a white
+// block on a black card is a hole, while on bone it belongs.
+// Red here is --brand-ink #C8151C, the deepened variant that survives on a
+// light surface; plain #EC1C24 is only 4.0:1 on bone.
+const INK = "rgb(22, 22, 26)";
+const BG = "rgb(245, 244, 241)";
+const BRAND = "rgb(200, 21, 28)";
 
 function buildPassJson(p: PassInput) {
   const fields = {
@@ -58,11 +70,12 @@ function buildPassJson(p: PassInput) {
       { key: "event", label: "", value: p.eventTitle },
     ],
     secondaryFields: [
-      { key: "when", label: "WHEN", value: p.whenLabel },
-      { key: "party", label: "YOUR PARTY", value: p.partyLabel },
+      { key: "when", label: "STARTS", value: p.whenLabel },
+      ...(p.venueLine ? [{ key: "venue", label: "VENUE", value: p.venueLine }] : []),
     ],
     auxiliaryFields: [
-      { key: "where", label: "WHERE", value: p.location },
+      { key: "guest", label: "ADMIT", value: p.guestName },
+      { key: "party", label: "PARTY", value: p.partyLabel },
       ...(p.artist ? [{ key: "artist", label: "ON THE BILL", value: p.artist }] : []),
     ],
     backFields: [
@@ -165,6 +178,17 @@ export async function buildPkpass(p: PassInput): Promise<Uint8Array> {
   files["pass.json"] = Buffer.from(JSON.stringify(buildPassJson(p)), "utf8");
   for (const [name, b64] of Object.entries(PASS_IMAGES)) {
     files[name] = Buffer.from(b64, "base64");
+  }
+  // A real headliner photo replaces the fallback disc. Written ONCE, at the 1x
+  // key only: there is no image resizer in this runtime, so writing the same
+  // file to all three densities tripled an 843KB headshot into a 2.5MB pass.
+  // Wallet scales a single thumbnail perfectly well, and the @2x/@3x keys are
+  // optional. The bundled fallback art is dropped so the manifest carries one
+  // thumbnail rather than a mismatched set.
+  if (p.thumbnail && p.thumbnail.length > 0) {
+    delete files["thumbnail@2x.png"];
+    delete files["thumbnail@3x.png"];
+    files["thumbnail.png"] = Buffer.from(p.thumbnail);
   }
 
   // manifest.json hashes every file EXCEPT itself and the signature.

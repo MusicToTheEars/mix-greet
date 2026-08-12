@@ -53,6 +53,27 @@ export const buildForToken = internalAction({
     );
     const g = data.rsvp.guests || 1;
 
+    // Pull the headliner's photo for the pass thumbnail. Best-effort on
+    // purpose: a slow or missing image must never stop a guest getting their
+    // ticket, so any failure falls through to the bundled disc.
+    let thumbnail: Uint8Array | null = null;
+    if (headliner?.imageUrl) {
+      try {
+        const res = await fetch(headliner.imageUrl);
+        if (res.ok) {
+          const buf = new Uint8Array(await res.arrayBuffer());
+          // Wallet caps pass payloads; a multi-megabyte headshot is not worth
+          // the bundle, and the fallback is on brand anyway.
+          if (buf.length > 0 && buf.length < 900_000) thumbnail = buf;
+        }
+      } catch (_) {
+        // ignore — fallback art ships with the pass
+      }
+    }
+
+    // Street only on the face; the full address is on the back of the pass.
+    const venueLine = (ev.location || "").split(",")[0].trim();
+
     const bytes = await buildPkpass({
       // Stable per RSVP: re-adding replaces the pass instead of stacking copies.
       serial: `mg-${data.rsvp.id}`,
@@ -69,6 +90,8 @@ export const buildForToken = internalAction({
       partyLabel: g > 1 ? `${g} guests` : "Just you",
       status: data.rsvp.status === "waitlist" ? "waitlist" : "confirmed",
       inviteUrl: undefined,
+      venueLine,
+      thumbnail,
     });
     // base64, not Array.from(bytes): a half-megabyte pass becomes ~500k JSON
     // numbers that way, which is orders of magnitude larger on the wire than
