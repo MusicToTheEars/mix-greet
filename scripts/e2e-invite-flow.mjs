@@ -329,8 +329,8 @@ async function main() {
     const res = await adminPost("/api/admin/checkin", body);
     check(`unscoped scan refused: ${label}`, res.status >= 400 || res.body?.state === "wrong_event", JSON.stringify(res.body));
   }
-  const wandaRow = (await adminGet(`/api/admin/rsvps?eventId=${ev.slug}`)).body?.rsvps?.find((r) => r.name === "Wanda Wait");
-  check("none of those unscoped scans checked anybody in", wandaRow?.status === "waitlist", JSON.stringify(wandaRow));
+  const wandaAfterUnscoped = (await adminGet(`/api/admin/rsvps?eventId=${ev.slug}`)).body?.rsvps?.find((r) => r.name === "Wanda Wait");
+  check("none of those unscoped scans checked anybody in", wandaAfterUnscoped?.status === "waitlist", JSON.stringify(wandaAfterUnscoped));
 
   step("19. undo really clears the arrival, it does not just change the status");
   const solo = await jsonPost("/api/rsvp", { eventId: ev.slug, name: "Solo Sam", email: mail("sam"), guests: 1 });

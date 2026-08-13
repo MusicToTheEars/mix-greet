@@ -77,29 +77,113 @@ echo "installing backend deps in $WORKDIR"
 }
 
 # --- bring the deployment up --------------------------------------------------
-# `--typecheck enable` is deliberate and is why this step can take a minute: it
-# runs tsc over the whole convex/ tree against freshly generated types. Nothing
-# else in this repo typechecks the backend, convex/_generated is gitignored, and
-# a push with types disabled will happily ship a function whose response shape
-# no longer matches what the routes destructure. If tsc fails, so does this
-# script, before a single assertion runs.
-echo "starting a local Convex deployment (anonymous, no login, no cloud)"
-(
-  cd "$WORKDIR"
-  CONVEX_AGENT_MODE=anonymous npx convex dev --typecheck enable --tail-logs disable
-) >"$WORKDIR/convex-dev.log" 2>&1 &
-CONVEX_PID=$!
+# Two ways in, and the difference is only how the backend binary is obtained.
+#
+# `convex dev --typecheck enable` is deliberate in both, and is why this step can
+# take a minute: it runs tsc over the whole convex/ tree against freshly
+# generated types. Nothing else in this repo typechecks the backend,
+# convex/_generated is gitignored, and a push with types disabled will happily
+# ship a function whose response shape no longer matches what the routes
+# destructure. If tsc fails, so does this script, before a single assertion runs.
+#
+# ANONYMOUS (the default, and what a laptop uses): `CONVEX_AGENT_MODE=anonymous`
+# lets the CLI pick and download the backend itself. It needs
+# version.convex.dev, which is a plain version-lookup service.
+#
+# SELF-HOSTED (the fallback): on a sandboxed or firewalled machine
+# version.convex.dev is often unreachable, and the CLI's anonymous path has no
+# way to fall back to an already-downloaded binary — it fails at the lookup and
+# never gets as far as the cache. So if a backend binary is present, this script
+# runs it directly and drives it through Convex's own self-hosted mode. Same
+# binary, same push, same typecheck; only the discovery step differs. Still no
+# login, no deploy key, and nothing but 127.0.0.1 on the wire.
+#
+#   E2E_BACKEND_BIN=/path/to/convex-local-backend   use this binary explicitly
+#
+# Otherwise the newest binary already in the Convex CLI's own cache is used.
+find_backend_bin() {
+  if [ -n "${E2E_BACKEND_BIN:-}" ]; then
+    [ -x "$E2E_BACKEND_BIN" ] && { echo "$E2E_BACKEND_BIN"; return; }
+    echo "ERROR: E2E_BACKEND_BIN=$E2E_BACKEND_BIN is not executable." >&2
+    exit 1
+  fi
+  local cache="${XDG_CACHE_HOME:-$HOME/.cache}/convex/binaries"
+  [ -d "$cache" ] || return 0
+  ls -1d "$cache"/*/ 2>/dev/null | sort | while read -r d; do
+    [ -x "$d/convex-local-backend" ] && echo "$d/convex-local-backend"
+  done | tail -1
+}
+BACKEND_BIN="$(find_backend_bin || true)"
 
-for _ in $(seq 1 90); do
-  [ -f "$WORKDIR/.env.local" ] && grep -q CONVEX_SITE_URL "$WORKDIR/.env.local" && break
-  kill -0 "$CONVEX_PID" 2>/dev/null || { echo "convex dev exited early:"; cat "$WORKDIR/convex-dev.log"; exit 1; }
-  sleep 1
-done
-SITE_URL="$(grep '^CONVEX_SITE_URL=' "$WORKDIR/.env.local" | cut -d= -f2- | tr -d '"')"
-if [ -z "$SITE_URL" ]; then
-  echo "ERROR: the deployment never reported an HTTP actions URL." >&2
-  cat "$WORKDIR/convex-dev.log" >&2
-  exit 1
+ADMIN_PASSWORD="e2e-door-pass"
+
+if [ -n "$BACKEND_BIN" ]; then
+  # --- self-hosted: run the binary we already have ----------------------------
+  echo "starting a local Convex backend (self-hosted, no login, no cloud)"
+  echo "  binary: $BACKEND_BIN"
+  INSTANCE="mixgreet-e2e"
+  # Not a secret: this backend is bound to 127.0.0.1, lives in a temp directory
+  # for the length of one test run, and is deleted with it. It is fixed rather
+  # than random so a kept deployment (E2E_KEEP=1) can be poked at afterwards.
+  INSTANCE_SECRET="$(printf '4%.0s' $(seq 1 64))"
+  ADMIN_KEY="$("$BACKEND_BIN" keygen admin-key \
+    --instance-name "$INSTANCE" --instance-secret "$INSTANCE_SECRET" | tail -1)"
+
+  # --port 0 is not supported, so a free pair is picked up front.
+  CLOUD_PORT="$(node -e 'const n=require("net"),s=n.createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')"
+  SITE_PORT="$(node -e 'const n=require("net"),s=n.createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')"
+
+  (
+    cd "$WORKDIR"
+    "$BACKEND_BIN" \
+      --port "$CLOUD_PORT" --site-proxy-port "$SITE_PORT" \
+      --interface 127.0.0.1 \
+      --instance-name "$INSTANCE" --instance-secret "$INSTANCE_SECRET" \
+      --do-not-require-ssl \
+      --local-storage "$WORKDIR/storage" \
+      "$WORKDIR/db.sqlite3"
+  ) >"$WORKDIR/convex-dev.log" 2>&1 &
+  CONVEX_PID=$!
+
+  CLOUD_URL="http://127.0.0.1:$CLOUD_PORT"
+  SITE_URL="http://127.0.0.1:$SITE_PORT"
+  export CONVEX_SELF_HOSTED_URL="$CLOUD_URL"
+  export CONVEX_SELF_HOSTED_ADMIN_KEY="$ADMIN_KEY"
+
+  for _ in $(seq 1 90); do
+    curl -sf -o /dev/null "$CLOUD_URL/version" && break
+    kill -0 "$CONVEX_PID" 2>/dev/null || { echo "backend exited early:"; cat "$WORKDIR/convex-dev.log"; exit 1; }
+    sleep 1
+  done
+
+  # The push is a separate, foreground step here: unlike `convex dev`, which
+  # watches, this returns when the functions are live, so a failed typecheck
+  # stops the script with its own output instead of being buried in a log.
+  echo "pushing convex/ (typecheck enabled)"
+  ( cd "$WORKDIR" && npx convex dev --once --typecheck enable ) || {
+    echo "ERROR: the push failed — see the typecheck output above." >&2
+    exit 1
+  }
+else
+  # --- anonymous: let the CLI fetch and manage the backend --------------------
+  echo "starting a local Convex deployment (anonymous, no login, no cloud)"
+  (
+    cd "$WORKDIR"
+    CONVEX_AGENT_MODE=anonymous npx convex dev --typecheck enable --tail-logs disable
+  ) >"$WORKDIR/convex-dev.log" 2>&1 &
+  CONVEX_PID=$!
+
+  for _ in $(seq 1 90); do
+    [ -f "$WORKDIR/.env.local" ] && grep -q CONVEX_SITE_URL "$WORKDIR/.env.local" && break
+    kill -0 "$CONVEX_PID" 2>/dev/null || { echo "convex dev exited early:"; cat "$WORKDIR/convex-dev.log"; exit 1; }
+    sleep 1
+  done
+  SITE_URL="$(grep '^CONVEX_SITE_URL=' "$WORKDIR/.env.local" | cut -d= -f2- | tr -d '"')"
+  if [ -z "$SITE_URL" ]; then
+    echo "ERROR: the deployment never reported an HTTP actions URL." >&2
+    cat "$WORKDIR/convex-dev.log" >&2
+    exit 1
+  fi
 fi
 
 if ! curl -sf --retry 60 --retry-delay 1 --retry-all-errors --retry-connrefused \
@@ -111,7 +195,6 @@ fi
 echo "deployment ready at $SITE_URL"
 
 # --- the secrets the flow needs (fixtures, never real ones) -------------------
-ADMIN_PASSWORD="e2e-door-pass"
 (
   cd "$WORKDIR"
   npx convex env set UNSUB_SECRET "e2e-fixture-secret-not-for-production" >/dev/null
