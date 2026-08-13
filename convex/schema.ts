@@ -93,6 +93,17 @@ export default defineSchema({
     // row keeps validating; its presence is what separates "said they'd come"
     // from "actually showed up".
     checkedInAt: v.optional(v.number()),
+    // Which list the guest was on immediately before that scan. Checking in
+    // overwrites `status`, so without this an undo has to guess, and guessing
+    // "confirmed" quietly promoted a mis-scanned waitlist guest onto the
+    // confirmed list, where every later capacity sum then counted a seat that
+    // was never given. Only ever "confirmed" or "waitlist", because those are
+    // the only statuses a check-in can be performed from. Optional: rows
+    // scanned in before this field existed have nothing recorded, and rows that
+    // are not currently checked in carry nothing at all.
+    statusBeforeCheckIn: v.optional(
+      v.union(v.literal("confirmed"), v.literal("waitlist")),
+    ),
   })
     .index("by_event", ["eventId"])
     .index("by_dedupeKey", ["dedupeKey"])

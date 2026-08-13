@@ -1,6 +1,8 @@
 # Local Netlify folder
 .netlify
-node_modules/
+# No trailing slash: this is sometimes a symlink to a store outside Dropbox,
+# and `node_modules/` does not match a symlink.
+node_modules
 
 # Internal planning/spec docs — NOT for the public deploy (Netlify publishes repo root)
 Grilled.md
@@ -13,3 +15,6 @@ convex/_generated/
 
 # macOS
 .DS_Store
+
+# Local wallet test rig — throwaway certs and generated passes. Never committed.
+.wallet-test/

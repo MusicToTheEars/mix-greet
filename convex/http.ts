@@ -268,13 +268,44 @@ const rsvp = httpAction(async (ctx, req) => {
   });
   // Hand back a signed manage token on success so the page that just took the
   // RSVP can offer "edit or cancel" instead of a second RSVP form. The rsvpId
-  // itself is never exposed — only the signed token, same as the email link.
-  if (result?.ok && (result as any).rsvpId && process.env.UNSUB_SECRET) {
-    const t = await rsvpToken(process.env.UNSUB_SECRET, String((result as any).rsvpId));
-    const { rsvpId: _drop, ...rest } = result as any;
+  // itself is never exposed, only the signed token, same as the email link.
+  //
+  // Stripping the id is not tidiness: the bare rsvp id is exactly what the door
+  // QR encodes, so anything that hands it to a browser has handed out a working
+  // door code. Signing needs UNSUB_SECRET, and this used to fall through to
+  // returning the mutation result verbatim when it was unset, which leaked that
+  // id to every visitor and left the page with no code to show. Now the id is
+  // dropped on every path and a missing secret answers as the failure it is.
+  //
+  // A 500, not a 200 with a flag: the RSVP row is already committed, so the
+  // guest really is on the list, but they have no way to reach their pass and
+  // no page copy can fix that. The error text says both halves, and the log
+  // line is what tells the operator which env var to set. The end-to-end test
+  // only asserts the happy path, so this branch has no test guarding it.
+  //
+  // The id is split off before anything branches, so no answer this route can
+  // give carries it — including the "you are already on the list" one, which is
+  // reached with nothing but a public slug and an email address and so is never
+  // given a token at all.
+  const { rsvpId, ...rest } = (result ?? {}) as any;
+  if (result?.ok && rsvpId) {
+    const secret = process.env.UNSUB_SECRET;
+    if (!secret) {
+      console.error("rsvp: UNSUB_SECRET is unset, no manage token could be issued");
+      return json(
+        {
+          ok: false,
+          status: rest.status,
+          error:
+            "You're on the list, but we could not create your pass link. Please contact the host so they can send it to you.",
+        },
+        500,
+      );
+    }
+    const t = await rsvpToken(secret, String(rsvpId));
     return json({ ...rest, manageToken: t }, 200);
   }
-  return json(result, result.ok ? 200 : 400);
+  return json(rest, result?.ok ? 200 : 400);
 });
 
 http.route({ path: "/api/rsvp", method: "POST", handler: rsvp });
@@ -292,9 +323,13 @@ const adminRsvps = httpAction(async (ctx, req) => {
   if (!data) return json({ error: "event not found" }, 404);
 
   if (url.pathname.endsWith(".csv")) {
-    const header = "name,email,phone,guests,status,source,notes,createdAt,confirmationSentAt";
+    // checkedInAt is appended rather than slotted in beside status, so every
+    // column an existing saved sheet or import already points at keeps its
+    // position. It is the column that answers "who actually came".
+    const header =
+      "name,email,phone,guests,status,source,notes,createdAt,confirmationSentAt,checkedInAt";
     const rows = data.rsvps.map((r) =>
-      [r.name, r.email, r.phone, r.guests, r.status, r.source, r.notes, r.createdAt, r.confirmationSentAt]
+      [r.name, r.email, r.phone, r.guests, r.status, r.source, r.notes, r.createdAt, r.confirmationSentAt, r.checkedInAt]
         .map(csvCell)
         .join(","),
     );
@@ -404,12 +439,65 @@ http.route({ path: "/unsubscribe", method: "POST", handler: unsubscribe });
 // QR the door scans, and the ability to cancel or resize a booking. A guest who
 // cannot come has to have a way to say so, or the door list quietly rots.
 
+// The "Pass unavailable" page in the one case where the guest still has a way
+// in: the QR link for their own token.
+//
+// Deliberately not `htmlPage` from lib/http.ts, and it is the same markup on
+// purpose so the guest sees the identical page: that helper escapes its
+// message, so it cannot carry a tappable link, and a guest standing at a door
+// is not going to retype a 90-character URL off a phone screen. lib/http.ts is
+// shared with the other endpoints and is left exactly as it is.
+function passFallbackPage(message: string, qrUrl: string, status: number): Response {
+  const esc = (s: string) =>
+    s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  const body = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Pass unavailable</title></head>
+<body style="margin:0;background:#0B0B0D;color:#EDEAE3;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
+<div style="max-width:480px;margin:16vh auto 0;padding:34px;background:#141419;border:2px solid #2A2A32;border-top:6px solid #EC1C24;">
+<div style="font-family:'Helvetica Neue Condensed Bold',Impact,sans-serif;font-size:30px;font-weight:800;letter-spacing:.01em;text-transform:uppercase;color:#EC1C24;">MIX<span style="color:#EDEAE3;">&amp;</span>GREET</div>
+<h1 style="font-size:13px;letter-spacing:.2em;text-transform:uppercase;margin:20px 0 10px;color:#EDEAE3;">Pass unavailable</h1>
+<p style="margin:0;color:#8B8B94;line-height:1.7;font-size:14px;">${esc(message)}</p>
+<p style="margin:26px 0 0;"><a href="${esc(qrUrl)}" style="display:inline-block;border:2px solid #EC1C24;background:#EC1C24;color:#FFFFFF;text-decoration:none;padding:12px 24px;font-size:12px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;">Show my QR code</a></p>
+</div></body></html>`;
+  return new Response(body, {
+    status,
+    headers: corsHeaders({
+      "content-type": "text/html; charset=utf-8",
+      "x-content-type-options": "nosniff",
+    }),
+  });
+}
+
 // GET /api/pass?t=<token> -> the .pkpass, served with Apple's MIME type so iOS
 // offers "Add to Apple Wallet" rather than downloading a zip.
 const walletPass = httpAction(async (ctx, req) => {
   const url = new URL(req.url);
   const token = clean(url.searchParams.get("t"), 200);
-  const out: any = await ctx.runAction(internal.wallet.serve.buildForToken, { token });
+  let out: any;
+  try {
+    out = await ctx.runAction(internal.wallet.serve.buildForToken, { token });
+  } catch (err: any) {
+    // Building a pass signs it with the Apple certificate held in the
+    // environment, so an unset or expired certificate throws here rather than
+    // returning an error, and it used to reach the guest as an unstyled Convex
+    // 500 with no way forward. Nothing the guest can do fixes a certificate,
+    // but the same code is served as a PNG from this very host, and that gets
+    // them through the door on any phone, so hand them that instead. Logged
+    // because a silently expired certificate is otherwise only discovered by a
+    // guest at the door.
+    console.error("pass build failed:", String(err?.message || err));
+    return passFallbackPage(
+      "Apple Wallet passes are not being issued right now. Your code still works: open it below and show that at the door.",
+      `${url.origin}/api/qr?t=${encodeURIComponent(token)}`,
+      503,
+    );
+  }
   if (!out?.ok) {
     return htmlPage(
       "Pass unavailable",
@@ -483,7 +571,25 @@ const manageRsvp = httpAction(async (ctx, req) => {
     action: action as "cancel" | "guests",
     guests,
   });
-  if (!res?.ok) return json({ error: res?.error || "failed" }, 400);
+  // A refusal carries a `reason` ("checked_in", "cancelled", "full") and is
+  // answered 409: the request was perfectly well formed, the RSVP is simply in
+  // a state this action must not touch. The guest's real status and party size
+  // ride along so the page can show what the booking actually is, rather than
+  // reporting a change that did not happen. `error` is already a sentence
+  // written for the guest, so it can be displayed as-is. Anything without a
+  // reason is the old failure and stays a 400.
+  if (!res?.ok) {
+    return json(
+      {
+        ok: false,
+        error: res?.error || "failed",
+        reason: res?.reason || "",
+        status: res?.status || "",
+        guests: res?.guests ?? 0,
+      },
+      res?.reason ? 409 : 400,
+    );
+  }
   return json({ ok: true, status: res.status, guests: res.guests });
 });
 http.route({ path: "/api/rsvp/manage", method: "GET", handler: manageRsvp });
@@ -508,6 +614,11 @@ const checkin = httpAction(async (ctx, req) => {
   const body = await req.json().catch(() => ({}) as any);
   const scanned = clean(body.code, 200);
   const undo = body.undo === true;
+  // Which event is being run tonight, as a slug or a raw id, resolved the same
+  // way every other admin route resolves one. Optional: without it the scan is
+  // unscoped, which is how manual entry and older callers still behave.
+  const eventKey = clean(body.eventId, 120);
+  const eventId = eventKey ? await resolveEventKey(ctx, eventKey) : "";
 
   // A scan carries "<rsvpId>.<hmac>"; only a verified signature is trusted.
   // Falling back to a bare id keeps manual entry working for staff.
@@ -515,7 +626,11 @@ const checkin = httpAction(async (ctx, req) => {
   if (!rsvpId && /^[a-z0-9]{20,40}$/i.test(scanned)) rsvpId = scanned;
   if (!rsvpId) return json({ error: "unrecognised code" }, 404);
 
-  const res: any = await ctx.runMutation(internal.rsvps.checkIn, { rsvpId, undo });
+  const res: any = await ctx.runMutation(internal.rsvps.checkIn, {
+    rsvpId,
+    undo,
+    eventId: eventId || undefined,
+  });
   if (!res?.ok) return json({ error: res?.error || "failed" }, 404);
   return json(res);
 });

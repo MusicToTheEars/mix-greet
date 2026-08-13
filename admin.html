@@ -111,7 +111,45 @@
 #guests-panel .foot{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
 #guests-panel td{word-break:break-word}
 #guests-panel .g-mail{font-size:12px;color:var(--text-muted);overflow-wrap:anywhere}
-.g-wait{color:var(--brand-ink);font-weight:700}
+/* brand.css:181-183 gives .badge a muted default, a green .live and a
+   brand-red .soon, and nothing else. Every "danger" badge this page already
+   prints, a bounced confirmation, a spam report, a suppressed address, was
+   landing in the same muted grey as "Not sent", which is the one pair a host
+   has to be able to tell apart without reading: nothing was ever sent, versus
+   this guest is holding no pass and does not know it. */
+.badge.danger{color:var(--danger);border-color:var(--danger)}
+/* The status cell carries the arrival time under the badge when the guest is
+   in, in the same green the door screen flashes on a good scan. */
+.g-when{margin-top:6px;font-size:12px;color:var(--ok-ink);letter-spacing:.02em}
+
+/* ---- the door band ---------------------------------------------------------
+   Attendance sits on top of the guest list rather than in a panel or a page of
+   its own, because it is the same question at two zoom levels: "how many are
+   in" and "which of these people are in" are answered by one set of rows, and
+   splitting them means the host reads a count in one place and then hunts for
+   the name in another. The panel is already per-event, already token-gated and
+   already the thing the host opens when they want to know who is coming, so
+   the counts belong at the top of it. There is no second page: /checkin is the
+   door's own screen and deliberately carries no numbers.
+
+   Square, 2px, same field ground as the invite box. The only colour is green
+   for heads through the door and brand red for heads that are not in the
+   expected number; no amber anywhere, that belongs to the meter. */
+.door{margin-top:18px;background:var(--field);border:2px solid var(--surface-line);padding:14px 16px 16px}
+.door .d-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.door .d-head b{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--text)}
+.door .d-head span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
+.door .d-stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.door .d-stat{flex:1 1 116px;min-width:0;border:2px solid var(--surface-line);padding:10px 12px}
+.door .d-stat b{display:block;font-size:26px;line-height:1.1;font-weight:700;color:var(--text)}
+.door .d-stat span{display:block;margin-top:4px;font-size:10px;font-weight:700;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--text-muted)}
+.door .d-stat i{display:block;margin-top:4px;font-size:11px;font-style:normal;color:var(--text-muted)}
+.door .d-stat.in{border-color:var(--ok-ink)}
+.door .d-stat.in b{color:var(--ok-ink)}
+/* "off" is a head that is not in the expected number: waitlisted, or gone. */
+.door .d-stat.off b{color:var(--brand-ink)}
+.door .d-foot{margin:12px 0 0;font-size:12px;line-height:1.6;color:var(--text-muted)}
 
 /* ---- deployment warning ---------------------------------------------------
    Loud on purpose. When this shows, every URL on the page was built from a host
@@ -259,6 +297,22 @@
 
     <div class="panel" id="guests-panel" hidden>
       <div class="head"><h2 id="guests-title">Who&rsquo;s coming</h2><span class="count" id="guests-count"></span></div>
+
+      <!-- Live head counts. Every number is filled by renderDoor() with
+           textContent; the zeros here are placeholders so the band has a shape
+           before the first read lands. -->
+      <div class="door" id="door" hidden>
+        <div class="d-head"><b id="d-title">At the door</b><span id="d-live"></span></div>
+        <div class="d-stats">
+          <div class="d-stat in"><b id="d-in">0</b><span>Through the door</span><i id="d-in-sub"></i></div>
+          <div class="d-stat"><b id="d-out">0</b><span id="d-out-lab">Not here yet</span><i id="d-out-sub"></i></div>
+          <div class="d-stat"><b id="d-exp">0</b><span>Expected</span></div>
+          <div class="d-stat off"><b id="d-wait">0</b><span>Waitlist</span></div>
+          <div class="d-stat off"><b id="d-canc">0</b><span>Cancelled</span></div>
+        </div>
+        <p class="d-foot" id="d-foot"></p>
+      </div>
+
       <table class="stack">
         <thead><tr><th>Guest</th><th>Party</th><th>Status</th><th>Invite email</th><th>Responded</th></tr></thead>
         <tbody id="guests-list"></tbody>
@@ -268,7 +322,7 @@
         <button class="mini go" id="guests-csv" type="button">Download CSV</button>
         <button class="mini" id="guests-close" type="button">Close</button>
       </div>
-      <p class="hint">Staff only. Guest names, emails and phone numbers are never shown on the invite page or anywhere else public &mdash; invite links are shareable and unauthenticated, so the page a guest sees carries no guest list and no headcount.</p>
+      <p class="hint">The CSV is this whole list, one row per response, with party size, status and the time each guest was scanned in. Staff only: guest names, emails and phone numbers are never shown on the invite page or anywhere else public. Invite links are shareable and unauthenticated, so the page a guest sees carries no guest list and no headcount.</p>
     </div>
 
     <div class="panel">
@@ -302,6 +356,7 @@ const API_BASE = 'https://good-labrador-980.convex.site';
 const EVENTS = API_BASE + '/api/events';
 const LOGIN  = API_BASE + '/api/admin/login';
 const RSVPS  = API_BASE + '/api/admin/rsvps';
+const DOOR   = API_BASE + '/api/admin/door';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const $ = id => document.getElementById(id);
@@ -344,6 +399,11 @@ function signOut(){
   $('office').hidden = true;
   $('guests-panel').hidden = true;
   $('gate').hidden = false;
+  // The door band polls on a timer. Without this it keeps firing against a
+  // dead token behind the login panel, and every tick signs the operator out
+  // again while they are typing the password back in.
+  guestsEvent = null;
+  stopDoorPoll();
 }
 
 async function tryEnter(password){
@@ -780,11 +840,11 @@ $('publish').addEventListener('click', async () => {
 // over at 5pm Pacific, so between 5pm and midnight it stamps an event happening
 // THAT EVENING as "(past)" and greys it out — on exactly the evening the
 // operator is most likely to have the office open.
-function localToday(){
-  const d = new Date();
+function ymd(d){
   const p = n => String(n).padStart(2, '0');
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
+function localToday(){ return ymd(new Date()); }
 
 function whoStrip(ev){
   const box = el('div', 'who');
@@ -931,13 +991,46 @@ const destroy = (ev, b) => {
 // construction: the invite page carries no guest list and no headcount, because
 // invite links are shareable and unauthenticated.
 let guestsEvent = null;
+let guestsTimer = null;
 
-const STATUS_LABEL = {
-  confirmed: 'Confirmed', waitlist: 'Waitlist',
-  cancelled: 'Cancelled', checked_in: 'Checked in'
+// The four statuses an RSVP can be in, in three inks. This panel has exactly
+// three colours available to it: green, brand red and muted grey. Amber is
+// spoken for by the meter and appears nowhere else in this product, so one
+// colour has to serve two statuses. The pair that must never be confused is
+// "through the door" and "still expected", so those take the two distinct
+// treatments: green for the guest who is inside, plain for the guest who is
+// not here yet. Waitlist and cancelled both print red because both mean the
+// same thing to a headcount, this head is not in the number you are expecting,
+// and the word in the badge says which.
+//
+// checked_in used to fall through to the plain label with no colour at all,
+// which read as a slightly differently worded "confirmed": the one status that
+// means a person is physically in the room looked like the one that means they
+// said they would come.
+const STATUS = {
+  confirmed:  ['Confirmed',  ''],
+  waitlist:   ['Waitlist',   'soon'],
+  cancelled:  ['Cancelled',  'danger'],
+  checked_in: ['Checked in', 'live']
 };
 
-function guestRow(r){
+// Heads, not parties. `guests` is the party size and the backend defaults it to
+// 1 when a guest submits, so a row missing the field is still one person. This
+// is the same arithmetic doorStats() runs in convex/rsvps.ts, which is what
+// lets the fallback below produce numbers that agree with the live endpoint.
+const heads = (rows, ok) => rows.filter(ok).reduce((n, r) => n + (Number(r.guests) || 1), 0);
+
+// When the guest arrived, off the `checkedInAt` stamp the door writes. The day
+// is only worth printing when it is not the event's own day, where it is the
+// interesting part: somebody was scanned in on the wrong date.
+function arrivedLine(iso, eventDate){
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d.getTime())) return 'Arrived, time not recorded';
+  const t = d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
+  return 'Arrived ' + (ymd(d) === eventDate ? '' : ymd(d) + ' ') + t;
+}
+
+function guestRow(r, eventDate){
   const tr = el('tr');
 
   const who = el('td');
@@ -954,8 +1047,16 @@ function guestRow(r){
 
   const st = el('td');
   st.dataset.label = 'Status';
-  st.appendChild(el('span', r.status === 'waitlist' ? 'g-wait' : null,
-    STATUS_LABEL[r.status] || r.status));
+  const [slab, scls] = STATUS[r.status] || [r.status, ''];
+  st.appendChild(el('span', 'badge ' + scls, slab));
+  // The arrival time, and only ever on a row that is checked in right now.
+  // "Undo" at the door puts the status back to confirmed but leaves
+  // `checkedInAt` on the row (checkIn in convex/rsvps.ts), so the stamp on its
+  // own is not evidence anybody is inside: printing off it would tell the host
+  // somebody arrived who is standing on the pavement.
+  if (r.status === 'checked_in') {
+    st.appendChild(el('div', 'g-when', arrivedLine(r.checkedInAt, eventDate)));
+  }
   tr.appendChild(st);
 
   // What actually happened to the confirmation. Resend's webhook patches the
@@ -986,39 +1087,165 @@ function guestRow(r){
   return tr;
 }
 
+// The same counts the door endpoint returns, rebuilt from the rows we already
+// have. It is the fallback for a deployment that has not shipped
+// /api/admin/door yet, and for the request that simply did not come back: the
+// host is at a door and "no numbers" is a worse answer than numbers a moment
+// older than the ones upstairs.
+function doorFromRows(rows){
+  const isIn = r => r.status === 'checked_in';
+  return {
+    confirmed: heads(rows, r => r.status === 'confirmed'),
+    checkedIn: heads(rows, isIn),
+    waitlist:  heads(rows, r => r.status === 'waitlist'),
+    cancelled: heads(rows, r => r.status === 'cancelled'),
+    parties: {
+      confirmed: rows.filter(r => r.status === 'confirmed').length,
+      checkedIn: rows.filter(isIn).length
+    }
+  };
+}
+
+// The band, filled.
+//
+// `confirmed` off the endpoint counts ONLY the rows still sitting in status
+// "confirmed", so it falls every time somebody is scanned in. It is "not here
+// yet", never "expected": labelling it expected would show the host their event
+// draining away over the course of the evening it is filling up. `expected` is
+// the whole yes-and-not-cancelled figure, and a deployment that predates that
+// field gets it rebuilt from its two halves.
+//
+// A date that has gone by changes the words, not the numbers. "Not here yet"
+// is a statement about a queue outside; the morning after there is no queue,
+// those people did not come, and the panel should say so.
+function renderDoor(d, ev, capacity){
+  const box = $('door');
+  if (!d) { box.hidden = true; return; }
+  const past = !!ev.date && ev.date < localToday();
+  const inHeads = Number(d.checkedIn) || 0;
+  const waiting = Number(d.confirmed) || 0;
+  const expected = typeof d.expected === 'number' ? d.expected : inHeads + waiting;
+  const p = d.parties || {};
+  const parties = n => (n ? (n === 1 ? '1 party' : n + ' parties') : '');
+  const cap = Number(capacity) || 0;
+
+  $('d-title').textContent = past ? 'Attendance' : 'At the door';
+  $('d-live').textContent = 'As of ' + new Date().toLocaleTimeString([],
+    { hour:'numeric', minute:'2-digit', second:'2-digit' });
+  $('d-in').textContent = inHeads;
+  $('d-in-sub').textContent = parties(Number(p.checkedIn) || 0);
+  $('d-out').textContent = waiting;
+  $('d-out-lab').textContent = past ? 'Did not arrive' : 'Not here yet';
+  $('d-out-sub').textContent = parties(Number(p.confirmed) || 0);
+  $('d-exp').textContent = expected;
+  $('d-wait').textContent = Number(d.waitlist) || 0;
+  $('d-canc').textContent = Number(d.cancelled) || 0;
+  $('d-foot').textContent = 'Heads, not parties. Expected is everyone who said yes and '
+    + (past
+      ? 'did not cancel: through the door plus did not arrive.'
+      : 'has not cancelled: through the door plus not here yet.')
+    + (cap > 0 ? ' Capacity ' + cap + ' heads, and responses past it are waitlisted automatically.' : '');
+  box.hidden = false;
+}
+
+// One read of everything the panel shows. `quiet` is the background refresh:
+// it leaves the rows on screen while the request is out, so a poll never
+// blinks the list the host is reading.
+async function loadGuests(quiet){
+  const ev = guestsEvent;
+  if (!ev) return;
+  const msg = $('guests-msg');
+  const tbody = $('guests-list');
+  const key = encodeURIComponent(ev.slug || ev.id);
+  if (!quiet) {
+    $('guests-count').textContent = 'loading…';
+    tbody.textContent = '';
+    msg.hidden = true;
+  }
+  // Both go out together, so the band and the rows underneath it can never be
+  // more than one round trip apart. Only the list is required: the counts have
+  // a local fallback, the names do not.
+  const [listRes, doorRes] = await Promise.allSettled([
+    apiGet(RSVPS + '?eventId=' + key),
+    apiGet(DOOR + '?eventId=' + key)
+  ]);
+  // A second Guests click, or a list refresh that dropped this event, landed
+  // while the request was in flight. Painting now would put one event's guests
+  // under another event's name.
+  if (!guestsEvent || guestsEvent.id !== ev.id) return;
+  if (listRes.status === 'rejected') throw listRes.reason;
+
+  const data = listRes.value || {};
+  const rsvps = data.rsvps || [];
+  renderDoor(
+    rsvps.length ? (doorRes.status === 'fulfilled' ? doorRes.value : doorFromRows(rsvps)) : null,
+    ev,
+    data.event && data.event.capacity);
+
+  // Responses are rows, and rows are the one thing the band does not count:
+  // every head, party and seat figure now lives in the band, said once, in one
+  // vocabulary. Two numbers for the same quantity under two different words on
+  // the same panel is how "12 seats" and "3 waitlisted" ended up meaning heads
+  // and parties respectively.
+  $('guests-count').textContent = rsvps.length
+    ? rsvps.length + (rsvps.length === 1 ? ' response' : ' responses')
+    : '';
+  tbody.textContent = '';
+  rsvps.forEach(r => tbody.appendChild(guestRow(r, ev.date)));
+  msg.hidden = true;
+  if (!rsvps.length) {
+    msg.textContent = ev.rsvpMode === 'external'
+      ? 'No RSVPs here. This event sends guests to your external link, so responses are collected there.'
+      : 'No RSVPs yet. They appear here as guests submit the invite page.';
+    msg.className = 'msg'; msg.hidden = false;
+  }
+  $('guests-csv').disabled = !rsvps.length;
+}
+
+// While the panel is open on an event that has not happened yet, the band keeps
+// itself current. The host opens this to watch the door and then puts the
+// laptop down: a count that was true an hour ago answers a question nobody
+// asked and looks exactly as live as a real one. Twenty seconds is two requests
+// a minute against a list this session is already authorised to read, and it is
+// quick enough that the screen matches the queue. A past event is settled, so
+// it is read once and left alone.
+function startDoorPoll(ev){
+  stopDoorPoll();
+  if (ev.date && ev.date < localToday()) return;
+  guestsTimer = setInterval(() => {
+    if (document.hidden || $('guests-panel').hidden || !guestsEvent) return;
+    loadGuests(true).catch(() => {
+      // Stale numbers still wearing a fresh timestamp are the exact lie this
+      // band exists to prevent, so a failed refresh says so and leaves the last
+      // good read on screen. The next success rewrites the line.
+      const live = $('d-live');
+      if (!$('door').hidden && live.textContent.indexOf('could not refresh') < 0) {
+        live.textContent = live.textContent + ' · could not refresh';
+      }
+    });
+  }, 20000);
+}
+function stopDoorPoll(){
+  if (guestsTimer) { clearInterval(guestsTimer); guestsTimer = null; }
+}
+
 async function showGuests(ev, btn){
   guestsEvent = ev;
   const panel = $('guests-panel');
-  const msg = $('guests-msg');
-  const tbody = $('guests-list');
   panel.hidden = false;
-  $('guests-title').textContent = 'Who’s coming · ' + ev.title;
-  $('guests-count').textContent = 'loading…';
-  tbody.textContent = '';
-  msg.hidden = true;
+  $('door').hidden = true;
+  // "Who's coming" is a question about an event that has not happened. After it
+  // has, the panel is the record of who did.
+  $('guests-title').textContent =
+    ((ev.date && ev.date < localToday()) ? 'Who came · ' : 'Who’s coming · ') + ev.title;
   if (btn) btn.disabled = true;
   try {
-    const data = await apiGet(RSVPS + '?eventId=' + encodeURIComponent(ev.slug || ev.id));
-    const rsvps = data.rsvps || [];
-    const seats = rsvps
-      .filter(r => r.status === 'confirmed' || r.status === 'checked_in')
-      .reduce((n, r) => n + (Number(r.guests) || 0), 0);
-    const waiting = rsvps.filter(r => r.status === 'waitlist').length;
-    $('guests-count').textContent = rsvps.length
-      ? rsvps.length + (rsvps.length === 1 ? ' response' : ' responses') + ' · ' + seats
-        + (seats === 1 ? ' seat' : ' seats') + (waiting ? ' · ' + waiting + ' waitlisted' : '')
-      : '';
-    rsvps.forEach(r => tbody.appendChild(guestRow(r)));
-    if (!rsvps.length) {
-      msg.textContent = ev.rsvpMode === 'external'
-        ? 'No RSVPs here — this event sends guests to your external link, so responses are collected there.'
-        : 'No RSVPs yet. They appear here as guests submit the invite page.';
-      msg.className = 'msg'; msg.hidden = false;
-    }
-    $('guests-csv').disabled = !rsvps.length;
+    await loadGuests(false);
+    startDoorPoll(ev);
   } catch(e) {
     $('guests-count').textContent = '';
     if (e.message !== 'auth') {
+      const msg = $('guests-msg');
       msg.textContent = 'Could not load the guest list: ' + e.message;
       msg.className = 'msg err'; msg.hidden = false;
     }
@@ -1031,6 +1258,7 @@ async function showGuests(ev, btn){
 $('guests-close').addEventListener('click', () => {
   $('guests-panel').hidden = true;
   guestsEvent = null;
+  stopDoorPoll();
 });
 
 $('guests-csv').addEventListener('click', async e => {
@@ -1163,7 +1391,8 @@ function render(lists){
   if (guestsEvent && !$('guests-panel').hidden) {
     const fresh = (lists.published || []).concat(lists.archived || [])
       .find(e => e.id === guestsEvent.id);
-    if (fresh) guestsEvent = fresh; else { $('guests-panel').hidden = true; guestsEvent = null; }
+    if (fresh) guestsEvent = fresh;
+    else { $('guests-panel').hidden = true; guestsEvent = null; stopDoorPoll(); }
   }
 }
 
