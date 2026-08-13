@@ -63,21 +63,22 @@ One string.
 "format": "PKBarcodeFormatQR"       <- what PassKit defines
 ```
 
-Apple's `Barcodes` dictionary enumerates exactly eight values, all camel case,
+PassKit's `Barcodes` dictionary defines exactly four values, all camel case,
 none with underscores: `PKBarcodeFormatQR`, `PKBarcodeFormatPDF417`,
-`PKBarcodeFormatAztec`, `PKBarcodeFormatCode128`, `PKBarcodeFormatCode39`,
-`PKBarcodeFormatCodabar`, `PKBarcodeFormatEAN13`, `PKBarcodeFormatI2of5`.
+`PKBarcodeFormatAztec` and `PKBarcodeFormatCode128`. That is the entire list.
+It is an easy list to pad, because Code 39, Codabar, EAN-13 and Interleaved 2
+of 5 do all have Apple constants — but those are AVFoundation and Vision
+metadata object types, the names for barcodes a camera *reads*. They are not
+formats a pass may ask Wallet to *draw*, and putting one in a pass gets the same
+silence as a typo. The rig holds the same four in `BARCODE_FORMATS` in
+`scripts/wallet/verify-pass.mjs`, and every build is checked against them.
 
 The underscored spelling appears in no Apple document and in none of Apple's
-sample passes. Grepping every Apple source pulled for this exercise:
-
-```
-  9 PKBarcodeFormatAztec      2 PKBarcodeFormatCodabar
- 22 PKBarcodeFormatCode128    2 PKBarcodeFormatCode39
- 35 PKBarcodeFormatPDF417     2 PKBarcodeFormatEAN13
- 19 PKBarcodeFormatQR         2 PKBarcodeFormatI2of5
-  0 PKBARCODE_FORMAT_*
-```
+sample passes. That was established by grepping the Apple documentation, sample
+bundles and Swift sources fetched while this was being worked out. Those files
+are not in this repo, so take it as a report of what was found at the time
+rather than something to re-run here — what is reproducible is the check, which
+rejects any format outside the four.
 
 iOS does not reject a pass over an unrecognised barcode format and shows the
 guest no error. It drops the barcode and draws the card without one.
@@ -111,11 +112,18 @@ Apple's five shipped sample bundles.
 
 **Bundle.** `pass.json`, the images, `manifest.json`, `signature`. The manifest
 is a flat map of pathname to **SHA-1** hash of every other file — Apple has not
-moved this to SHA-256; verified by `openssl asn1parse` against Apple's own
-signed `Event.pkpass`, whose `digestAlgorithms` is `sha1` and whose signed
-`messageDigest` matches `shasum -a 1 manifest.json` exactly. `signature` is a
-**detached PKCS#7**, DER, with `contentType`, `signingTime` and `messageDigest`
-as signed attributes, carrying the leaf and the WWDR intermediate.
+moved this to SHA-256. That was verified against *Apple's* sample: `openssl
+asn1parse` on Apple's own signed `Event.pkpass` reports `digestAlgorithms` of
+`sha1`, and its signed `messageDigest` matches `shasum -a 1 manifest.json`
+exactly. Our bundle follows Apple on the manifest — `pkpass.ts` hashes each file
+with `forge.md.sha1` — but not on the signature: our `addSigner` passes
+`digestAlgorithm: forge.pki.oids.sha256`, and `openssl asn1parse` on our own
+`signature` shows `sha256` and `sha256WithRSAEncryption`. So the two halves use
+different digests, deliberately: **SHA-1 for the manifest hashes, SHA-256 for
+the signature**. Apple's requirement is on the manifest, and iOS does not object
+to a stronger digest over it. `signature` itself is a **detached PKCS#7**, DER,
+with `contentType`, `signingTime` and `messageDigest` as signed attributes,
+carrying the leaf and the WWDR intermediate — that shape is the same in both.
 
 **Barcodes.** `barcodes` is an array; "the system uses the first displayable
 barcode for the device". `format`, `message` and `messageEncoding` are all
@@ -139,21 +147,27 @@ absent by default and the pass stays a classic `eventTicket`.
 
 The artwork is not lost to that decision. On a classic event ticket Apple scales
 `background.png` to fill the card and blurs it, so the invite poster becomes the
-ground the fields sit on rather than a flat colour block. `artwork.png` at
-1x/2x/3x ships alongside it, so switching `WALLET_STYLE_SCHEMES` to
-`posterEventTicket,eventTicket` on the day an NFC entitlement exists is a config
-change and not a rebuild. The four semantic tags that layout requires
-(`eventName`, `venueName`, `venueRegionName`, `venueRoom`) are already populated
-for the same reason.
+ground the fields sit on rather than a flat colour block. `artwork.png` is a
+different image for a different layout, and it does **not** ship: §6 explains why
+it was taken out, and `PASS_IMAGES` in `convex/wallet/images.ts` now holds nine
+entries, `background`, `icon` and `logo` at 1x/2x/3x, and nothing else. So the
+day an NFC entitlement exists, switching `WALLET_STYLE_SCHEMES` to
+`posterEventTicket,eventTicket` is a rebuild rather than a config change:
+`make-images.mjs --with-artwork` has to run first, or the poster layout gets a
+ground it cannot find. The four semantic tags that layout requires (`eventName`,
+`venueName`, `venueRegionName`, `venueRoom`) *are* already populated, so that
+half of the switch costs nothing.
 
 ---
 
 ## 4. The rig
 
-Three files, none of which ship to Convex.
+Five files, none of which ship to Convex.
 
 ```
 scripts/wallet/gen-test-certs.sh    a throwaway Pass Type ID chain
+scripts/wallet/make-images.mjs      draws every image the pass ships
+scripts/wallet/convex-resolve.mjs   lets plain node import the Convex modules
 scripts/wallet/verify-pass.mjs      build, unzip, verify, decode
 scripts/wallet/render-face.mjs      draw the card, read the code back off it
 ```
@@ -168,20 +182,60 @@ The certificates are self-signed into `.wallet-test/`, which is gitignored. iOS
 would reject them, which is the point: the rig proves our pipeline, not Apple's
 trust store. Swapping in the real leaf changes nothing structural.
 
+`make-images.mjs` is the largest of the five and the least like a test. It is
+the generator: it screenshots the invite page's own `.flyer` stack — the same
+`brand.css`, the same fonts, the same SVG rings — at Apple's frame sizes, and
+base64s the result into `convex/wallet/images.ts`, so every pixel the pass ships
+comes from the stylesheet that draws the invitation rather than from a
+hand-exported copy of it. `--with-artwork` adds the poster layout's `artwork.*`
+back to that set; without the flag it writes the nine images §3 describes, which
+is what ships.
+
+`convex-resolve.mjs` is a resolver hook and nothing else. Convex bundles with
+esbuild, so its source imports `./images` without an extension and Node's ESM
+resolver will not take it. The hook puts the extension back at resolve time,
+which is what lets the rig import the shipped modules unchanged rather than
+editing the server code to suit the test.
+
 `verify-pass.mjs` imports `buildPkpass` from the module the server actually
 calls, not a copy of it. It checks the zip, checks that the manifest hashes every
-file and that every hash matches the bytes, verifies the signature with
+file and that every hash matches the bytes, and verifies the signature with
 **openssl** rather than with node-forge — verifying with the library that signed
-would only prove the library agrees with itself — and then flips a byte of the
-manifest and requires the same verification to fail, so the check cannot pass
-vacuously.
+would only prove the library agrees with itself.
+
+Two of its checks carry a **negative control**: a deliberately broken input the
+same check has to reject before its green line means anything. The signature
+check flips a byte of the manifest and requires the verification to fail. The
+identity check, described next, rebuilds the pass with the wrong identifiers and
+requires itself to fail. The rest of the checks have no such control; they are
+assertions about the bundle, and they are only as good as the assertion.
+
+The identity check is there because verifying the signature says nothing about
+*whose* pass it is. `passTypeIdentifier` and `teamIdentifier` come out of
+`PASS_TYPE_ID` and `PASS_TEAM_ID`, while the signature comes out of
+`PASS_CERT_B64`, and nothing in the build ties those three env vars to each
+other. Point the identifiers at a pass type the certificate was never issued for
+and the bundle is still internally consistent, still verifies, and is still
+refused by iOS the instant a guest taps Add — with no error the guest can see.
+That is the same silent failure this whole branch exists to atone for, and it is
+one certificate rotation away. Apple puts the pass type identifier in the leaf's
+subject `UID` and the team identifier in its `OU`, so the rig pulls the leaf out
+of the PKCS#7 and requires both to match `pass.json`.
 
 Then it checks the parts that were actually broken: that every barcode format is
 a constant Apple defines, that the payload is exactly the identifier
 `/api/admin/checkin` expects and matches that route's own regex, that the style
 can display every image shipped, that a background exists at all three densities,
-that @2x and @3x are exact integer multiples of @1x, and that the poster scheme
-is not silently switched on.
+and that the poster scheme is not silently switched on.
+
+The image check asserts sizes, not shapes. Ratios are not enough: a set of
+3x3, 6x6 and 9x9 icons is perfectly self-consistent and draws a smear where the
+icon goes, because Wallet lays the card out at the point sizes §3 recites and
+does not scale an image up to fill the box it was given. So `icon.png` must be
+29x29, `logo.png` 160x50 and `background.png` 180x220, with @2x and @3x exact
+integer multiples of those — and a family shipping an @2x with no @1x is a
+failure rather than a family to skip, since @1x is what a non-retina render
+falls back to and what everything else is measured against.
 
 `render-face.mjs` is the half that would have caught the original bug. It lays
 the card out the way Wallet does, rasterises it in a real browser at
@@ -191,6 +245,36 @@ would quietly test the encoder instead of the card. It is not a Wallet emulator
 and does not pretend to be. What it proves is the thing that was wrong: that a
 code of this payload, at the size and contrast Wallet draws it, over this
 artwork, survives being looked at.
+
+### What the rig still cannot catch
+
+Recorded plainly, because a green run is only worth what it actually covers, and
+the bug this branch exists to atone for was one nobody had thought to check.
+
+**An expired certificate.** The signature is verified with `-purpose any` against
+the throwaway chain, so nothing reads the leaf's validity window. An Apple Pass
+Type ID certificate lasts a year. The day the production one lapses this rig
+still scores 20/20 while iOS refuses every pass — the same silent shape as the
+identity mismatch the rig now does catch. That one is a calendar reminder more
+than a check, since the rig signs with its own chain and cannot see production's.
+
+**The wrong images for the style.** `artwork` and `secondaryLogo` are accepted
+for every style, so an `eventTicket` shipping `artwork.*` with the poster layout
+off — exactly the waste section 6 is about — passes.
+
+**A barcode carrying no `altText` at all.** The check validates the value when
+one is present and skips when it is absent, so a build that dropped it goes green
+while the door quietly loses its read-it-aloud fallback.
+
+**Agreement with the door, and with the card.** `CHECKIN_ACCEPTS` is a
+hand-copied transcription of the regex in `convex/http.ts` rather than an import
+of it, so tightening that route would not fail the rig. The semantic tags are
+likewise checked for presence, not against the text actually printed on the card,
+so the two can drift apart.
+
+**Anything about the deployment.** The poster-scheme check reads
+`WALLET_STYLE_SCHEMES` out of the environment the rig runs in, which says nothing
+about what Convex is set to.
 
 ---
 
@@ -203,38 +287,40 @@ test chain written to ./.wallet-test/certs
 ./.wallet-test/certs/pass.pem: OK
 
 $ node --import ./scripts/wallet/convex-resolve.mjs scripts/wallet/verify-pass.mjs
-PASS  zip opens and is non-trivial                                       12 files, 217 KB
-PASS  carries the files Apple requires                                   background.png, background@2x.png, background@3x.png, icon.png, icon@2x.png, icon@3x.png, logo.png, logo@2x.png, logo@3x.png, manifest.json, pass.json, signature
-PASS  manifest hashes every file, and every hash matches                 10 files, all SHA-1 matched
-PASS  signature is a detached PKCS#7 that verifies against the manifest  openssl smime -verify: OK
-PASS  the signed content really is this manifest, not another one        tampered manifest rejected, as it must be
-PASS  pass.json declares exactly one style, with its field dictionary    eventTicket
-PASS  pass.json carries the required top-level keys                      formatVersion 1, ids and description present
-PASS  every barcode format is a constant Apple actually defines          PKBarcodeFormatQR, PKBarcodeFormatQR
-PASS  barcodes is a non-empty array of well-formed entries               PKBarcodeFormatQR/iso-8859-1
-PASS  the QR payload is EXACTLY the id /api/admin/checkin expects        jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd (32 chars, matches /^[a-z0-9]{20,40}$/i)
-PASS  the payload round-trips through a real QR encoder and zbarimg      zbarimg --raw -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
-PASS  a second, independent decoder agrees                               jsQR -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
-PASS  every image is a real PNG at the density its filename claims       background.png 180x220, background@2x.png 360x440, background@3x.png 540x660, icon.png 29x29, icon@2x.png 58x58, icon@3x.png 87x87, logo.png 160x50, logo@2x.png 320x100, logo@3x.png 480x150
-PASS  the style can actually display every image the bundle ships        eventTicket: background, icon, logo
-PASS  the card has an artwork ground, not just a flat colour             background.png at 1x, 2x and 3x
-PASS  the poster layout is not silently switched on                      preferredStyleSchemes absent, classic card, barcode on the face
-PASS  the altText under the code is something the door would accept      jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
-PASS  semantics carry the four tags Apple requires of an event pass      PKEventTypeLivePerformance, TEST Event @ 1933 S. Broadway
+PASS  zip opens and is non-trivial                                           12 files, 217 KB
+PASS  carries the files Apple requires                                       background.png, background@2x.png, background@3x.png, icon.png, icon@2x.png, icon@3x.png, logo.png, logo@2x.png, logo@3x.png, manifest.json, pass.json, signature
+PASS  manifest hashes every file, and every hash matches                     10 files, all SHA-1 matched
+PASS  signature is a detached PKCS#7 that verifies against the manifest      openssl smime -verify: OK
+PASS  the signed content really is this manifest, not another one            tampered manifest rejected, as it must be
+PASS  pass.json declares exactly one style, with its field dictionary        eventTicket
+PASS  pass.json carries the required top-level keys                          formatVersion 1, ids and description present
+PASS  the certificate that signed it was issued for THIS pass type and team  UID=pass.com.mixandgreet.test, OU=TESTTEAM99
+PASS  a pass whose identifiers the certificate does not cover is rejected    stray passTypeIdentifier and teamIdentifier both rejected, as they must be
+PASS  every barcode format is a constant Apple actually defines              PKBarcodeFormatQR, PKBarcodeFormatQR
+PASS  barcodes is a non-empty array of well-formed entries                   PKBarcodeFormatQR/iso-8859-1
+PASS  the QR payload is EXACTLY the id /api/admin/checkin expects            jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd (32 chars, matches /^[a-z0-9]{20,40}$/i)
+PASS  the payload round-trips through a real QR encoder and zbarimg          zbarimg --raw -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+PASS  a second, independent decoder agrees                                   jsQR -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+PASS  every image is a real PNG at the exact point size Apple documents      background.png 180x220, background@2x.png 360x440, background@3x.png 540x660, icon.png 29x29, icon@2x.png 58x58, icon@3x.png 87x87, logo.png 160x50, logo@2x.png 320x100, logo@3x.png 480x150
+PASS  the style can actually display every image the bundle ships            eventTicket: background, icon, logo
+PASS  the card has an artwork ground, not just a flat colour                 background.png at 1x, 2x and 3x
+PASS  the poster layout is not silently switched on                          preferredStyleSchemes absent, classic card, barcode on the face
+PASS  the altText under the code is something the door would accept          jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
+PASS  semantics carry the four tags Apple requires of an event pass          PKEventTypeLivePerformance, TEST Event @ 1933 S. Broadway
 
 pkpass:   ./.wallet-test/out/MixAndGreet.pkpass
 unzipped: ./.wallet-test/out/unzipped
-18/18 checks passed
+20/20 checks passed
 
 $ node scripts/wallet/render-face.mjs
 style: eventTicket   schemes: "(none)"
 payload in pass.json: jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
 
-PASS  poster face  1125x1623px
+PASS  poster face  1125x1614px
         zbarimg  -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
         jsQR     -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
         file     -> ./.wallet-test/out/faces/face-poster.png
-PASS  classic face  1125x1365px
+PASS  classic face  1125x1356px
         zbarimg  -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
         jsQR     -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
         file     -> ./.wallet-test/out/faces/face-classic.png
@@ -410,8 +496,11 @@ worth keeping: "the only crisp edge in the top third, so it floats... exactly
 what a logo that had lost its alpha channel looks like."
 
 **The artwork, dropped from the bundle.** Only the poster layout draws
-`artwork.*`, that layout is off by design, and it was **1.31 MB of a 1.53 MB
-pass** for a picture no guest can ever see. The grain is why: at 1089x1530 the
+`artwork.*`, that layout is off by design, and it was **395 KB of a 583 KB
+pass** for a picture no guest can ever see — 90.1 KB at 1x, 103.5 KB at @2x and
+201.6 KB at @3x, measured per entry in the bundle `efc5f0e` builds. Two thirds
+of what a guest downloaded was an image their phone would never draw. The grain
+is why: at 1089x1530 the
 `feTurbulence` tile is real per-pixel noise, and over a plate rather than a
 photograph it is the only high-frequency content in the frame, so PNG cannot
 compress it and dithering cannot help. `make-images.mjs --with-artwork` puts it
@@ -419,7 +508,8 @@ back if the poster layout is ever switched on. That makes enabling it a rebuild
 rather than a config change, which is the honest trade while the door is what
 matters.
 
-The pass went from **538 KB to 197 KB**.
+The pass went from **583 KB to 217 KB**, which is the size §5's decode output
+reports.
 
 The card that came out of this: the mark reading through Apple's blur as
 concentric halos with the cream hub, the left column dark so the red labels
@@ -449,8 +539,12 @@ change.
 One new **optional** var exists, `WALLET_STYLE_SCHEMES`. Leave it unset. Setting
 it to `posterEventTicket,eventTicket` switches on the iOS 18 poster layout,
 which Apple documents as incompatible with barcode entry, and would take the QR
-off the door. It is there for the day this pass rides on NFC instead; the
-artwork and the semantic tags it needs are already in the bundle.
+off the door. It is there for the day this pass rides on NFC instead — and on
+that day it is not enough on its own. The semantic tags that layout needs are
+already in the bundle, but `artwork.*` is not: it was dropped for size, as §6
+records. Flipping the var without running `make-images.mjs --with-artwork` first
+would produce a poster pass with no poster art and no barcode, which is worse
+than either layout on its own.
 
 **3. Certificates.** Untouched, and no cert or key is in this branch. The rig's
 throwaway chain lives in `.wallet-test/`, which is gitignored; `git diff` on the

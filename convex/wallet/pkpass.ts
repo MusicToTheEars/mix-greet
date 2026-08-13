@@ -66,7 +66,7 @@
 // flat colour block.
 //
 // artwork.png is NOT in the bundle. Only the poster layout draws it, that layout
-// is off, and shipping it cost 1.31 MB of a 1.53 MB pass for a picture no guest
+// is off, and shipping it cost 395 KB of a 583 KB pass for a picture no guest
 // could see. `scripts/wallet/make-images.mjs --with-artwork` puts it back, so
 // enabling the poster scheme is a rebuild rather than a config change — which is
 // the right trade while the door is what matters.

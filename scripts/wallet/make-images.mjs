@@ -312,13 +312,14 @@ const FRAMES = {
   // Nothing renders artwork.* while the poster scheme is off, and the poster
   // scheme is off deliberately and permanently for a ticket that is scanned at
   // a door — Apple: "Poster event tickets aren't compatible with tickets that
-  // require a QR code or barcode for entry." Shipping it anyway cost 1.31 MB of
-  // a 1.53 MB bundle, at three densities, for a picture no guest can ever see.
+  // require a QR code or barcode for entry." Shipping it anyway cost 395 KB of
+  // a 583 KB bundle — 90.1 KB, 103.5 KB and 201.6 KB across the three densities
+  // — for a picture no guest can ever see.
   //
   // The grain is why it is so expensive: at 1089x1530 the feTurbulence tile is
   // real per-pixel noise, and over a plate rather than a photograph it is the
   // only high-frequency content in the frame, so PNG cannot compress it and
-  // dithering cannot help. The blurred family, which does ship, is 0.26 MB for
+  // dithering cannot help. The blurred family, which does ship, is 191 KB for
   // all three.
   //
   // If the poster layout is ever switched on, regenerate with --with-artwork.

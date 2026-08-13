@@ -9,13 +9,20 @@
 //   2. manifest.json hashes EVERY other file, and each hash actually matches
 //   3. `signature` is a detached PKCS#7 that openssl verifies against the
 //      manifest and the chain
-//   4. pass.json's structure matches the spec for the style it declares
-//   5. the barcode payload is EXACTLY the identifier /api/admin/checkin expects
-//   6. that payload survives a round trip through a real QR encoder and a real
+//   4. the certificate that signed it was issued for THIS pass type and team,
+//      and not for some other pass that happens to share a keychain
+//   5. pass.json's structure matches the spec for the style it declares
+//   6. the barcode payload is EXACTLY the identifier /api/admin/checkin expects
+//   7. that payload survives a round trip through a real QR encoder and a real
 //      camera-grade decoder (zbarimg), at the pixel size Wallet draws it
+//   8. every image is the size Apple documents, not merely the right shape
 //
-// Step 6 is the one that matters. A payload that is present in JSON but cannot
+// Step 7 is the one that matters. A payload that is present in JSON but cannot
 // be decoded off a screen is the same as no pass at all.
+//
+// The checks that could pass without proving anything carry a negative control
+// beside them — a deliberately broken input the same check has to reject. A
+// green line from a check that cannot go red is worse than no check at all.
 //
 // Signing uses the throwaway chain from gen-test-certs.sh. iOS would reject it,
 // which is the point: this proves OUR pipeline, not Apple's trust store.
@@ -80,8 +87,10 @@ fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 
 // The same shape convex/wallet/serve.ts assembles from a live event: the real
-// published TEST Event, its real billed artist, a real party size.
-const bytes = await buildPkpass({
+// published TEST Event, its real billed artist, a real party size. Held in a
+// const because the negative controls below rebuild the same pass with one
+// thing deliberately wrong.
+const PASS_INPUT = {
   serial: `mg-${RSVP_ID}`,
   authToken: RSVP_ID,
   eventTitle: "TEST Event",
@@ -96,7 +105,9 @@ const bytes = await buildPkpass({
   partyLabel: "2 guests",
   status: "confirmed",
   venueLine: "1933 S. Broadway",
-});
+};
+
+const bytes = await buildPkpass(PASS_INPUT);
 
 const pkpassPath = path.join(OUT, "MixAndGreet.pkpass");
 fs.writeFileSync(pkpassPath, bytes);
@@ -217,7 +228,142 @@ check("pass.json carries the required top-level keys", () => {
   return "formatVersion 1, ids and description present";
 });
 
-// --- 6. the barcode block ---------------------------------------------------
+// --- 6. does the signature belong to THIS pass? -----------------------------
+
+// Step 4 proves the signature covers these bytes. It says nothing about whose
+// pass they are, and the three things that decide that are unrelated to each
+// other: pass.json's passTypeIdentifier and teamIdentifier are read from
+// PASS_TYPE_ID and PASS_TEAM_ID, while the signature comes from PASS_CERT_B64.
+// Nothing in the build ties those env vars together, so pointing the identifiers
+// at a pass type the certificate was never issued for produces a bundle that is
+// internally consistent, verifies perfectly, and is refused by iOS the moment a
+// guest taps Add — with no error the guest can see. That is the same silent
+// failure class as the barcode typo this rig exists to catch, and it is one
+// certificate rotation away at any time.
+//
+// Apple's leaf carries the evidence to catch it: the pass type identifier is the
+// subject's UID and the team identifier is its OU.
+
+function subjectFields(certPem) {
+  const file = path.join(OUT, "signer-leaf.pem");
+  fs.writeFileSync(file, certPem);
+  // openssl again rather than node-forge, for the same reason step 4 uses it:
+  // reading the signature back with the library that wrote it would only prove
+  // the library agrees with itself.
+  const out = execFileSync(
+    "openssl",
+    ["x509", "-in", file, "-noout", "-subject", "-nameopt", "RFC2253,sep_multiline"],
+    { encoding: "utf8" },
+  );
+  const fields = {};
+  for (const line of out.split("\n")) {
+    const m = /^\s+([A-Za-z0-9.]+)=(.*)$/.exec(line);
+    if (m) fields[m[1]] = m[2];
+  }
+  return fields;
+}
+
+function signerSubjectOf(signaturePath) {
+  let bundle = "";
+  try {
+    bundle = execFileSync(
+      "openssl",
+      ["pkcs7", "-inform", "DER", "-in", signaturePath, "-print_certs"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+  } catch {
+    bundle = "";
+  }
+  const pems =
+    bundle.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g) ?? [];
+  // The leaf is the one with a UID. The WWDR intermediate travelling with it
+  // has none, which is what separates them without guessing at ordering.
+  const leaves = pems.map(subjectFields).filter((s) => s.UID);
+  if (leaves.length === 1) return leaves[0];
+  assert(leaves.length < 2, `the signature carries ${leaves.length} leaf certificates`);
+  // A signature that embedded no certificate at all still has to be held to
+  // something, so fall back to the leaf this chain was signed with.
+  const onDisk = path.join(CERTS, "pass.pem");
+  assert(
+    fs.existsSync(onDisk),
+    "the signature embeds no leaf certificate and there is none on disk to check against",
+  );
+  return subjectFields(fs.readFileSync(onDisk, "utf8"));
+}
+
+function assertSignerMatches(passJson, subject) {
+  assert(subject.UID, "the signing certificate has no UID, so it names no pass type");
+  assert(subject.OU, "the signing certificate has no OU, so it names no team");
+  assert(
+    subject.UID === passJson.passTypeIdentifier,
+    `the certificate was issued for ${JSON.stringify(subject.UID)} but pass.json ` +
+      `declares ${JSON.stringify(passJson.passTypeIdentifier)}. iOS refuses such a ` +
+      "pass at add time and tells the guest nothing.",
+  );
+  assert(
+    subject.OU === passJson.teamIdentifier,
+    `the certificate belongs to team ${JSON.stringify(subject.OU)} but pass.json ` +
+      `declares ${JSON.stringify(passJson.teamIdentifier)}. iOS refuses such a ` +
+      "pass at add time and tells the guest nothing.",
+  );
+  return `UID=${subject.UID}, OU=${subject.OU}`;
+}
+
+let signerSubject = null;
+let signerSubjectError = null;
+try {
+  signerSubject = signerSubjectOf(path.join(unzipped, "signature"));
+} catch (e) {
+  signerSubjectError = e;
+}
+
+check("the certificate that signed it was issued for THIS pass type and team", () => {
+  if (!signerSubject) throw signerSubjectError;
+  return assertSignerMatches(pass, signerSubject);
+});
+
+// Negative control, in the shape of the tampered-manifest one above: rebuild the
+// pass with the identifiers pointed somewhere else and the certificate left
+// alone — precisely the state a rotated PASS_CERT_B64 leaves behind — and
+// require the check to catch it. Without this it is two strings compared for
+// equality with nothing proving they were ever free to differ.
+const realTypeId = process.env.PASS_TYPE_ID;
+const realTeamId = process.env.PASS_TEAM_ID;
+const strays = [];
+for (const [what, override] of [
+  ["passTypeIdentifier", { PASS_TYPE_ID: "pass.com.someone.else.entirely" }],
+  ["teamIdentifier", { PASS_TEAM_ID: "WRONGTEAM" }],
+]) {
+  process.env.PASS_TYPE_ID = realTypeId;
+  process.env.PASS_TEAM_ID = realTeamId;
+  Object.assign(process.env, override);
+  const strayZip = await JSZip.loadAsync(await buildPkpass(PASS_INPUT));
+  strays.push([what, JSON.parse(await strayZip.file("pass.json").async("string"))]);
+}
+process.env.PASS_TYPE_ID = realTypeId;
+process.env.PASS_TEAM_ID = realTeamId;
+
+check("a pass whose identifiers the certificate does not cover is rejected", () => {
+  if (!signerSubject) throw signerSubjectError;
+  const caught = [];
+  for (const [what, strayPass] of strays) {
+    let rejected = false;
+    try {
+      assertSignerMatches(strayPass, signerSubject);
+    } catch {
+      rejected = true;
+    }
+    assert(
+      rejected,
+      `a pass declaring a ${what} the certificate does not name still passed — ` +
+        "the check is not real",
+    );
+    caught.push(what);
+  }
+  return `stray ${caught.join(" and ")} both rejected, as they must be`;
+});
+
+// --- 7. the barcode block ---------------------------------------------------
 
 // Apple's spelling, verbatim from the PassKit Barcode dictionary and from every
 // sample pass Apple ships. Camel case, no underscores.
@@ -277,7 +423,7 @@ check("the QR payload is EXACTLY the id /api/admin/checkin expects", () => {
   return `${qr.message} (${qr.message.length} chars, matches ${CHECKIN_ACCEPTS})`;
 });
 
-// --- 7. does it actually scan? ----------------------------------------------
+// --- 8. does it actually scan? ----------------------------------------------
 
 // Wallet draws the QR at roughly 150pt on the pass face. Rendering it smaller
 // than that here would be testing an easier problem than the door.
@@ -326,9 +472,29 @@ check("a second, independent decoder agrees", () => {
   return `jsQR -> ${decoded}`;
 });
 
-// --- 8. the image set -------------------------------------------------------
+// --- 9. the image set -------------------------------------------------------
 
-check("every image is a real PNG at the density its filename claims", () => {
+// Apple's point sizes, from Table 4-1 and the notes beside it in Pass Design and
+// Creation. These are the sizes Wallet lays the card out to; it does not scale
+// an image up to fill the box it was given, so a bundle can be internally
+// consistent — every density an exact multiple of the one below it — and still
+// draw a 3x3 icon into a 29x29 slot. Ratios alone cannot see that, which is why
+// the actual numbers are asserted here rather than the shapes.
+//
+// The logo box is Apple's maximum rather than a required size, and a narrower
+// mark is legal. This one is composed to fill it exactly, so an exact assertion
+// is the tighter check: if the logo stops being 160x50 that is a change worth
+// being told about rather than one to shrug at.
+const IMAGE_POINTS = {
+  icon: [29, 29],
+  logo: [160, 50],
+  background: [180, 220],
+  thumbnail: [90, 90],
+  strip: [375, 98],
+  artwork: [363, 510], // the poster layout's full-bleed ground, off by default
+};
+
+check("every image is a real PNG at the exact point size Apple documents", () => {
   const pngs = names.filter((n) => n.endsWith(".png"));
   assert(pngs.length > 0, "no images at all");
   const dims = {};
@@ -341,18 +507,39 @@ check("every image is a real PNG at the density its filename claims", () => {
     // IHDR sits at a fixed offset in every PNG.
     dims[n] = [b.readUInt32BE(16), b.readUInt32BE(20)];
   }
-  // @2x must be twice @1x, @3x three times. Wallet picks by density and a
-  // mismatched set is drawn at the wrong size or skipped.
+  // The @1x is the size everything else is measured against, so a family that
+  // ships only a retina density is a hole, not a case to skip. Wallet falls back
+  // to @1x on a non-retina render, and an @2x on its own says nothing about
+  // what that fallback would draw.
   for (const n of pngs) {
     const base = n.replace(/@[23]x\.png$/, ".png");
     if (base === n) continue;
+    assert(
+      dims[base],
+      `${n} ships but ${base} does not, so there is no @1x to be a multiple of ` +
+        "and nothing for a non-retina device to fall back to",
+    );
+    // @2x must be twice @1x, @3x three times. Wallet picks by density and a
+    // mismatched set is drawn at the wrong size or skipped.
     const scale = n.includes("@2x") ? 2 : 3;
-    if (!dims[base]) continue;
     const [w1, h1] = dims[base];
     const [wn, hn] = dims[n];
     assert(
       wn === w1 * scale && hn === h1 * scale,
       `${n} is ${wn}x${hn}, but ${base} is ${w1}x${h1} so it should be ${w1 * scale}x${h1 * scale}`,
+    );
+  }
+  // And the @1x itself has to be the size Apple asks for, or the whole family
+  // is an exact multiple of the wrong picture.
+  for (const n of pngs) {
+    if (/@[23]x\.png$/.test(n)) continue;
+    const base = n.replace(/\.png$/, "");
+    const want = IMAGE_POINTS[base];
+    assert(want, `${n} is not an image name Apple defines a size for`);
+    const [w, h] = dims[n];
+    assert(
+      w === want[0] && h === want[1],
+      `${n} is ${w}x${h}, but Apple draws ${base} at ${want[0]}x${want[1]}`,
     );
   }
   return Object.entries(dims).map(([n, d]) => `${n} ${d[0]}x${d[1]}`).join(", ");
