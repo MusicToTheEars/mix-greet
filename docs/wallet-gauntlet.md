@@ -345,6 +345,87 @@ measurement was red on *dark red*, where the plate's lobe ran under the type
 column — a background problem, fixed by darkening the left third, not a reason
 to give up the brand colour.
 
+### Round 1, in full — what it found in the file rather than the design
+
+The first critic compared the sharp artwork against the invite flyer with the
+labels stripped. On the design it could not separate them, and said so with
+measurements: the hub dot 55x55 px in both, the red rule 132x12 px in both, the
+misregistration offset +9x/+12y in both, ring radii all 0.990 of the reference —
+exactly the height ratio. Its conclusion was that these were not a copy and an
+original but "the same code rendered into two containers", which is precisely
+what the generator does.
+
+Then it found the real defect, in the encoding rather than the layout:
+
+> A: PNG colour type 3 (indexed), **16 palette entries, all 16 used**... A flat
+> black patch of 14,490 px in A contains **exactly one luminance value**... A
+> right-edge patch: **4 distinct levels in A, 56 in B**. A has no grain in the
+> blacks at all.
+
+> Its p90 and p95 are the same value (167): a flat plateau where the beard
+> highlight should have modelling... **A's arcs are stippled dashes; B's are
+> solid.** A's ring strokes alternate between two palette entries along a single
+> continuous stroke.
+
+And the single biggest gap:
+
+> **Re-export A as 24-bit RGB. Delete the palette-reduction step.** That one
+> setting is responsible for the dead black, the nine-step red ramp, the flat
+> beard plate, the 194 highlight clip, the arcs breaking into stipple, the ring
+> stroke flicker, the stair-stepped type, the rose date stamp and the muddy rule
+> bar. Fifteen minutes, one export flag.
+
+That was right, and the cause turned out to be a quirk in `sharp` rather than a
+deliberate setting. `colours` does not choose a palette size; it chooses a bit
+depth bucket. Measured against a truecolour source:
+
+```
+colours: 16  -> 16-entry palette, 4-bit
+colours: 64  -> 16-entry palette, 4-bit
+colours: 128 -> 16-entry palette, 4-bit
+colours: 160 -> 256-entry palette, 8-bit
+colours: 256 -> 256-entry palette, 8-bit
+```
+
+Everything from 17 to 159 collapses to sixteen colours. The ladder was
+`[160, 128, 96, 64, 48]`, so the first frame to miss its budget at 160 fell
+straight off a cliff — and the generator logged `128 colours` while writing a
+16-colour file, because it reported the rung it had tried rather than the result
+it got. The ladder is now `[256]`: sixteen colours is not a compression setting,
+it is a different picture.
+
+### Round 3 — what shipped
+
+Three changes came out of the two critics.
+
+**The palette**, as above. All three background densities now carry one
+256-entry palette, so they are the same picture at three sizes rather than three
+that merely resemble each other. The family is packed together for that reason:
+choosing per density is what produced a set where `@2x` was smaller than `@1x`.
+
+**The logo.** Recut from the project's own `academix-logo.png` as a transparent
+PNG, so the red is the acade-**mix** device and the ampersand rather than a
+rectangle baked into the file. The critic's read of the old one was correct and
+worth keeping: "the only crisp edge in the top third, so it floats... exactly
+what a logo that had lost its alpha channel looks like."
+
+**The artwork, dropped from the bundle.** Only the poster layout draws
+`artwork.*`, that layout is off by design, and it was **1.31 MB of a 1.53 MB
+pass** for a picture no guest can ever see. The grain is why: at 1089x1530 the
+`feTurbulence` tile is real per-pixel noise, and over a plate rather than a
+photograph it is the only high-frequency content in the frame, so PNG cannot
+compress it and dithering cannot help. `make-images.mjs --with-artwork` puts it
+back if the poster layout is ever switched on. That makes enabling it a rebuild
+rather than a config change, which is the honest trade while the door is what
+matters.
+
+The pass went from **538 KB to 197 KB**.
+
+The card that came out of this: the mark reading through Apple's blur as
+concentric halos with the cream hub, the left column dark so the red labels
+clear it, the bottom third flat so the white barcode tile sits clean, and a
+transparent logo that belongs to the card instead of sitting on top of it.
+
 ---
 
 ## 7. Still needs Lawrence
