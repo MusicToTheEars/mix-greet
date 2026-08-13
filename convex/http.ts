@@ -282,8 +282,13 @@ const rsvp = httpAction(async (ctx, req) => {
   // no page copy can fix that. The error text says both halves, and the log
   // line is what tells the operator which env var to set. The end-to-end test
   // only asserts the happy path, so this branch has no test guarding it.
-  if (result?.ok && (result as any).rsvpId) {
-    const { rsvpId, ...rest } = result as any;
+  //
+  // The id is split off before anything branches, so no answer this route can
+  // give carries it — including the "you are already on the list" one, which is
+  // reached with nothing but a public slug and an email address and so is never
+  // given a token at all.
+  const { rsvpId, ...rest } = (result ?? {}) as any;
+  if (result?.ok && rsvpId) {
     const secret = process.env.UNSUB_SECRET;
     if (!secret) {
       console.error("rsvp: UNSUB_SECRET is unset, no manage token could be issued");
@@ -300,7 +305,7 @@ const rsvp = httpAction(async (ctx, req) => {
     const t = await rsvpToken(secret, String(rsvpId));
     return json({ ...rest, manageToken: t }, 200);
   }
-  return json(result, result.ok ? 200 : 400);
+  return json(rest, result?.ok ? 200 : 400);
 });
 
 http.route({ path: "/api/rsvp", method: "POST", handler: rsvp });

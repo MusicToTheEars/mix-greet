@@ -338,7 +338,18 @@ async function main() {
   await adminPost("/api/admin/checkin", { code: soloId, eventId: ev.slug });
   await adminPost("/api/admin/checkin", { code: soloId, eventId: ev.slug, undo: true });
   const soloRow = (await adminGet(`/api/admin/rsvps?eventId=${ev.slug}`)).body?.rsvps?.find((r) => r.name === "Solo Sam");
-  check("undo returns a confirmed guest to confirmed", soloRow?.status === "confirmed", JSON.stringify(soloRow));
+  // Against the list they were actually on, not a hardcoded "confirmed": by
+  // this point in the run this room of four is holding four heads (two parties
+  // through the door and one still confirmed), so Sam RSVPs onto the waitlist
+  // and undo restoring "waitlist" is the correct answer. Demanding "confirmed"
+  // here would demand the exact overbooking step 21 forbids. What undo has to
+  // prove is that it puts a guest back on the list they came in on, whichever
+  // one that is, rather than only wiping the stamp.
+  check(
+    "undo returns a guest to the list they were on before the scan",
+    !!solo.body?.status && soloRow?.status === solo.body.status,
+    JSON.stringify({ atRsvp: solo.body?.status, afterUndo: soloRow }),
+  );
   check("undo clears the arrival time", soloRow?.checkedInAt === "", JSON.stringify(soloRow?.checkedInAt));
   const csv2 = await (await fetch(`${API}/api/admin/rsvps.csv?eventId=${ev.slug}`, { headers: { "x-admin-token": TOKEN } })).text();
   const soloLine = csv2.split("\r\n").find((l) => l.includes("Solo Sam")) || "";
@@ -398,7 +409,17 @@ async function main() {
     adminPost("/api/admin/checkin", { code: twinId, eventId: ev.slug }),
   ]);
   const states = both.map((r) => r.body?.state).sort();
-  check("exactly one of the two scans is the check-in", JSON.stringify(states) === JSON.stringify(["already", "in"]), JSON.stringify(states));
+  // One check-in and one duplicate, never two of either. Both forms of a
+  // check-in count: this room of four is full by now, so a party of three
+  // arrives on the waitlist and is admitted as "waitlist_in", which is a
+  // check-in with a label on it. Two check-ins would double the head count and
+  // two "already"s would mean nobody was ever counted.
+  const admitted = states.filter((s) => s === "in" || s === "waitlist_in");
+  check(
+    "exactly one of the two scans is the check-in",
+    admitted.length === 1 && states.filter((s) => s === "already").length === 1,
+    JSON.stringify(states),
+  );
 
   step("24. closing RSVPs actually closes them");
   await adminPost("/api/events", { action: "closeRsvps", id: other.id });

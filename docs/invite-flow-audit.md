@@ -15,11 +15,25 @@ to the check-in route.
 
 It needs Node 20, 22 or 24 somewhere on the machine (the local backend refuses
 to run `"use node"` actions, which is what the Wallet pass and the QR renderer
-are, on anything else). It needs no Convex login, no deploy key, and it cannot
-reach production: `CONVEX_AGENT_MODE=anonymous` never talks to the cloud.
+are, on anything else). It needs no Convex login and no deploy key, and it
+cannot reach production: the deployment it talks to is a backend process on
+127.0.0.1 that is deleted when the run ends.
+
+There are two ways it gets that backend, and the only difference is where the
+binary comes from. By default `CONVEX_AGENT_MODE=anonymous` lets the Convex CLI
+choose and download one, which is what a laptop does and needs nothing set up.
+That path first asks `version.convex.dev` which build to fetch, and on a
+sandboxed or firewalled machine that host is often unreachable — at which point
+the CLI gives up at the lookup, without ever falling back to a binary already
+sitting in its own cache. So if a backend binary is present the script runs it
+directly instead, through Convex's own self-hosted mode, and picks it up from
+`$E2E_BACKEND_BIN` or from the newest one in the CLI's cache. Same binary, same
+push, same `--typecheck enable`. Only the discovery step differs.
 
 Baseline on entry to this work: **33 passed, 11 failed**.
 After the work, with harder assertions added on top: **59 passed, 0 failed**.
+After the round below, with the reviewer's harder assertions on top of that:
+**80 passed, 0 failed**.
 
 The eleven original failures were, in the order they would have cost a real
 night: a pass from any event opened any door; no guest without an Apple device
@@ -95,6 +109,27 @@ confirmation email is sent: the send ledger dedupes on
 skipped anyway and would only look like a send that never arrived. The guest is
 not stranded, because `/api/rsvp` hands the signed token straight back to the
 page they are standing on.
+
+**Was broken twice more**, both reachable with nothing but an invite slug — which
+is printed in every invite link — and a guest's email address, over one unsigned
+POST.
+
+*A repeat submission handed out that guest's manage token.* The route minted one
+for whatever row the dedupe returned, so knowing an address was the same as being
+its owner: the token is the QR, the Wallet pass and the cancel button. A
+submission that lands on an existing live row now gets no token and no id at all,
+only its status. The returning guest still has theirs — it is in the confirmation
+email, and the device that RSVPed remembers it. The cancelled-and-back path above
+still mints one, because that row was holding no live pass to give away. The id
+is now split off in `convex/http.ts` before the response branches, so no answer
+this route can give carries it.
+
+*A repeat submission rewrote a guest who was already inside.* `submit` patched
+name, phone and party size onto any row it deduped onto, checked-in ones
+included, so an anonymous form post moved a head count the door had already taken
+(observed in the test: three heads became ten). Refused now. A repeat submission
+that grows a party is also put through the same seat test the manage page's
+resize gets, because that hole was the same hole with a token in front of it.
 
 ## 4. Token minting and verification
 
@@ -253,7 +288,20 @@ scan that belongs to a different event changes nothing and reports
 `state: "wrong_event"` naming the event the pass is really for, so staff can say
 it out loud. It fails closed: an event key that resolves to nothing is treated as
 a mismatch rather than silently becoming an unscoped door. Undo is scoped too.
-The unscoped path is deliberately still permitted for manual entry.
+
+*A scan that named no event was trusted.* The unscoped path was left open here
+for manual entry. Nothing was using it: `checkin.html` refuses to start scanning
+until an event is picked ("Pick an event first.") and sends it on every call
+including the undo and every replayed offline scan, and the back office has no
+check-in control at all. The caller that actually sent no event was a stale or
+cached scanner tab, and it was checking guests in against whatever night their
+pass happened to be for. It is refused now, with a sentence telling the door to
+pick tonight's event. No caller needed changing.
+
+*An archived event was still a working door.* Check-in never looked at the
+event's status, so a pass for a night the host had already put away opened it and
+recorded arrivals onto an event no list is watching. Refused now, both ways,
+scan and undo.
 
 *Undo corrupted the list.* Checking in overwrote `status`, losing whether the
 guest was confirmed or waitlisted, and undo always wrote back "confirmed". A
@@ -303,6 +351,25 @@ The page also handles the refusals the backend now returns (HTTP 409 with a
 sentence rather than a generic "that did not go through", and it stops offering
 the cancel button at all once it knows the guest is already checked in.
 
+## 12b. Capacity, and who is holding a seat
+
+**Was broken, two ways**, both in the promotion that runs when a guest cancels.
+
+*It counted the wrong people.* Promotion summed only the rows still sitting in
+status `confirmed` while every other capacity sum in the file counted the guests
+already through the door as well, so one guest dropping out of a room of four
+promoted a party of four into it while three people stood inside. Every capacity
+decision now goes through one `seatsTaken`, which counts confirmed and checked-in
+heads together — the same reason `assignStatus` was lifted out in the first
+place, applied to the one path that had been left out of it.
+
+*One party blocked the whole queue.* Promotion tried the oldest waitlisted party
+and stopped. If that party had grown since joining and no longer fitted, a room
+that had just emptied let nobody in at all, however many smaller parties were
+behind it. The waitlist is walked in order now and every party that fits is
+promoted. Nobody jumps the queue; they only step around somebody the room cannot
+take. This was listed as out of scope in the previous round and is now closed.
+
 The manage page's old error copy said the link had "expired or was mistyped".
 These tokens are stateless HMACs with no timestamp in them, so they do not
 expire; that sentence was never true. It says something true now.
@@ -313,9 +380,6 @@ expire; that sentence was never true. It says something true now.
 
 Listed so nobody thinks these were missed.
 
-- **`updateByGuest` promotes exactly one waitlisted guest** when a cancellation
-  frees capacity, even when the freed seats could take several parties. Out of
-  scope: it is a behaviour change, not a defect in the door flow.
 - **No rate limit on `/api/rsvp`, `/api/qr` or `/api/pass`.** The tokens are
   128-bit HMACs so brute force is not the risk; volume is. Not touched.
 - **The door has no way to look a guest up by name** when a phone is dead and the
