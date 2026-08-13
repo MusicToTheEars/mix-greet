@@ -158,10 +158,42 @@ async function slugTaken(ctx: MutationCtx, slug: string): Promise<boolean> {
   return hit !== null;
 }
 
-// Readable stem plus a random suffix, retried until the index says it is free.
-// A title with no usable characters (emoji-only, non-Latin) falls back to a
-// pure random token, so minting can never fail for lack of a stem.
-async function mintSlug(ctx: MutationCtx, title: string): Promise<string> {
+// "2026-08-29" -> "08-29-26". The invite link a guest is handed reads as the
+// night they are being invited to, which is the one fact they already know and
+// the only one that makes a texted URL self-evidently current.
+//
+// US order, because the audience is Los Angeles and the rest of the product
+// prints "AUG 15" rather than "15 AUG".
+export function dateSlug(date: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || "").trim());
+  if (!m) return "";
+  return `${m[2]}-${m[3]}-${m[1].slice(2)}`;
+}
+
+// The date is the stem. A title stem is the fallback, and a random token the
+// fallback to that, so minting can never fail for want of either.
+//
+// Two events CAN land on one date, whatever the calendar feels like: a matinee
+// and an evening, or a new event on the day an archived one already used. The
+// premise that dates never repeat is the reason to try the date first, not a
+// reason to assume the second one away — an unsuffixed collision would hand two
+// events the same public link, and the loser would be unreachable. The suffix
+// is `-2`, `-3`, counting, rather than random, so the second event of a day
+// still has a link somebody can read down the phone.
+async function mintSlug(
+  ctx: MutationCtx,
+  title: string,
+  date?: string,
+): Promise<string> {
+  const day = dateSlug(date ?? "");
+  if (day) {
+    if (!(await slugTaken(ctx, day))) return day;
+    for (let n = 2; n <= 9; n++) {
+      const candidate = `${day}-${n}`;
+      if (!(await slugTaken(ctx, candidate))) return candidate;
+    }
+  }
+
   const stem = slugifyTitle(title);
   for (let attempt = 0; attempt < 6; attempt++) {
     const candidate = stem ? `${stem}-${randomChars(4)}` : randomChars(10);
@@ -191,7 +223,7 @@ async function mintSlug(ctx: MutationCtx, title: string): Promise<string> {
 // button rendered on every closed row by `linkCell` in admin.html.
 async function backfillRow(ctx: MutationCtx, e: Doc<"events">): Promise<void> {
   if (e.slug) return;
-  await ctx.db.patch(e._id, { slug: await mintSlug(ctx, e.title) });
+  await ctx.db.patch(e._id, { slug: await mintSlug(ctx, e.title, e.date) });
 }
 
 // --- Output shape -----------------------------------------------------------
@@ -319,6 +351,36 @@ async function findByKey(
     .withIndex("by_slug", (q) => q.eq("slug", k))
     .first();
   if (bySlug) return bySlug;
+
+  // A date key, "08-29-26", resolved against the event's own date.
+  //
+  // This is what lets the date link work on events minted before dates were
+  // slugs, without rewriting a single stored slug. Rewriting them was the
+  // obvious move and it is the wrong one: those links are already in
+  // circulation — texted, pasted into threads, sitting in sent confirmations —
+  // and schema.ts says plainly that a slug is never rewritten so a link already
+  // out there stays valid for the life of the event. So both forms resolve, the
+  // old one keeps working forever, and the date form starts working today on
+  // every event rather than only on the next one created.
+  const asDate = /^(\d{2})-(\d{2})-(\d{2})$/.exec(k);
+  if (asDate) {
+    const iso = `20${asDate[3]}-${asDate[1]}-${asDate[2]}`;
+    const sameDay = await ctx.db
+      .query("events")
+      .withIndex("by_status_and_date", (q) =>
+        q.eq("status", "published").eq("date", iso),
+      )
+      .collect();
+    // Exactly one published event that day is the whole point of a date link.
+    // Two is the case the premise says cannot happen, and if it ever does, the
+    // bare date is genuinely ambiguous — answer with the one created first, the
+    // same one that holds the unsuffixed slug, so the link and the lookup agree
+    // rather than disagreeing silently.
+    if (sameDay.length) {
+      return sameDay.reduce((a, b) => (a._creationTime <= b._creationTime ? a : b));
+    }
+  }
+
   const id = ctx.db.normalizeId("events", k);
   return id ? await ctx.db.get(id) : null;
 }
@@ -447,7 +509,7 @@ export const create = internalMutation({
     const rsvpUrl = httpUrl(event.rsvpUrl);
     const id = await ctx.db.insert("events", {
       title,
-      slug: await mintSlug(ctx, title),
+      slug: await mintSlug(ctx, title, date),
       subtitle: clamp(event.subtitle, 160) || undefined,
       date,
       start: clamp(event.start, 20) || undefined,
@@ -485,7 +547,7 @@ export const update = internalMutation({
       title,
       // The slug is minted once and never rewritten — a retitled event must not
       // break links that are already out in the world. Pre-slug rows get one here.
-      slug: existing.slug ?? (await mintSlug(ctx, title)),
+      slug: existing.slug ?? (await mintSlug(ctx, title, date)),
       subtitle: clamp(event.subtitle, 160) || undefined,
       date,
       start: clamp(event.start, 20) || undefined,
@@ -545,7 +607,7 @@ export const setRsvpMode = internalMutation({
     await ctx.db.patch(id, {
       rsvpMode: mode,
       // A pre-slug row opened from here needs its invite link to exist now.
-      slug: existing.slug ?? (await mintSlug(ctx, existing.title)),
+      slug: existing.slug ?? (await mintSlug(ctx, existing.title, existing.date)),
     });
     return { ...(await adminLists(ctx)), saved: await shapeById(ctx, id) };
   },
