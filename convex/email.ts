@@ -28,39 +28,21 @@ export const resend: Resend = new Resend(components.resend, {
   testMode: false,
 });
 
-const WEEKDAYS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-// "2026-07-11" + "1:00 PM"/"4:00 PM" -> "Saturday, July 11, 2026 · 1:00 PM – 4:00 PM"
-// Mirrors the site's event-card format; parsed manually so no timezone shifts.
+// "2026-08-29" + "1:00 PM"/"4:00 PM" -> "08-29-26 · 1:00 PM – 4:00 PM"
+//
+// Numeric, matching the invite link (/i/08-29-26), the invite page and the rest
+// of the message. This one was missed when the other date helpers were
+// converted: the template's own formatters were changed, but `whenLine` is
+// built HERE and passed in, so the WHEN row kept printing "Saturday, August 29,
+// 2026" while every other date in the same email read 08-29-26. It survived a
+// render check because that check passed `date`/`start`/`end` and let the
+// template format them, which is not the path production takes.
+//
+// Parsed manually rather than through Date formatting, so no timezone shifts.
 function formatWhenLine(date: string, start?: string, end?: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   let line = date;
-  if (m) {
-    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
-    line = `${WEEKDAYS[d.getUTCDay()]}, ${MONTHS[+m[2] - 1]} ${+m[3]}, ${m[1]}`;
-  }
+  if (m) line = `${m[2]}-${m[3]}-${m[1].slice(2)}`;
   if (start) line += ` · ${start}${end ? ` – ${end}` : ""}`;
   return line;
 }
@@ -216,8 +198,10 @@ export const sendRsvpConfirmation = internalAction({
     // so it belongs on the CDN that already serves brand.css, not on a function
     // invocation. Site origin, not apiOrigin — this one is not an API route.
     const meterUrl = `${inviteOrigin()}/meter.gif`;
+    // The partners strip, scrolling, same static-file reasoning as the meter.
+    const partnersUrl = `${inviteOrigin()}/partners.gif`;
 
-    const rendered = renderRsvpConfirmation({ ...vars, icsUrl, walletUrl, manageUrl, qrUrl, meterUrl });
+    const rendered = renderRsvpConfirmation({ ...vars, icsUrl, walletUrl, manageUrl, qrUrl, meterUrl, partnersUrl });
 
     let enqueued = false;
     try {

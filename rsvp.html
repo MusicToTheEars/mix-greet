@@ -595,6 +595,38 @@ body.has-sticky{padding-bottom:84px}
      wash and the grain are static, so the band stays lit either way. */
   .dark-zone.top > .motes{display:none}
 }
+
+/* ---------- partners strip ----------
+   Lifted from index.html so the two read as one brand. Kept here rather than
+   promoted into brand.css because index.html does not load brand.css, so a
+   shared home would mean maintaining it in two places anyway — and this page's
+   version differs: it carries its own heading and pauses on hover.
+
+   The animation is the whole point of the strip, so it is honoured, not
+   assumed: prefers-reduced-motion stops it dead and leaves the logos legible
+   in a row rather than fading them out. */
+.carousel{
+  background:var(--bg);overflow:hidden;
+  border-top:4px solid var(--line);border-bottom:4px solid var(--line);
+  padding:26px 0 30px;position:relative;margin-top:clamp(40px,7vw,72px);
+}
+.partners-head{margin-bottom:22px}
+.track{
+  display:flex;align-items:center;gap:clamp(56px,9vw,110px);
+  width:max-content;animation:pscroll 26s linear infinite;
+}
+/* Hover pauses it so a logo can actually be read and clicked; focus-within
+   does the same for a keyboard, which would otherwise be chasing a moving
+   target through five links. */
+.carousel:hover .track,.track:focus-within{animation-play-state:paused}
+.track a{flex:none;display:flex;align-items:center}
+.track img{height:clamp(34px,5vw,52px);width:auto}
+.track img.mm{height:clamp(48px,7vw,72px)}
+@keyframes pscroll{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){
+  .track{animation:none}
+  .carousel{overflow-x:auto}
+}
 </style>
 </head>
 <body>
@@ -919,6 +951,35 @@ body.has-sticky{padding-bottom:84px}
 
   </div>
 </main>
+
+<!-- PARTNERS ------------------------------------------------------------------
+     The same strip the main site runs, on the invitation. A guest who arrives
+     from a texted link never sees the home page, so without this the people
+     backing the night are invisible to exactly the audience being invited.
+
+     Logos are files under /partners/ rather than the base64 blobs index.html
+     inlines: this page is already the heaviest thing we send a phone, and five
+     inline PNGs would add ~175 KB to the HTML itself, before the browser can
+     paint anything. As files they are cacheable, lazy and off the critical path.
+
+     The set is printed twice. The second run is aria-hidden and untabbable, and
+     exists only so translateX(-50%) lands on an identical frame — that is what
+     makes the loop seamless rather than snapping back at the end. -->
+<div class="carousel" aria-label="Partner logos">
+  <div class="slab wrap invite partners-head"><span class="dot"></span><h2>Partners</h2></div>
+  <div class="track">
+      <a href="https://www.musictotheears.org/" target="_blank" rel="noopener" aria-label="Music To The Ears"><img src="/partners/music-to-the-ears.png" alt="Music To The Ears" loading="lazy" decoding="async"></a>
+      <a href="https://www.leadersofthenewschooled.com/" target="_blank" rel="noopener" aria-label="Leaders Of The New Schooled"><img src="/partners/leaders-of-the-new-schooled.png" alt="Leaders Of The New Schooled" loading="lazy" decoding="async"></a>
+      <a href="https://pulse.myindsound.com" target="_blank" rel="noopener" aria-label="Pulse"><img src="/partners/pulse.png" alt="Pulse" loading="lazy" decoding="async"></a>
+      <a href="https://www.academixbeatlab.com/" target="_blank" rel="noopener" aria-label="Academix Beat Lab"><img src="/partners/academix-beat-lab.png" alt="Academix Beat Lab" loading="lazy" decoding="async"></a>
+      <a href="https://mixmats.com" target="_blank" rel="noopener" aria-label="Mixmats"><img class="mm" src="/partners/mixmats.png" alt="Mixmats" loading="lazy" decoding="async"></a>
+      <a class="dup" href="https://www.musictotheears.org/" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="/partners/music-to-the-ears.png" alt="" loading="lazy" decoding="async"></a>
+      <a class="dup" href="https://www.leadersofthenewschooled.com/" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="/partners/leaders-of-the-new-schooled.png" alt="" loading="lazy" decoding="async"></a>
+      <a class="dup" href="https://pulse.myindsound.com" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="/partners/pulse.png" alt="" loading="lazy" decoding="async"></a>
+      <a class="dup" href="https://www.academixbeatlab.com/" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="/partners/academix-beat-lab.png" alt="" loading="lazy" decoding="async"></a>
+      <a class="dup" href="https://mixmats.com" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img class="mm" src="/partners/mixmats.png" alt="" loading="lazy" decoding="async"></a>
+  </div>
+</div>
 
 <footer class="dark-zone">
   <div class="wrap invite">

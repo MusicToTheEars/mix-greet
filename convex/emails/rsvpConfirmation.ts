@@ -127,6 +127,12 @@ const HOST = "ACADEMIX BEAT LAB";
 // The light panel's content width at 600px: 600 - 2*28 outer pad = 544.
 const POSTER_WIDTH = 544;
 
+// Read aloud when the strip cannot be seen. Kept beside POSTER_WIDTH rather
+// than derived, because the GIF's contents are baked at build time too: both
+// come from /partners/ and both change in the same commit.
+const PARTNER_NAMES =
+  "Academix Beat Lab, Mixmats, Music To The Ears Foundation, Leaders Of The New Schooled, Pulse";
+
 function esc(v: unknown): string {
   return String(v ?? "")
     .replace(/&/g, "&amp;")
@@ -198,6 +204,9 @@ export type ConfirmationVars = {
   // falls back to the table of coloured cells, which is what shipped before and
   // is still what a client with images off sees.
   meterUrl?: string;
+  // Absolute URL of the scrolling partners GIF. Optional: without it the strip
+  // is simply not rendered, rather than leaving an empty black band.
+  partnersUrl?: string;
   mapUrl?: string; // overrides the derived Google Maps search link
   // The event's own flyer, resolved from events.posterId in convex/email.ts.
   // This is the only thing in the message that changes shape between events,
@@ -718,6 +727,38 @@ function meterHtml(gifUrl?: string): string {
   return `<table role="presentation" aria-hidden="true" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.ledCase}" style="width:100%;border-collapse:separate;background-color:${BRAND.ledCase};">
   <tr>${cells.join("")}</tr>
 </table>`;
+}
+
+// The partners strip, scrolling, exactly as the site runs it.
+//
+// A guest who arrives from a texted link may never see the home page, so this
+// is the only place the people backing the night reach the audience being
+// invited. Built by scripts/build-partners-gif.mjs from the same /partners/
+// files rsvp.html points at, so the email and the invite page cannot disagree
+// about who the partners are.
+//
+// Same client rules as the meter: a GIF because Gmail strips @keyframes and
+// Outlook's Word engine never had them; frame 1 is a clean, evenly-spaced still
+// because Outlook draws frame 1 and stops; and the cell keeps the dark
+// background so images-off shows a black band at the strip's height rather than
+// a row of broken-image icons.
+//
+// Unlike the meter there is no table fallback. A meter is a divider and can be
+// drawn with coloured cells; a partner's logo cannot. With no URL the strip is
+// omitted entirely rather than leaving an empty black band, and the alt text
+// names them so a screen reader and a blocked-image client still get the fact.
+function partnersHtml(gifUrl?: string, names?: string): string {
+  if (!gifUrl) return "";
+  const alt = names ? `Partners: ${names}` : "Our partners";
+  return `  <tr><td class="mg-pad mg-band" bgcolor="${BRAND.white}" style="background-color:${BRAND.white};padding:0 28px 26px 28px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+      <tr><td style="padding:0 0 10px 0;font-family:${MONO};font-size:10px;line-height:14px;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:${BRAND.textMuted};">PARTNERS</td></tr>
+      <tr><td align="center" bgcolor="${BRAND.bg}" style="background-color:${BRAND.bg};font-size:0;line-height:0;padding:0;">
+        <img src="${esc(gifUrl)}" width="${POSTER_WIDTH}" alt="${esc(alt)}" style="display:block;width:100%;max-width:${POSTER_WIDTH}px;height:auto;border:0;outline:none;text-decoration:none;background-color:${BRAND.bg};font-family:${MONO};font-size:11px;line-height:16px;color:${BRAND.muted};">
+      </td></tr>
+    </table>
+  </td></tr>
+`;
 }
 
 // The panel's top bar, and the loudest of the signals that separate a confirmed
@@ -1486,6 +1527,8 @@ ${posterHtml}  <!-- ============ LIGHT PANEL ============ -->
     </table>
   </td></tr>
 
+  <!-- ============ PARTNERS ============ -->
+${partnersHtml(safeUrl(v.partnersUrl), PARTNER_NAMES)}
   <!-- ============ DARK FOOTER ============ -->
   <tr><td class="mg-pad mg-band" bgcolor="${BRAND.white}" style="background-color:${BRAND.white};padding:0 28px 34px 28px;font-size:0;line-height:0;">&nbsp;</td></tr>
   <tr><td class="mg-pad" bgcolor="${BRAND.bg}" style="background-color:${BRAND.bg};padding:34px 28px 44px 28px;">
