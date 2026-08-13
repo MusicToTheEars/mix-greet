@@ -204,8 +204,15 @@ export const sendRsvpConfirmation = internalAction({
     const apiOrigin = siteUrl || "https://good-labrador-980.convex.site";
     const walletUrl = mgTok ? `${apiOrigin}/api/pass?t=${encodeURIComponent(mgTok)}` : undefined;
     const manageUrl = mgTok ? `${inviteOrigin()}/rsvp?manage=${encodeURIComponent(mgTok)}` : undefined;
+    // The same door code as a plain PNG, served by the same router. Without it
+    // the confirmation offered exactly one scannable thing, an Apple Wallet
+    // pass, so an Android guest reached the door holding an email with nothing
+    // in it to scan. The endpoint has been live all along and nothing pointed at
+    // it; the template renders it as an image AND links the code, so no guest
+    // depends on their client agreeing to load a remote image.
+    const qrUrl = mgTok ? `${apiOrigin}/api/qr?t=${encodeURIComponent(mgTok)}` : undefined;
 
-    const rendered = renderRsvpConfirmation({ ...vars, icsUrl, walletUrl, manageUrl });
+    const rendered = renderRsvpConfirmation({ ...vars, icsUrl, walletUrl, manageUrl, qrUrl });
 
     let enqueued = false;
     try {

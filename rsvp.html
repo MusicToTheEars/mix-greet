@@ -468,6 +468,42 @@ a.copy-btn,.copy-btn{
 }
 a.copy-btn:hover,.copy-btn:hover,.copy-btn:focus-visible{border-color:var(--text);background:var(--text);color:var(--surface)}
 
+/* ---------- the pass ----------
+   The code the door scans, printed on the page the guest is already holding.
+   It used to exist only as an ADD TO APPLE WALLET button inside the
+   confirmation email, so a guest on an Android phone reached the end of the
+   whole journey with nothing to show at the door.
+
+   A scanner reads dark modules on a white field with a quiet margin round
+   them, and nothing else. So the plate is flat white, the code is never
+   tinted, screened or laid over the brand's ground, and the 2px rule and the
+   square corners are the only things this block borrows from the page. It is
+   the one graphic here whose job is not decoration. */
+.pass{margin-top:18px;border-top:2px solid var(--surface-line);padding-top:18px}
+.pass-plate{
+  background:#FFFFFF;border:2px solid var(--text);
+  padding:12px;width:100%;max-width:250px;margin:0 auto;
+}
+.pass-plate img{width:100%;height:auto;display:block}
+.pass-say{
+  margin:13px 0 0;text-align:center;color:var(--text);font-weight:700;
+  font-size:12px;letter-spacing:.16em;text-transform:uppercase;line-height:1.5;
+}
+/* the one line about signal. The room is downstairs and the page will not
+   load at the door, so the only thing that survives the trip is a picture the
+   guest already took. */
+.pass-note{
+  margin:9px 0 0;text-align:center;color:var(--text-muted);
+  font-size:12px;line-height:1.6;letter-spacing:.02em;
+}
+/* A broken-image icon tells the guest nothing and leaves them with no code and
+   no next step, so a file that fails to decode is replaced outright by what
+   happened and by something they can press. */
+.pass-fail{border:2px solid var(--text-muted);padding:16px;text-align:center}
+.pass-fail p{font-size:13px;line-height:1.6;color:var(--text-soft);margin:0}
+.pass-fail p+p{margin-top:8px}
+.pass-fail .copy-btn{margin-top:14px}
+
 /* full-width states (loading / not found) sit in their own panel */
 .page-state{max-width:560px;margin:0 auto;text-align:center;padding:clamp(30px,6vw,54px) 4px}
 .page-state h2{
@@ -711,6 +747,13 @@ body.has-sticky{padding-bottom:84px}
         <div id="confirmed" class="state ok hidden">
           <h2>You're on the list</h2>
           <p>Confirmation on its way to <b id="okEmail"></b>. Save the date now so it doesn't get lost in a text thread.</p>
+          <!-- The door code. Filled by renderPass() only when the submission
+               actually handed back a signed token, and left empty and hidden
+               when it did not, because the honeypot reply and a deployment
+               with no signing secret both answer ok without one. Every word
+               about a code lives inside this block, so a screen without one
+               never promises the guest something they are not holding. -->
+          <div class="pass hidden" id="okPass"></div>
           <div class="recap" id="okRecap"></div>
           <div class="acts-row">
             <button class="cal-btn" id="icsBtn2" type="button">
@@ -726,9 +769,38 @@ body.has-sticky{padding-bottom:84px}
 
         <div id="waitlisted" class="state wait hidden">
           <h2>You're on the waitlist</h2>
-          <p>This one is at capacity. We'll email <b id="waitEmail"></b> the moment a spot opens up — no need to check back.</p>
+          <p>This one is at capacity. We'll email <b id="waitEmail"></b> the moment a spot opens up, no need to check back.</p>
+          <!-- A waitlisted guest gets a real code: /api/qr renders for every
+               status except cancelled, and the door scanner accepts it and
+               records the arrival as a waitlist walk-up. The code being valid
+               is not the same as a place being free, so the line under it says
+               which of the two the guest actually has. -->
+          <div class="pass hidden" id="waitPass"></div>
           <div class="recap" id="waitRecap"></div>
           <div class="acts-row">
+            <a class="back-btn" href="/">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5l-5 5 5 5"/><path d="M6 10h9"/></svg>
+              Back to Mix &amp; Greet
+            </a>
+          </div>
+        </div>
+
+        <!-- The submission came back cancelled.
+             This is what happens when a guest cancels and then RSVPs again
+             with the same address: the submission dedupes onto the old row and
+             answers ok with the OLD status, so the page used to print "You're
+             on the list" over an RSVP that the door would refuse. The backend
+             is being changed to reinstate instead, and this state is what
+             stands between that change and a guest who is lied to: if
+             "cancelled" ever comes back from a submission again, this says so
+             and points at the one route that puts a name back on the list
+             without any server change at all. -->
+        <div id="stillCancelled" class="state err hidden">
+          <h2>You're still off the list</h2>
+          <p>You cancelled this RSVP earlier, and sending the form again has not put it back. Nothing is booked, and there is no code to show at the door.</p>
+          <p>RSVP again with a different email address and you're on the list straight away. To keep this address, ask whoever sent you the invitation to add you back.</p>
+          <div class="acts-row">
+            <button class="btn" id="reRsvp" type="button">RSVP with another email</button>
             <a class="back-btn" href="/">
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5l-5 5 5 5"/><path d="M6 10h9"/></svg>
               Back to Mix &amp; Greet
@@ -747,12 +819,19 @@ body.has-sticky{padding-bottom:84px}
 
         <!-- Reached from the confirmation email's "change or cancel" link,
              which carries a signed token. Everything here acts on that token;
-             the page never sees or needs an rsvp id. -->
+             the page never sees or needs an rsvp id.
+
+             It is no longer only a cancellation form. The email's one route to
+             a scannable code is an Apple Wallet button, so for a guest on
+             Android, or for anyone whose mail app refuses to load images, this
+             page is now the place the code lives. It leads with the pass and
+             keeps the controls underneath it. -->
         <div id="manageState" class="state hidden">
-          <h2 id="mgHead">Your RSVP</h2>
+          <h2 id="mgHead">Your pass</h2>
           <p id="mgLead"></p>
+          <div class="pass hidden" id="mgPass"></div>
           <div class="recap" id="mgRecap"></div>
-          <label for="mgGuests">Party size</label>
+          <label for="mgGuests" id="mgGuestsLabel">Party size</label>
           <select id="mgGuests">
             <option value="1">Just me</option>
             <option value="2">2 people</option>
@@ -763,6 +842,11 @@ body.has-sticky{padding-bottom:84px}
           <div class="acts-row">
             <button class="cal-btn" id="mgSave" type="button">Save party size</button>
             <button class="cal-btn" id="mgCancel" type="button">Cancel my RSVP</button>
+            <!-- Only ever shown when the load failed. The same 404 covers a
+                 tampered token, a deleted RSVP and a server that is down, and
+                 only the last of those is worth pressing a button over, so the
+                 button is offered rather than the page guessing which it was. -->
+            <button class="cal-btn" id="mgRetry" type="button" hidden>Try again</button>
           </div>
           <p class="msg" id="mgMsg" hidden></p>
           <div class="acts-row" style="margin-top:14px">
@@ -771,6 +855,18 @@ body.has-sticky{padding-bottom:84px}
               Back to Mix &amp; Greet
             </a>
           </div>
+        </div>
+
+        <!-- The same device coming back to the same invite link, days later,
+             out of a text thread. offerEdit() already swapped the RSVP call to
+             action for an edit one; without this block the panel was a lone
+             button with no context, and the code the guest is holding was two
+             taps away behind it. Now the code is on screen and the controls
+             sit under it, which is the same shape as the manage page. -->
+        <div id="backState" class="state ok hidden">
+          <h2 id="backHead">You're going</h2>
+          <p id="backLead"></p>
+          <div class="pass hidden" id="backPass"></div>
         </div>
 
         <div id="closedState" class="state shut hidden">
@@ -1303,6 +1399,70 @@ function recap(node, email, guests){
   add('Party', guests > 1 ? guests + ' people' : 'Just you');
 }
 
+/* ---------- the pass ----------
+   GET /api/qr?t=<signed token> answers with the door QR as a PNG. It has
+   existed for a while and nothing on this site linked to it, so the only route
+   to a scannable code was the ADD TO APPLE WALLET button in the confirmation
+   email and a guest on an Android phone finished the journey holding nothing.
+   Every screen that knows a token now prints the code.
+
+   Drawn as a plain <img> on purpose. Not fetch + blob, not a canvas: an <img>
+   is the one thing a browser will still have when the page is opened again
+   with no network, and the venue is a basement. The response is sent
+   `private, max-age=300` though, so the cache alone is not a plan and the line
+   under the code asks for a screenshot. That line is the whole of the offline
+   story: no service worker, no offline app.
+
+   The token is the guest's own credential, so the URL is never logged, shared
+   or put behind a link the page would print in the clear. */
+function qrUrl(token, bust){
+  return API + '/api/qr?t=' + encodeURIComponent(token) + (bust ? '&r=' + bust : '');
+}
+
+// A code the page cannot draw is worse than no block at all: a broken-image
+// icon says nothing and leaves the guest with nowhere to go. So the plate is
+// replaced by what happened and by a button, and the retry carries a fresh
+// query so a failed response cannot simply be served back from cache.
+function passFail(box, token, note, tries){
+  box.textContent = '';
+  const w = el('div', 'pass-fail');
+  w.appendChild(el('p', null, 'Your code didn’t load.'));
+  w.appendChild(el('p', null,
+    'You might be offline, or this RSVP may have been cancelled. Try again once you have a signal. ' +
+    'If it still won’t load, give your name at the door.'));
+  const b = el('button', 'copy-btn', 'Try again');
+  b.type = 'button';
+  b.addEventListener('click', () => renderPass(box, token, note, tries + 1));
+  w.appendChild(b);
+  box.appendChild(w);
+}
+
+// note: the one honest sentence about what this particular code is worth.
+// A confirmed guest and a waitlisted guest hold the same picture and do not
+// hold the same thing, so the caller says which.
+function renderPass(box, token, note, tries){
+  if (!box) return;
+  box.textContent = '';
+  // No token means no code: the honeypot reply and a deployment with no
+  // signing secret both answer ok without one. The block disappears rather
+  // than printing a promise the page cannot keep.
+  if (!token) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+
+  const plate = el('div', 'pass-plate');
+  const img = el('img');
+  img.alt = 'Your entry code, a QR code for the door';
+  img.decoding = 'async';
+  img.addEventListener('error', () => passFail(box, token, note, tries || 0), {once: true});
+  img.src = qrUrl(token, tries || 0);
+  plate.appendChild(img);
+
+  box.appendChild(plate);
+  box.appendChild(el('p', 'pass-say', note || 'Show this at the door.'));
+  box.appendChild(el('p', 'pass-note',
+    'Screenshot this before you travel. If there’s no signal at the door, a saved picture still scans.'));
+}
+
 /* ---------- sticky mobile CTA ----------
    Rides along whenever neither the hero button nor the panel is on screen. */
 function watchSticky(){
@@ -1545,21 +1705,36 @@ $('rsvpForm').addEventListener('submit', async (e) => {
     const out = await res.json().catch(() => ({}));
     if (res.ok && out.ok) {
       SUBMITTED = true;
+      // ok:true is not the same as "you are on the list". A submission that
+      // dedupes onto a cancelled row answers ok and hands back that row's
+      // status, and this branch used to treat everything that was not
+      // "waitlist" as a confirmation: a guest who cancelled and RSVPed again
+      // was told they were going, and would have been turned away at the door.
+      // Nothing here trusts a shape it does not recognise either, because the
+      // only screens that promise anything are the two the backend names.
+      const status = String(out.status || '');
+      const cancelled = status === 'cancelled';
       // Remember the signed manage token for this event on this device, so a
       // guest who comes back to the same link is offered "edit or cancel"
       // rather than an RSVP form that would just tell them they are a
-      // duplicate. Only the token is stored — never an id or an email.
-      if (out.manageToken) rememberRsvp(out.manageToken);
+      // duplicate. Only the token is stored, never an id or an email, and a
+      // cancelled RSVP is not worth remembering: there is nothing to edit.
+      if (out.manageToken && !cancelled) rememberRsvp(out.manageToken);
       $('stickyBar').classList.remove('up');
       document.body.classList.remove('has-sticky');
       hide('formWrap');
-      if (out.status === 'waitlist') {
+      if (cancelled) {
+        show('stillCancelled');
+      } else if (status === 'waitlist') {
         $('waitEmail').textContent = email;
         recap($('waitRecap'), email, guests);
+        renderPass($('waitPass'), out.manageToken,
+          'Bring this to the door. It only gets you in if a spot opens.');
         show('waitlisted');
       } else {
         $('okEmail').textContent = email;
         recap($('okRecap'), email, guests);
+        renderPass($('okPass'), out.manageToken, 'Show this at the door.');
         show('confirmed');
       }
       $('rsvp-panel').scrollIntoView({block: 'center', behavior: CALM ? 'auto' : 'smooth'});
@@ -1575,6 +1750,22 @@ $('rsvpForm').addEventListener('submit', async (e) => {
     btn.disabled = false;
     btn.textContent = submitLabel();
   }
+});
+
+// Back to the form from the cancelled-submission state, with the address
+// cleared: the same address is exactly what will dedupe onto the cancelled row
+// again, so the field a guest has to change is the field that is empty.
+$('reRsvp').addEventListener('click', () => {
+  hide('stillCancelled');
+  show('formWrap');
+  revealForm();
+  SUBMITTED = false;
+  const btn = $('submitBtn');
+  btn.disabled = false;
+  $('f-email').value = '';
+  syncButton();
+  $('rsvp-panel').scrollIntoView({block: 'center', behavior: CALM ? 'auto' : 'smooth'});
+  $('f-email').focus({preventScroll: true});
 });
 
 $('icsBtn').addEventListener('click', downloadIcs);
@@ -1729,12 +1920,17 @@ function rememberedRsvp(){
 // Swap the RSVP call to action for an edit one when this device already booked.
 async function offerEdit(token){
   let live = null;
+  // Forgetting the token is destructive: it is this device's only route back to
+  // the guest's own code. So it is only forgotten on an answer that means the
+  // RSVP is gone, never on silence. A guest on a train with no bars used to
+  // land in the same branch as a cancelled RSVP and lose the token for good.
+  let gone = false;
   try {
     const r = await fetch(API + '/api/rsvp/manage?t=' + encodeURIComponent(token));
     if (r.ok) live = await r.json();
+    else if (r.status === 404) gone = true;
   } catch (_) {}
-  // Cancelled or unrecognised: drop the memory and let them RSVP again.
-  if (!live || live.status === 'cancelled') {
+  if (gone || (live && live.status === 'cancelled')) {
     try {
       const all = JSON.parse(localStorage.getItem(RSVP_STORE) || '{}');
       delete all[eventKey];
@@ -1742,10 +1938,34 @@ async function offerEdit(token){
     } catch (_) {}
     return false;
   }
+  // Unreachable rather than gone: leave the memory alone and leave the RSVP
+  // form up, which is the one screen that still works with no answer from us.
+  if (!live) return false;
   const href = '?manage=' + encodeURIComponent(token);
-  const label = live.status === 'waitlist' ? "You're on the waitlist" : "You're going";
+  const waiting = live.status === 'waitlist';
+  const inside = live.status === 'checked_in';
+  const label = waiting ? "You're on the waitlist" : (inside ? "You're checked in" : "You're going");
   const panelLead = $('panelLead');
   if (panelLead) panelLead.textContent = label + ' · ' + (live.guests > 1 ? live.guests + ' guests' : 'just you');
+
+  // The code, on the panel, without a round trip through the manage page. This
+  // route is how most guests come back: the invite link is the one they still
+  // have in the text thread, days later, and until now it led to a button
+  // rather than to the thing the door actually needs.
+  // Not printed over an event that has already happened, where "You're going"
+  // is the wrong tense and the closed state is already saying so.
+  const evd = EVENT && evDate(EVENT.date);
+  if (!(evd && daysOut(evd) < 0)) {
+    $('backHead').textContent = label;
+    $('backLead').textContent = 'You RSVPed for ' +
+      ((live.event && live.event.title) || 'this event') + ' on this device, ' +
+      (live.guests > 1 ? 'party of ' + live.guests + '.' : 'just you.');
+    renderPass($('backPass'), token,
+      inside ? 'You’ve already been scanned in with this code.'
+      : waiting ? 'Bring this to the door. It only gets you in if a spot opens.'
+      : 'Show this at the door.');
+    show('backState');
+  }
   // "Two fields, about twenty seconds" describes filling the form. Once this
   // device has already booked there is no form to fill, so the caption has to
   // describe what the button now does instead of promising a signup again.
@@ -1776,10 +1996,96 @@ async function offerEdit(token){
    is the only credential; a guest never handles an id, and a tampered token
    returns the same 404 as a missing one. */
 const manageToken = (qs.get('manage') || '').trim();
+// The slug the manage payload came back with. Held so that the guest can be
+// handed the invitation again after cancelling, not only after arriving to a
+// row that was already cancelled.
+let MG_SLUG = '';
+
+// "RSVP again from the invitation" is only a next step if the guest can reach
+// the invitation, and this page never has the event key in its own URL.
+function mgAgainLink(){
+  if (!MG_SLUG || $('mgAgain')) return;
+  const a = el('a', 'copy-btn', 'Open the invitation');
+  a.id = 'mgAgain';
+  a.href = '/i/' + encodeURIComponent(MG_SLUG);
+  $('mgRetry').parentNode.appendChild(a);
+}
 
 function mgShow(msg, cls){
   const m = $('mgMsg');
   m.textContent = msg; m.className = 'msg ' + (cls || ''); m.hidden = false;
+}
+
+// The last thing the server said about this RSVP. Held because the same state
+// now arrives down two paths: the load, and a refused POST that comes back
+// carrying the guest's real status and party size. Both re-run mgRender(), so
+// the screen can never keep describing a booking the server has moved on from.
+let MG_STATE = null;
+
+/* One place decides what this page says and which controls it offers.
+   Four states arrive here and none of them are interchangeable: a place at the
+   event, a place in the queue for one, a guest already inside the room, and no
+   booking at all. */
+function mgRender(lead){
+  const d = MG_STATE || {};
+  const title = (d.event && d.event.title) || 'this event';
+  const status = String(d.status || '');
+  const cancelled = status === 'cancelled';
+  const waiting = status === 'waitlist';
+  const inside = status === 'checked_in';
+
+  $('mgHead').textContent = cancelled ? 'RSVP cancelled'
+    : inside ? 'You’re checked in'
+    : waiting ? 'Your waitlist pass' : 'Your pass';
+
+  $('mgLead').textContent = lead ? lead
+    : cancelled
+      ? 'This RSVP is cancelled, so the code that came with it no longer scans. To come after all, RSVP again from the invitation.'
+    : inside
+      ? 'You’ve been scanned in at ' + title + ', so there’s nothing left to do here. An RSVP can’t be cancelled once you’re through the door.'
+    : waiting
+      ? 'You’re on the waitlist for ' + title + '. Keep the code below: a place only opens if someone drops out, and we’ll email you the moment one does. Change your party size or cancel underneath.'
+      : 'You’re on the list for ' + title + '. Show the code below at the door. Change your party size or cancel underneath.';
+
+  // The code itself, and the reason this page is worth more than a
+  // cancellation form: the confirmation email's only scannable code is an
+  // Apple Wallet button. A cancelled RSVP gets no code, because /api/qr
+  // refuses one and the door scanner would refuse it too.
+  renderPass($('mgPass'), cancelled ? '' : manageToken,
+    inside ? 'You’ve already been scanned in with this code.'
+    : waiting ? 'Bring this to the door. It only gets you in if a spot opens.'
+    : 'Show this at the door.');
+
+  // Built as nodes rather than as a merged HTML string, and reusing the recap
+  // typography the confirmed state already prints, so an event title out of
+  // the back office is never parsed as markup.
+  const rows = [
+    ['Event', (d.event && d.event.title) || ''],
+    ['When', [d.event && d.event.date, d.event && d.event.start].filter(Boolean).join(' · ')],
+    ['Name', d.name || ''],
+    ['Party', d.guests > 1 ? d.guests + ' people' : (d.guests ? 'Just you' : '')],
+    ['Status', inside ? 'Checked in'
+      : waiting ? 'Waitlisted'
+      : cancelled ? 'Cancelled' : (status ? 'On the list' : '')],
+  ].filter(row => row[1]);
+  const box = $('mgRecap');
+  box.textContent = '';
+  rows.forEach(([k, v2]) => {
+    const row = el('div');
+    row.appendChild(el('span', 'rk', k));
+    row.appendChild(el('div', 'rv', v2));
+    box.appendChild(row);
+  });
+
+  $('mgGuests').value = String(Math.min(5, Math.max(1, d.guests || 1)));
+  $('mgGuests').disabled = cancelled;
+  $('mgSave').hidden = cancelled;
+  // Cancelling after the door has scanned someone in would erase the one
+  // number the host cannot rebuild the next morning, so the server refuses it.
+  // Offering the button anyway and telling the guest off for pressing it is a
+  // worse way to say that than not offering it.
+  $('mgCancel').hidden = cancelled || inside;
+  if (cancelled) mgAgainLink();
 }
 
 async function mgLoad(){
@@ -1797,32 +2103,39 @@ async function mgLoad(){
     .forEach(id => { const n = $(id); if (n) n.classList.add('hidden'); });
   const eb = $('eventBlock'); if (eb) eb.classList.remove('hidden');
   show('manageState');
+  // The retry re-enters here, so every control this function can take away has
+  // to be handed back first, or a second attempt loads onto a stripped page.
+  $('mgRetry').hidden = true;
+  ['mgSave','mgCancel','mgGuests','mgGuestsLabel'].forEach(id => { $(id).hidden = false; });
+  $('mgGuests').disabled = false;
+  $('mgMsg').hidden = true;
   try {
     const r = await fetch(API + '/api/rsvp/manage?t=' + encodeURIComponent(manageToken));
     if (!r.ok) throw new Error('bad');
     const d = await r.json();
+    MG_STATE = d;
+    MG_SLUG = String(d.event?.slug || '');
     document.title = 'Your RSVP · ' + (d.event?.title || 'Mix & Greet');
-    $('mgHead').textContent = d.status === 'cancelled' ? 'RSVP cancelled' : 'Your RSVP';
-    $('mgLead').textContent = d.status === 'cancelled'
-      ? 'This RSVP is cancelled. If you want back in, RSVP again from the invitation.'
-      : 'You are on the list for ' + (d.event?.title || 'this event') + '. Change your party size or cancel below.';
-    const rows = [
-      ['EVENT', d.event?.title || ''],
-      ['WHEN', [d.event?.date, d.event?.start].filter(Boolean).join(' · ')],
-      ['NAME', d.name || ''],
-      ['STATUS', d.status === 'checked_in' ? 'Checked in' : (d.status || '')],
-    ].filter(r => r[1]);
-    $('mgRecap').innerHTML = rows
-      .map(([k, v2]) => '<div class="rr"><span>' + k + '</span><b></b></div>')
-      .join('');
-    [...$('mgRecap').querySelectorAll('.rr b')].forEach((b, i) => { b.textContent = rows[i][1]; });
-    $('mgGuests').value = String(Math.min(5, Math.max(1, d.guests || 1)));
-    const done = d.status === 'cancelled';
-    $('mgSave').hidden = done; $('mgCancel').hidden = done; $('mgGuests').disabled = done;
+    mgRender();
   } catch (_) {
-    $('mgHead').textContent = 'Link not valid';
-    $('mgLead').textContent = 'That link has expired or was mistyped. Open the most recent confirmation email.';
-    $('mgSave').hidden = true; $('mgCancel').hidden = true; $('mgGuests').hidden = true;
+    // These tokens are stateless HMACs over the rsvp id with no timestamp in
+    // them, so nothing here has expired and saying so sent guests hunting for
+    // a newer email that does not exist. The same 404 also covers a tampered
+    // link, an RSVP the operator deleted and a server that is simply down, and
+    // the page cannot tell those apart, so it names all three and does not
+    // pretend the guest did something wrong.
+    $('mgHead').textContent = 'We couldn’t open this RSVP';
+    $('mgLead').textContent = 'The link itself doesn’t expire, so it isn’t too late. Either it was altered somewhere between the email and here, the RSVP has been removed, or we can’t reach the server right now. Nothing has changed either way, and you’re still on the list if you were.';
+    renderPass($('mgPass'), '');
+    // Nothing came back, so nothing is described. A retry that fails used to
+    // leave the previous attempt's name and party size sitting under the
+    // apology, which reads as a booking the page has just failed to confirm.
+    $('mgRecap').textContent = '';
+    $('mgSave').hidden = true;
+    $('mgCancel').hidden = true;
+    $('mgGuests').hidden = true;
+    $('mgGuestsLabel').hidden = true;
+    $('mgRetry').hidden = false;
   }
 }
 
@@ -1833,13 +2146,45 @@ async function mgPost(action, guests){
       body: JSON.stringify({ t: manageToken, action, guests })
     });
     const d = await r.json();
+    // A refusal is not a failure. The server sends 409 with a `reason`, a
+    // sentence it wrote for the guest, and the RSVP's real state: already
+    // through the door, already cancelled, or a party that will not fit the
+    // room. "That did not go through. Try again." is wrong for all three, and
+    // for a full room it is wrong twice over, because nothing went wrong and
+    // trying again cannot help. Print what the server said, then re-sync from
+    // the state it sent, so the party-size control stops showing a number that
+    // was rejected.
+    if (d && d.reason) {
+      MG_STATE = Object.assign({}, MG_STATE, {status: d.status, guests: d.guests});
+      mgRender();
+      mgShow(d.error || 'That change was not applied.', 'err');
+      return;
+    }
     if (!r.ok || d.error) { mgShow('That did not go through. Try again.', 'err'); return; }
-    if (action === 'cancel') {
-      $('mgHead').textContent = 'RSVP cancelled';
-      $('mgLead').textContent = 'You are off the list. Thanks for telling us — it frees the spot for someone else.';
-      $('mgSave').hidden = true; $('mgCancel').hidden = true; $('mgGuests').disabled = true;
-      mgShow('Cancelled.', 'ok');
+    // The reply carries the status the row ended up in, and it is the only
+    // thing worth believing here. Reporting "Party size updated" over a row the
+    // door will refuse is the same lie this page used to tell after a
+    // re-submission, so the whole screen follows the status home.
+    const status = String(d.status || '');
+    MG_STATE = Object.assign({}, MG_STATE, {
+      status,
+      guests: d.guests != null ? d.guests : (MG_STATE && MG_STATE.guests)
+    });
+    if (status === 'cancelled') {
+      // The pass comes down with it. /api/qr refuses a cancelled RSVP and the
+      // door scanner reads it as cancelled, so leaving the picture on screen
+      // would hand someone a code that gets them turned away.
+      mgRender(action === 'cancel'
+        ? 'You’re off the list. Thanks for telling us, it frees the spot for someone else. The code that came with this RSVP has stopped working.'
+        : null);
+      mgShow(action === 'cancel' ? 'Cancelled.' : 'This RSVP was already cancelled.', 'ok');
+    } else if (action === 'cancel') {
+      // Asked to cancel and came back on the list: the guest's own instruction
+      // has not been carried out, so nothing here says it has.
+      mgRender();
+      mgShow('That didn’t go through, and you’re still on the list. Try again.', 'err');
     } else {
+      mgRender();
       mgShow('Party size updated.', 'ok');
     }
   } catch (_) { mgShow('Network error. Try again.', 'err'); }
@@ -1850,6 +2195,9 @@ if (manageToken) {
   $('mgCancel').addEventListener('click', () => {
     if (confirm('Cancel your RSVP for this event?')) mgPost('cancel');
   });
+  // A server that was down a moment ago is the only one of the three causes a
+  // guest can do anything about, and this is the doing.
+  $('mgRetry').addEventListener('click', () => mgLoad());
 }
 
 if (manageToken) {
