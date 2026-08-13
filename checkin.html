@@ -83,18 +83,27 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
 .hits{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
 .hits li{margin:0}
 .hits button{
-  width:100%;display:flex;align-items:baseline;gap:12px;text-align:left;
+  width:100%;display:block;text-align:left;
   background:none;border:2px solid var(--line);color:var(--ink);
-  padding:13px 14px;font:inherit;cursor:pointer;
+  padding:12px 14px;font:inherit;cursor:pointer;
 }
 .hits button:hover,.hits button:focus-visible{border-color:var(--ink)}
 .hits button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.hits .top{display:flex;align-items:baseline;gap:12px}
 .hits .who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hits .party{color:var(--muted);font-size:13px;white-space:nowrap}
+/* The second line exists because two guests can share a name — this list found
+   two Lawrence Berments on the first event it was pointed at. The email is the
+   only thing that tells them apart, so it is always shown rather than only when
+   a clash is detected: staff should not have to notice the clash first. */
+.hits .sub2{
+  display:block;margin-top:3px;font-size:12px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
 /* Already through the door: dimmed, still tappable, because the honest reason
-   to tap it is to check what the door already recorded. */
-.hits button.in{border-color:var(--line);color:var(--muted)}
-.hits button.in .who::after{content:' · already in';color:var(--muted);font-size:13px}
+   to tap it is to see what the door already recorded. */
+.hits button.in{color:var(--muted)}
+.hits button.in .arrived{color:var(--green)}
 .hits button.wait .party::before{content:'waitlist · ';color:var(--brand)}
 .finder .none{color:var(--muted);font-size:13px;margin-top:14px}
 
@@ -589,6 +598,12 @@ async function loadRoster(){
   try { return await rosterPending; } finally { rosterPending = null; }
 }
 
+// Whether the door has already counted this guest. Read off checkedInAt rather
+// than status: the admin list carries an arrival stamp on rows whose status is
+// still "confirmed", so testing the status alone showed a guest who walked in an
+// hour ago as though they had not arrived yet.
+function arrived(row){ return !!row.checkedInAt; }
+
 // Match on any word boundary, so "berment" finds "Lawrence Berment" and a guest
 // who gave their name as "Lawrence" is not buried under everyone called Lawson.
 function matches(rows, q){
@@ -604,7 +619,7 @@ function matches(rows, q){
   }
   // Guests not yet through the door first: at a door, the person in front of
   // you is almost never one you have already scanned.
-  const rank = (a, b) => (a.status === 'checked_in') - (b.status === 'checked_in');
+  const rank = (a, b) => arrived(a) - arrived(b);
   return starts.sort(rank).concat(contains.sort(rank)).slice(0, 8);
 }
 
@@ -622,15 +637,31 @@ function renderHits(rows, q){
     const li = document.createElement('li');
     const b = document.createElement('button');
     b.type = 'button';
-    if (row.status === 'checked_in') b.classList.add('in');
+    if (arrived(row)) b.classList.add('in');
     if (row.status === 'waitlist') b.classList.add('wait');
+
+    const top = document.createElement('span');
+    top.className = 'top';
     const who = document.createElement('span');
     who.className = 'who';
     who.textContent = row.name;
     const party = document.createElement('span');
     party.className = 'party';
     party.textContent = (Number(row.guests) || 1) > 1 ? (row.guests + ' guests') : 'just them';
-    b.appendChild(who); b.appendChild(party);
+    top.appendChild(who); top.appendChild(party);
+
+    const sub = document.createElement('span');
+    sub.className = 'sub2';
+    sub.textContent = row.email || '';
+    if (arrived(row)) {
+      const mark = document.createElement('span');
+      mark.className = 'arrived';
+      mark.textContent = '✓ in at ' + clock(row.checkedInAt);
+      sub.appendChild(document.createTextNode(row.email ? ' · ' : ''));
+      sub.appendChild(mark);
+    }
+
+    b.appendChild(top); b.appendChild(sub);
     b.addEventListener('click', () => {
       // The same call the camera makes, with the same id the QR encodes, so a
       // guest found by name and a guest scanned are one code path and one
