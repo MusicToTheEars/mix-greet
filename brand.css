@@ -33,6 +33,14 @@
   --accent-ink:var(--brand-ink);
   --ok-ink:#1E7F46;      /* --green is too light to read on white */
   --danger:var(--red);
+
+  /* Corner radius for SURFACES — panels, tiles, cards, the flyer. One token so
+     the whole app turns together instead of drifting a pixel at a time.
+     Controls (buttons, inputs) stay square on purpose: they are set in
+     `border-radius:0` further down, and a rounded surface holding square
+     controls is a deliberate pairing, not an oversight. */
+  --radius:14px;
+  --radius-sm:10px;   /* smaller boxes, where 14px would eat the corner */
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{
@@ -119,7 +127,7 @@ header.wrap{padding-top:clamp(24px,4vw,44px);padding-bottom:0}
 .slab .dot{width:10px;height:10px;background:var(--brand);flex:none}
 
 /* ---- panels ---- */
-.panel{background:var(--surface);border:2px solid var(--surface-line);padding:clamp(22px,4vw,32px);margin-top:24px}
+.panel{background:var(--surface);border:2px solid var(--surface-line);padding:clamp(22px,4vw,32px);margin-top:24px;border-radius:var(--radius)}
 .panel.accent{border-top:6px solid var(--brand)}
 .panel.editing{border-color:var(--brand)}
 .head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:2px solid var(--surface-line);padding-bottom:12px}

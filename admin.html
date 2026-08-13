@@ -59,7 +59,7 @@
 .add:hover{border-color:var(--brand);color:var(--brand)}
 
 /* the hosted invite link — the one thing the operator actually shares */
-.invite{margin-top:24px;background:var(--field);border:2px solid var(--brand);padding:18px 18px 16px}
+.invite{margin-top:24px;background:var(--field);border:2px solid var(--brand);padding:18px 18px 16px;border-radius:var(--radius-sm)}
 .invite .lab{margin:0 0 10px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
   font-weight:700;color:var(--brand-ink)}
 .invite .line{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
@@ -135,12 +135,12 @@
    Square, 2px, same field ground as the invite box. The only colour is green
    for heads through the door and brand red for heads that are not in the
    expected number; no amber anywhere, that belongs to the meter. */
-.door{margin-top:18px;background:var(--field);border:2px solid var(--surface-line);padding:14px 16px 16px}
+.door{margin-top:18px;background:var(--field);border:2px solid var(--surface-line);padding:14px 16px 16px;border-radius:var(--radius-sm)}
 .door .d-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
 .door .d-head b{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--text)}
 .door .d-head span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
 .door .d-stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
-.door .d-stat{flex:1 1 116px;min-width:0;border:2px solid var(--surface-line);padding:10px 12px}
+.door .d-stat{flex:1 1 116px;min-width:0;border:2px solid var(--surface-line);padding:10px 12px;border-radius:var(--radius-sm)}
 .door .d-stat b{display:block;font-size:26px;line-height:1.1;font-weight:700;color:var(--text)}
 .door .d-stat span{display:block;margin-top:4px;font-size:10px;font-weight:700;letter-spacing:.16em;
   text-transform:uppercase;color:var(--text-muted)}
@@ -154,7 +154,7 @@
 /* ---- deployment warning ---------------------------------------------------
    Loud on purpose. When this shows, every URL on the page was built from a host
    the backend guessed, and it looks exactly as correct as a real one. */
-.warn{margin-top:18px;background:var(--field);border:2px solid var(--brand-ink);
+.warn{margin-top:18px;background:var(--field);border:2px solid var(--brand-ink);border-radius:var(--radius-sm);
   border-left-width:6px;padding:14px 16px}
 .warn b{display:block;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
   color:var(--brand-ink);margin-bottom:6px}
@@ -213,7 +213,7 @@
    inside the phone media query above rather than depending on source order. */
 .stack.tiles tr{
   border:2px solid var(--surface-line);background:var(--field);
-  padding:16px 18px;
+  padding:16px 18px;border-radius:var(--radius);
   /* Square corners and a 2px rule: the same vocabulary as the invite page and
      the pass. No shadow — this palette does depth with edges, not blur. */
   transition:border-color .2s ease,background-color .2s ease;

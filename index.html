@@ -35,7 +35,10 @@
 html{scroll-behavior:smooth}
 body{background:#FFFFFF;color:#16161A;font-family:'Plex Mono',ui-monospace,monospace;line-height:1.6;-webkit-font-smoothing:antialiased}
 .dark-zone{background:var(--bg);color:var(--ink)}
-:root{--amber-ink:#B87700;--line-lt:#E5E3DE;--muted-lt:#84848C}
+:root{--amber-ink:#B87700;--line-lt:#E5E3DE;--muted-lt:#84848C;
+  /* This page does not load brand.css, so the surface radius is repeated
+     here. brand.css is the source of truth — change both together. */
+  --radius:14px;--radius-sm:10px}
 .wrap{max-width:1080px;margin:0 auto;padding:0 clamp(20px,5vw,72px)}
 a{color:var(--amber)}
 img{display:block;max-width:100%}
@@ -191,7 +194,7 @@ section{padding:clamp(8px,2vw,16px) 0}
 
 /* flyer overlay */
 .flyer-bd{position:fixed;inset:0;background:rgba(6,6,8,.86);z-index:120;display:flex;align-items:flex-start;justify-content:center;padding:clamp(16px,5vh,60px) 16px;overflow-y:auto;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
-.flyer{position:relative;background:#F5F4F1;border:2px solid var(--line-lt);border-top:6px solid var(--amber);max-width:640px;width:100%;padding:clamp(26px,4vw,44px);margin:auto}
+.flyer{position:relative;background:#F5F4F1;border:2px solid var(--line-lt);border-top:6px solid var(--amber);border-radius:var(--radius);max-width:640px;width:100%;padding:clamp(26px,4vw,44px);margin:auto}
 .flyer .x{position:absolute;top:10px;right:10px;width:40px;height:40px;border:2px solid var(--line-lt);background:transparent;color:#16161A;font-size:20px;line-height:1;cursor:pointer;font-family:'Plex Mono'}
 .flyer .x:hover,.flyer .x:focus-visible{border-color:var(--red);color:var(--red)}
 .flyer .when{color:var(--amber-ink);font-size:13px;letter-spacing:.16em;font-weight:600;text-transform:uppercase}

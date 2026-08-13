@@ -170,11 +170,16 @@ body{--text-muted:#5F5F68}
 /* the when slab — typeset, not tabulated, and printed exactly once on the
    page. The venue is NOT repeated here: it is one typeset fact below, with
    the directions link attached to it. */
+/* Date on its own line, time under it — the same order the event cards use,
+   so the invitation and the card the guest tapped to reach it read the same
+   way round. Side by side, the two competed: a 40px date and a 15px time on
+   one baseline made the time look like a suffix of the date rather than the
+   second fact. */
 .hero-when{
   margin-top:0;
   border-top:2px solid var(--line);border-bottom:2px solid var(--line);
   padding:clamp(13px,2vw,17px) 0;
-  display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;
+  display:flex;flex-direction:column;align-items:flex-start;gap:6px;
 }
 .hero-when .d{
   font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
@@ -239,7 +244,7 @@ body{--text-muted:#5F5F68}
    belt and braces if anything ever constrains the box. */
 #evPoster{width:100%;height:auto;display:block;object-fit:contain}
 
-.flyer{
+.flyer{border-radius:var(--radius);overflow:hidden;
   position:relative;overflow:hidden;aspect-ratio:4/5;background:#0B0B0D;
   border:0;border-radius:0;box-shadow:none;isolation:isolate;
   container-type:inline-size;
@@ -377,7 +382,7 @@ body{--text-muted:#5F5F68}
 .act{display:grid;grid-template-columns:104px minmax(0,1fr);gap:24px;align-items:start}
 .act .ph,.act .ini{
   width:104px;height:104px;flex:none;object-fit:cover;
-  border:2px solid var(--surface-line);background:#FFFFFF;
+  border:2px solid var(--surface-line);background:#FFFFFF;border-radius:var(--radius-sm);
 }
 /* Partner marks arrive as transparent PNGs and we cannot know their polarity.
    This project's own academix-logo.png is white type plus a red mark, so on
@@ -504,7 +509,7 @@ a.copy-btn:hover,.copy-btn:hover,.copy-btn:focus-visible{border-color:var(--text
    the one graphic here whose job is not decoration. */
 .pass{margin-top:18px;border-top:2px solid var(--surface-line);padding-top:18px}
 .pass-plate{
-  background:#FFFFFF;border:2px solid var(--text);
+  background:#FFFFFF;border:2px solid var(--text);border-radius:var(--radius-sm);
   padding:12px;width:100%;max-width:250px;margin:0 auto;
 }
 .pass-plate img{width:100%;height:auto;display:block}
@@ -522,7 +527,7 @@ a.copy-btn:hover,.copy-btn:hover,.copy-btn:focus-visible{border-color:var(--text
 /* A broken-image icon tells the guest nothing and leaves them with no code and
    no next step, so a file that fails to decode is replaced outright by what
    happened and by something they can press. */
-.pass-fail{border:2px solid var(--text-muted);padding:16px;text-align:center}
+.pass-fail{border:2px solid var(--text-muted);padding:16px;text-align:center;border-radius:var(--radius-sm)}
 .pass-fail p{font-size:13px;line-height:1.6;color:var(--text-soft);margin:0}
 .pass-fail p+p{margin-top:8px}
 .pass-fail .copy-btn{margin-top:14px}
