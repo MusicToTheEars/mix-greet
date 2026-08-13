@@ -237,16 +237,22 @@ body{--text-muted:#5F5F68}
       file actually decodes, so a slow or dead storage URL never blanks the
       column and there is no layout shift while it loads.
 
-   Both are square-cornered, unframed, uncaptioned and unshadowed. */
+   Both are unframed, uncaptioned and unshadowed. The "border-radius 0" in the
+   spec above no longer holds: the app's surfaces are rounded now and a square
+   poster inside a rounded page was the one hard corner left. Still no border,
+   no rules, no caption — only the corner changed. */
 .poster{background:transparent;border:0;opacity:0;transition:opacity .4s ease}
 .poster.on{opacity:1}
 /* height:auto already means a portrait flyer is never cropped; object-fit is
    belt and braces if anything ever constrains the box. */
 #evPoster{width:100%;height:auto;display:block;object-fit:contain}
 
-.flyer{border-radius:var(--radius);overflow:hidden;
+.flyer{
   position:relative;overflow:hidden;aspect-ratio:4/5;background:#0B0B0D;
-  border:0;border-radius:0;box-shadow:none;isolation:isolate;
+  /* overflow:hidden above is what actually rounds this: the composed artwork
+     is absolutely-positioned layers that would otherwise square off the
+     corners the border-radius just cut. */
+  border:0;border-radius:var(--radius);box-shadow:none;isolation:isolate;
   container-type:inline-size;
   transition:opacity .5s ease .06s,transform .5s ease .06s;
 }
