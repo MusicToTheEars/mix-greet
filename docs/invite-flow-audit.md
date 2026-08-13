@@ -376,35 +376,83 @@ expire; that sentence was never true. It says something true now.
 
 ---
 
+## Closed since this audit was written
+
+All four items this section originally listed as open have been done, and the
+suite is now **90 passed, 0 failed**.
+
+- **Rate limits on `/api/rsvp`, `/api/pass` and `/api/qr`.** The same two-bucket
+  shape as the login throttle already in `convex/http.ts`: a per-caller budget
+  keyed on `x-forwarded-for` plus a global backstop, because that header is the
+  only caller identity a Convex httpAction can see and it is trivially forged.
+  One 15-minute window, no lockout — these are things real guests do, and a
+  guest reloading their code at a dark door should wait, not be shut out.
+  Budgets are `RATE_LIMIT_RSVP` / `_PASS` / `_QR`, client or `client,global`,
+  so they tune without a deploy; case 26 drops one to two and drives the real
+  middleware into a real 429, including proving one caller's ceiling does not
+  touch another's.
+- **The door finds a guest by name.** Not behind a panel: the field is pinned to
+  the bottom of the live scanning view and results rise above it, because at a
+  door most guests are scanned and the one with the dead phone is standing in
+  the same queue. Tapping a name calls the same route with the same id the QR
+  encodes, so found-by-name and scanned share one verdict, one duplicate guard
+  and one undo. Two guests can share a name — the first real event had two
+  identical rows — so the email is always on the second line rather than only
+  when a clash is noticed. It needs signal and says so when it has none.
+- **A waitlisted party cannot grow past the room it is waiting for.** The
+  promotion loop tests `taken + guests <= capacity`, so an oversized row sat at
+  the front being skipped forever while the guest believed they were next.
+  Refused when they ask, on both the manage page and the repeat-submission path.
+- **The three static pages have been clicked through in a live browser**, on
+  production, against real data: the invite page and its new way back to the
+  site, and the door end to end — search, tap, green verdict with the guest's
+  name, and the automatic return to a live camera. The test check-in was undone
+  and the probe RSVP deleted afterwards.
+
 ## Still open, and why
 
-Listed so nobody thinks these were missed.
-
-- **No rate limit on `/api/rsvp`, `/api/qr` or `/api/pass`.** The tokens are
-  128-bit HMACs so brute force is not the risk; volume is. Not touched.
-- **The door has no way to look a guest up by name** when a phone is dead and the
-  guest has no code at all. That is a real door scenario and the current answer
-  is "use the back office on another device". It is the largest remaining hole
-  in the door experience and it is a deliberate omission, not an oversight: the
-  scanner is built around "nothing on screen but the camera" and a search field
-  is a different product decision for Lawrence to make.
-- **A waitlisted guest can still set their party to 10.** They hold no seats, and
-  the promotion path re-tests the room before they ever do, so it harms nobody
-  today. It would matter if promotion ever became automatic.
-- **The three static pages have not been clicked through in a live browser.**
-  See section 8b. This is the one verification gap in the work.
+- **A first-time RSVP for a party larger than the room is still accepted onto
+  the waitlist.** The rule above bounds *growth*, on the two paths where a party
+  inflates after the fact. Refusing somebody outright at first contact is a
+  different decision — the host may well want to see that ten people asked — so
+  it is left for Lawrence rather than assumed.
+- **The verdict sound is synthesised, not measured.** It was chosen to be
+  distinguishable by ear at a noisy door, but nobody has stood at one with it.
 
 ## Needs Lawrence's hands
 
-1. **Convex env vars on production.** `UNSUB_SECRET` must be set or every RSVP
-   now answers 500 (previously it silently leaked the raw rsvp id instead, which
-   was worse). Confirm with `npx convex env list` against production.
-2. **The Apple Wallet certificate.** See step 7. If `/api/pass` returns the 503
-   fallback page in production, no guest is getting a pass and the QR is carrying
-   the entire door.
-3. **`RESEND_API_KEY` and `EMAIL_FROM`.** Without both, `recordAndEnqueue` writes
-   a `failed` row saying "email not configured" and no confirmation is sent at
-   all, which means no guest gets a code. The back office shows this per guest as
-   the invite status, so check it there after the next real RSVP.
-4. **Deploy.** Nothing here has been deployed. `scripts/deploy.sh` against
-   production is Lawrence's call.
+Everything in this section has now been checked or done against production. Kept
+with its findings rather than deleted, because the checks are worth re-running
+before a real night.
+
+1. **Convex env vars on production — all present.** `npx convex env list` against
+   `good-labrador-980` shows `UNSUB_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`,
+   `ADMIN_PASSWORD`, `SITE_ORIGIN`, `INVITE_ORIGIN`, `RESEND_WEBHOOK_SECRET` and
+   all five `PASS_*` values set. Nothing had to be added.
+2. **The Apple Wallet certificate works.** `/api/pass` on production returns a
+   222 KB `application/vnd.apple.pkpass`, not the 503 fallback. Unzipped: an
+   `eventTicket` with background art at 1x/2x/3x, `preferredStyleSchemes` absent,
+   `PKBarcodeFormatQR` carrying the bare rsvp id, all ten manifest hashes
+   matching, signed by `CN=Pass Type ID: pass.com.mixandgreet.rsvp` issued by
+   Apple WWDR G4, `OU=SCFGWPBXMF` matching `teamIdentifier`, valid to 11 Sep 2027.
+3. **The door was walked end to end on production.** A probe RSVP was created
+   through the real route, `/api/qr` returned a PNG, `zbarimg` decoded it to the
+   same payload the pass carries, that payload POSTed to `/api/admin/checkin`
+   answered `state: "in"`, and a second scan answered `state: "already"`. The
+   probe was then deleted.
+4. **Deployed.** `scripts/deploy.sh` has been run against production and the
+   static site is merged to `main`.
+
+**The one thing still nobody's checked: an iPhone.** Everything above is verified
+against Apple's spec, Apple's samples and real decoders, and the production
+certificate is confirmed genuine — but where Wallet actually *draws* the barcode
+only a device can show. Open a real invite on a phone, add the pass, look at the
+card.
+
+**A caution found the hard way.** A repeat submission to `/api/rsvp` patches the
+existing row's name, phone, party size and notes with nothing but a public invite
+slug and an email address. That is deliberate — it is how a returning guest
+updates their details — but it means a probe run against a real event overwrites
+a real guest's name, which is exactly what happened during this verification and
+had to be restored by hand. Use an address nobody has used before when testing
+against production.
