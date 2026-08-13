@@ -225,6 +225,13 @@
   font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
   color:var(--text-muted);margin:0 0 7px}
 .stack.tiles td.manage{border-top:2px solid var(--surface-line);margin-top:11px;padding-top:12px}
+/* No MANAGE eyebrow on a tile. Two reasons, and the second is the load-bearing
+   one: four buttons reading GUESTS EDIT ARCHIVE DELETE do not need naming, and
+   the ::before is a grid item — with it present the collapsed cell is a
+   two-track grid, `grid-template-rows:0fr` sizes only the first track, and the
+   buttons keep their full height while invisible. The tile then never shrinks
+   and the reveal is a fade into a gap that was always there. */
+.tiles td.manage::before{content:none}
 
 /* ---- the options reveal on hover -----------------------------------------
    Four destructive-adjacent buttons on every tile is a lot of red for a page
