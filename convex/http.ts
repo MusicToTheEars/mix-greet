@@ -27,7 +27,10 @@ const LOGIN_MAX_PER_CLIENT = 5;
 const LOGIN_MAX_GLOBAL = 40;
 const LOGIN_GLOBAL_KEY = "global";
 
-function loginClientKey(req: Request): string {
+// The only caller identity a Convex httpAction can see. Shared with the public
+// rate limits below, which have the same forgeable-header problem and answer it
+// the same way: a global bucket behind the per-caller one.
+function callerKey(req: Request): string {
   const fwd = clean((req.headers.get("x-forwarded-for") || "").split(",")[0], 64);
   return fwd ? `ip:${fwd}` : "ip:unknown";
 }
@@ -101,10 +104,118 @@ export const settleLogin = internalMutation({
   },
 });
 
+// --- Public route rate limits -------------------------------------------------
+// The login throttle above counts failures, because a wrong password is the
+// thing worth rationing there. These count requests: /api/rsvp, /api/pass and
+// /api/qr all succeed by design, and succeeding is what costs — a row and a
+// queued email, a signed 200 KB bundle from a Node action, a rendered PNG.
+//
+// One 15-minute window, same as the login throttle, so an operator reading the
+// logs has one number in their head rather than two. No lockout: the window
+// lapses on its own. These are things guests genuinely do, and a guest who
+// reloads their code on a bad signal at the door should wait a moment, not be
+// shut out of the event they paid attention to.
+//
+// The budgets are deliberately generous for a person and tight for a loop. They
+// are overridable per route so they can be tuned without a deploy, and so the
+// end-to-end suite can drive a real limiter into a real 429 instead of asserting
+// against a mock: `scripts/e2e-invite-flow.mjs` raises them for the bulk of its
+// cases and drops one to a budget of two to prove the ceiling exists.
+const RATE_WINDOW_MS = 15 * 60 * 1000;
+const RATE_BUDGETS: Record<string, { client: number; global: number }> = {
+  // Two or three submissions is a guest changing their mind. Sixty is a script.
+  rsvp: { client: 12, global: 300 },
+  // A guest may re-open the pass a few times, and it is the most expensive of
+  // the three to serve, so the per-caller budget sits between the other two.
+  pass: { client: 30, global: 600 },
+  // The cheapest, and the one a guest legitimately refreshes at a dark door.
+  qr: { client: 60, global: 1200 },
+};
+
+function budgetFor(route: string): { client: number; global: number } {
+  const base = RATE_BUDGETS[route] ?? { client: 30, global: 600 };
+  // RATE_LIMIT_RSVP=40 or RATE_LIMIT_RSVP=40,900 — client, or client and global.
+  const raw = process.env[`RATE_LIMIT_${route.toUpperCase()}`];
+  if (!raw) return base;
+  const [c, g] = String(raw).split(",").map((n) => Number(n.trim()));
+  return {
+    client: Number.isFinite(c) && c > 0 ? c : base.client,
+    global: Number.isFinite(g) && g > 0 ? g : base.global,
+  };
+}
+
+// One mutation for both buckets, counted before the work is done rather than
+// after: the point is to not do the work. A caller who trips the ceiling still
+// increments, so hammering a closed door keeps it closed rather than letting
+// the count drift back under the line while the requests continue.
+export const takeRateToken = internalMutation({
+  args: {
+    route: v.string(),
+    clientKey: v.string(),
+    now: v.number(),
+    clientMax: v.number(),
+    globalMax: v.number(),
+  },
+  handler: async (ctx, { route, clientKey: ck, now, clientMax, globalMax }) => {
+    let retryAfter = 0;
+    const buckets: Array<[string, number]> = [
+      [`${route}:${ck}`, clientMax],
+      [`${route}:global`, globalMax],
+    ];
+    for (const [key, max] of buckets) {
+      const row = await ctx.db
+        .query("rateLimits")
+        .withIndex("by_key", (q: any) => q.eq("key", key))
+        .first();
+      if (!row) {
+        await ctx.db.insert("rateLimits", { key, windowStart: now, count: 1 });
+        continue;
+      }
+      // Window lapsed: reuse the row rather than deleting and re-inserting, so
+      // a busy route does not churn documents every quarter hour.
+      if (now - row.windowStart >= RATE_WINDOW_MS) {
+        await ctx.db.patch(row._id, { windowStart: now, count: 1 });
+        continue;
+      }
+      const count = row.count + 1;
+      await ctx.db.patch(row._id, { count });
+      if (count > max) {
+        const left = RATE_WINDOW_MS - (now - row.windowStart);
+        retryAfter = Math.max(retryAfter, Math.ceil(left / 1000));
+      }
+    }
+    return { allowed: retryAfter === 0, retryAfter };
+  },
+});
+
+// Returns a 429 Response when the caller is over budget, or null to carry on.
+// Written as "the answer, or nothing" so each route reads as one guard line.
+async function rateLimited(ctx: any, req: Request, route: string): Promise<Response | null> {
+  const { client, global } = budgetFor(route);
+  const gate = await ctx.runMutation(internal.http.takeRateToken, {
+    route,
+    clientKey: callerKey(req),
+    now: Date.now(),
+    clientMax: client,
+    globalMax: global,
+  });
+  if (gate.allowed) return null;
+  return new Response(
+    JSON.stringify({ error: "too many requests — try again in a few minutes" }),
+    {
+      status: 429,
+      headers: corsHeaders({
+        "retry-after": String(gate.retryAfter),
+        "content-type": "application/json",
+      }),
+    },
+  );
+}
+
 // --- Admin login: exchange the shared password for a 12h session token ------
 const login = httpAction(async (ctx, req) => {
   const now = Date.now();
-  const clientKey = loginClientKey(req);
+  const clientKey = callerKey(req);
 
   const gate = await ctx.runMutation(internal.http.gateLogin, { clientKey, now });
   if (!gate.allowed) {
@@ -252,6 +363,12 @@ http.route({ path: "/api/events", method: "OPTIONS", handler: httpAction(async (
 
 // --- RSVP submission (public) ------------------------------------------------
 const rsvp = httpAction(async (ctx, req) => {
+  // Counted before the body is even read: a submission costs a row and a queued
+  // email, and the honeypot below answers success-shaped, so a bot that fills it
+  // must still spend budget or the cheap path becomes the free one.
+  const capped = await rateLimited(ctx, req, "rsvp");
+  if (capped) return capped;
+
   const body = (await req.json().catch(() => ({}))) as any;
   // Honeypot: bots fill the hidden "website" field. Success-shaped, stores nothing.
   if (clean(body.website, 20)) {
@@ -477,6 +594,11 @@ function passFallbackPage(message: string, qrUrl: string, status: number): Respo
 // GET /api/pass?t=<token> -> the .pkpass, served with Apple's MIME type so iOS
 // offers "Add to Apple Wallet" rather than downloading a zip.
 const walletPass = httpAction(async (ctx, req) => {
+  // The most expensive route in the app: a Node action that builds and signs a
+  // ~200 KB bundle. Capped before any of that is spent.
+  const capped = await rateLimited(ctx, req, "pass");
+  if (capped) return capped;
+
   const url = new URL(req.url);
   const token = clean(url.searchParams.get("t"), 200);
   let out: any;
@@ -678,6 +800,11 @@ http.route({
 
 // GET /api/qr?t=<token> -> the door QR as a PNG, for guests without Wallet.
 const doorQr = httpAction(async (ctx, req) => {
+  // The most forgiving budget of the three: this is the image a guest stares at
+  // in a dark doorway, and reloading it is the reasonable thing to do.
+  const capped = await rateLimited(ctx, req, "qr");
+  if (capped) return capped;
+
   const t = clean(new URL(req.url).searchParams.get("t"), 200);
   const out: any = await ctx.runAction(internal.wallet.qr.renderForToken, { token: t });
   if (!out?.ok) return json({ error: out?.error || "not found" }, 404);

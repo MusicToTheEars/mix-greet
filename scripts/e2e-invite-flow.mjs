@@ -387,18 +387,84 @@ async function main() {
   );
 
   step("22. one waitlisted guest cannot block everyone behind them");
-  const queue = await mkEvent({ title: `E2E Queue ${stamp}`, date: "2099-05-05", rsvpMode: "hosted", capacity: 4 });
-  const big = await jsonPost("/api/rsvp", { eventId: queue.slug, name: "Big Party", email: mail("big"), guests: 4 });
-  const blocker = await jsonPost("/api/rsvp", { eventId: queue.slug, name: "Blocker", email: mail("blocker"), guests: 1 });
+  // A room of ten, nine seats spoken for by two parties. The blocker asks for
+  // five: more than the one seat free, so they queue, but not more than the room
+  // holds, so it is a party that could genuinely be seated one day. Then the
+  // party of three leaves, freeing four. The blocker still does not fit and must
+  // be stepped over rather than allowed to stall the single guest behind them.
+  //
+  // The sizes matter and are not arbitrary. The room must start FULL, or the
+  // guest behind the blocker is simply seated on arrival and the queue is never
+  // exercised — which is exactly what a first draft of this case did. And the
+  // freed seats have to land between the two waiting parties: three free, four
+  // wanted, one wanted.
+  const queue = await mkEvent({ title: `E2E Queue ${stamp}`, date: "2099-05-05", rsvpMode: "hosted", capacity: 8 });
+  const big = await jsonPost("/api/rsvp", { eventId: queue.slug, name: "Big Party", email: mail("big"), guests: 5 });
+  const mid = await jsonPost("/api/rsvp", { eventId: queue.slug, name: "Mid Party", email: mail("mid"), guests: 3 });
+  const blocker = await jsonPost("/api/rsvp", { eventId: queue.slug, name: "Blocker", email: mail("blocker"), guests: 4 });
   const behind = await jsonPost("/api/rsvp", { eventId: queue.slug, name: "Behind Them", email: mail("behind"), guests: 1 });
-  check("both later guests are waitlisted", blocker.body?.status === "waitlist" && behind.body?.status === "waitlist");
-  await jsonPost("/api/rsvp/manage", { t: blocker.body.manageToken, action: "guests", guests: 10 });
-  await jsonPost("/api/rsvp/manage", { t: big.body.manageToken, action: "cancel" });
-  const queueDoor = await adminGet(`/api/admin/door?eventId=${queue.slug}`);
   check(
-    "a freed room promotes somebody rather than nobody",
-    (queueDoor.body?.confirmed ?? 0) >= 1,
-    JSON.stringify(queueDoor.body),
+    "the two seated parties are confirmed",
+    big.body?.status === "confirmed" && mid.body?.status === "confirmed",
+    JSON.stringify({ big: big.body?.status, mid: mid.body?.status }),
+  );
+  check(
+    "both later guests are waitlisted",
+    blocker.body?.status === "waitlist" && behind.body?.status === "waitlist",
+    JSON.stringify({ blocker: blocker.body?.status, behind: behind.body?.status }),
+  );
+  await jsonPost("/api/rsvp/manage", { t: mid.body.manageToken, action: "cancel" });
+  const queueRows = await adminGet(`/api/admin/rsvps?eventId=${queue.slug}`);
+  const queueList = Array.isArray(queueRows.body)
+    ? queueRows.body
+    : queueRows.body?.rsvps || queueRows.body?.rows || [];
+  const byName = (n) => queueList.find((r) => r.name === n);
+  check(
+    "the guest behind the blocker is let in",
+    byName("Behind Them")?.status === "confirmed",
+    JSON.stringify(queueList.map((r) => [r.name, r.status, r.guests])),
+  );
+  check(
+    "the blocker, who still does not fit, stays on the waitlist",
+    byName("Blocker")?.status === "waitlist",
+    JSON.stringify(queueList.map((r) => [r.name, r.status, r.guests])),
+  );
+
+  step("22b. a waitlisted party cannot grow past the room it is waiting for");
+  // The queue only works because a waiting party is a size the room could take.
+  // A party larger than the venue can never be promoted, so it would sit at the
+  // front being skipped forever while the guest believed they were next.
+  // Ten, against a room of eight. Asking for more than ten is pointless here:
+  // the mutation clamps every party to ten before it tests anything, so a room
+  // of ten can never trip this rule and the case has to use a smaller one.
+  const overgrow = await jsonPost("/api/rsvp/manage", {
+    t: blocker.body.manageToken,
+    action: "guests",
+    guests: 10,
+  });
+  check(
+    "growing past capacity is refused",
+    overgrow.body?.ok === false && overgrow.body?.reason === "full",
+    JSON.stringify(overgrow.body),
+  );
+  const afterGrow = await adminGet(`/api/admin/rsvps?eventId=${queue.slug}`);
+  const afterList = Array.isArray(afterGrow.body)
+    ? afterGrow.body
+    : afterGrow.body?.rsvps || afterGrow.body?.rows || [];
+  check(
+    "and the party is left at the size it was",
+    afterList.find((r) => r.name === "Blocker")?.guests === 4,
+    JSON.stringify(afterList.map((r) => [r.name, r.status, r.guests])),
+  );
+  const shrink = await jsonPost("/api/rsvp/manage", {
+    t: blocker.body.manageToken,
+    action: "guests",
+    guests: 2,
+  });
+  check(
+    "shrinking to something the room could seat still works",
+    shrink.body?.ok === true && shrink.body?.guests === 2,
+    JSON.stringify(shrink.body),
   );
 
   step("23. two iPads scanning the same guest at the same instant");
@@ -432,6 +498,82 @@ async function main() {
   const nastyCsv = await (await fetch(`${API}/api/admin/rsvps.csv?eventId=${nasty.slug}`, { headers: { "x-admin-token": TOKEN } })).text();
   check("a formula cell is neutralised", nastyCsv.includes(`"'=cmd`), nastyCsv.split("\r\n")[1]);
   check("an embedded quote is doubled", nastyCsv.includes('""quotes""'), nastyCsv.split("\r\n")[1]);
+
+  step("26. the public routes have a ceiling");
+  // Every other case in this file runs with the budgets raised out of the way,
+  // because they all share one loopback caller and would otherwise exhaust a
+  // production budget partway through. This case puts a real one back — two
+  // requests — and drives the real middleware into a real 429. Nothing is
+  // stubbed: the same route, the same counter, the same header a browser sees.
+  //
+  // /api/qr is the route chosen because it is the cheapest to call repeatedly
+  // and its failure mode is the most visible: it is the code a guest without an
+  // Apple device shows at the door.
+  const convexDir = process.env.E2E_CONVEX_DIR;
+  if (!convexDir) {
+    check("rate limit case ran", false, "E2E_CONVEX_DIR is not set");
+  } else {
+    const setBudget = (value) =>
+      execFileSync("npx", ["convex", "env", "set", "RATE_LIMIT_QR", value], {
+        cwd: convexDir,
+        stdio: ["ignore", "ignore", "pipe"],
+        encoding: "utf8",
+      });
+    const capped = await mkEvent({ title: `E2E Ceiling ${stamp}`, date: "2099-07-07", rsvpMode: "hosted" });
+    const rider = await jsonPost("/api/rsvp", { eventId: capped.slug, name: "Rate Rider", email: mail("rate"), guests: 1 });
+    const riderToken = rider.body?.manageToken;
+    if (!riderToken) {
+      check("rate limit case got a token to work with", false, JSON.stringify(rider.body));
+    } else {
+      setBudget("2,1000000");
+      try {
+        // Two invented client addresses, because the counter is per caller and
+        // the rest of this suite has already spent the loopback caller's budget
+        // many times over — reusing it would start this case already refused,
+        // which is what the first draft did. Inventing one also lets the case
+        // prove the thing that makes a per-caller limit worth having: one
+        // caller running out does not touch anybody else.
+        const noisy = { "x-forwarded-for": "203.0.113.7" };
+        const quiet = { "x-forwarded-for": "203.0.113.9" };
+        const getQr = (headers) =>
+          req(`/api/qr?t=${encodeURIComponent(riderToken)}`, { headers });
+
+        const codes = [];
+        for (let i = 0; i < 4; i++) codes.push((await getQr(noisy)).status);
+        check(
+          "the first requests inside the budget are served",
+          codes[0] === 200 && codes[1] === 200,
+          JSON.stringify(codes),
+        );
+        check(
+          "the request past the budget is refused with 429",
+          codes[2] === 429,
+          JSON.stringify(codes),
+        );
+        check(
+          "and it keeps refusing rather than drifting back under the line",
+          codes[3] === 429,
+          JSON.stringify(codes),
+        );
+        const over = await getQr(noisy);
+        check(
+          "the refusal tells the caller how long to wait",
+          Number(over.headers.get("retry-after")) > 0,
+          `retry-after: ${over.headers.get("retry-after")}`,
+        );
+        const bystander = await getQr(quiet);
+        check(
+          "a different caller is untouched by somebody else's ceiling",
+          bystander.status === 200,
+          `status: ${bystander.status}`,
+        );
+      } finally {
+        // Put the ceiling back up, or every case added after this one inherits
+        // a budget of two and fails for a reason that has nothing to do with it.
+        setBudget("100000,100000");
+      }
+    }
+  }
 }
 
 // The email itself cannot be posted through an HTTP route, so it is rendered

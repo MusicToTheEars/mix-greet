@@ -198,4 +198,26 @@ export default defineSchema({
     lockedUntil: v.number(), // ms epoch; 0 when not locked
   })
     .index("by_key", ["key"]),
+
+  // Request counters for the three public routes that cost something real:
+  // /api/rsvp writes a row and schedules an email, /api/pass builds and signs a
+  // 200 KB bundle in a Node action, /api/qr renders a PNG. None of them is
+  // guessable-secret protected — an invite slug is printed in every link — so
+  // without a ceiling the only limit on them is how fast somebody can loop.
+  //
+  // Same two-row shape as adminLoginAttempts, and for the same reason: a
+  // per-caller budget keyed on x-forwarded-for, plus a global backstop, because
+  // that header is the only caller identity a Convex httpAction can see and it
+  // is trivially forged. Unlike the login table there is no lockout — the
+  // window simply has to lapse — because these are things real guests do, and a
+  // guest who reloads their code too eagerly should wait, not be banned.
+  //
+  //   "<route>:ip:<x-forwarded-for>" — per-caller
+  //   "<route>:global"               — every caller summed
+  rateLimits: defineTable({
+    key: v.string(),
+    windowStart: v.number(), // ms epoch; the window this count belongs to
+    count: v.number(),
+  })
+    .index("by_key", ["key"]),
 });

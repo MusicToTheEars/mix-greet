@@ -70,18 +70,22 @@ body{--text-muted:#5F5F68}
    tag rather than beside the logo because the logo already leaves for Academix,
    and two links on the same edge going to two different places reads as one. */
 .rail-end{display:flex;align-items:center;gap:clamp(10px,2.5vw,18px)}
-.backlink{
+/* Scoped to .rail so it outranks brand.css's `.dark-zone a{color:var(--brand)}`.
+   That red is 3.4:1 on this band — fine for the 20px+ display type it was
+   written for, short of AA for a 12px label. --muted is 5.82:1 here, and the
+   red stays as the underline, where contrast is not what carries it. */
+.rail .backlink{
   color:var(--muted);text-decoration:none;white-space:nowrap;
   letter-spacing:.18em;font-weight:500;font-size:clamp(10px,1.4vw,12px);
   text-transform:uppercase;border-bottom:2px solid transparent;padding-bottom:2px;
   transition:color .18s ease,border-color .18s ease;
 }
-.backlink:hover,.backlink:focus-visible{color:var(--ink);border-bottom-color:var(--brand)}
-.backlink:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+.rail .backlink:hover,.rail .backlink:focus-visible{color:var(--ink);border-bottom-color:var(--brand)}
+.rail .backlink:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
 /* The arrow carries the direction; the words carry the destination. Hiding it
    from assistive tech stops "left arrow Mix and Greet" being read aloud. */
-.backlink i{font-style:normal;margin-right:.4em}
-@media (max-width:380px){.backlink span{display:none}}
+.rail .backlink i{font-style:normal;margin-right:.4em}
+@media (max-width:380px){.rail .backlink span{display:none}}
 
 /* perforation under the rail rule — the printed edge the flyer tears from */
 .ticks{display:flex;justify-content:space-between;margin-top:0;height:7px}

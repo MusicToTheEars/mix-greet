@@ -154,6 +154,23 @@ export const submit = internalMutation({
         }
       }
 
+      // Same bound as the manage page puts on a waitlisted party: it claims no
+      // seats, so it is not tested against the ones taken, but a party larger
+      // than the room can never be promoted and should not be told it is
+      // waiting for something that will not come.
+      if (
+        existing.status === "waitlist" &&
+        guests > existing.guests &&
+        typeof event.capacity === "number" &&
+        event.capacity > 0 &&
+        guests > event.capacity
+      ) {
+        return {
+          ok: false as const,
+          error: `This event only holds ${event.capacity}, so a party that size could never be let in. The existing RSVP is unchanged.`,
+        };
+      }
+
       await ctx.db.patch(existing._id, { name, phone, guests, notes });
       // Deliberately no rsvpId, which is what /api/rsvp mints the manage token
       // from. The invite slug is public and an email address is not a secret,
@@ -413,6 +430,26 @@ export const updateByGuest = internalMutation({
               guests: rsvp.guests,
             };
           }
+        }
+      }
+      // A waitlisted party is not tested against seats taken — it holds none —
+      // but it is still bounded by the room. Waiting for twelve seats in a room
+      // of eight is not a queue position, it is a party that can never be
+      // promoted: the promotion loop tests `taken + guests <= capacity`, so an
+      // oversized row sits at the front of the queue being skipped forever
+      // while the guest believes they are next. Refusing here says so at the
+      // moment they ask, instead of at the door.
+      if (rsvp.status === "waitlist" && n > rsvp.guests) {
+        const event = await ctx.db.get(rsvp.eventId);
+        if (typeof event?.capacity === "number" && event.capacity > 0 && n > event.capacity) {
+          return {
+            ok: false as const,
+            reason: "full" as const,
+            error:
+              `This event only holds ${event.capacity}, so a party that size could never be let in. Your place on the waitlist is unchanged.`,
+            status: rsvp.status,
+            guests: rsvp.guests,
+          };
         }
       }
       await ctx.db.patch(id, { guests: n });

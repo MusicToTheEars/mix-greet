@@ -74,6 +74,30 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
 #manual .why{border-left:2px solid var(--brand);padding-left:12px;color:var(--ink);
   font-size:13px;line-height:1.6;margin-top:18px}
 #manual input{font-family:'Plex Mono',ui-monospace,monospace;letter-spacing:.06em}
+/* Find a guest by name. The door's whole design is "nothing on screen but the
+   camera", and this deliberately stays behind the same panel as typed entry
+   rather than joining the scanning view: it is the answer to a dead phone, not
+   a second way to run the queue. */
+.finder{margin-top:30px;padding-top:26px;border-top:2px solid var(--line)}
+#m-name{font-family:inherit;letter-spacing:0}
+.hits{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.hits li{margin:0}
+.hits button{
+  width:100%;display:flex;align-items:baseline;gap:12px;text-align:left;
+  background:none;border:2px solid var(--line);color:var(--ink);
+  padding:13px 14px;font:inherit;cursor:pointer;
+}
+.hits button:hover,.hits button:focus-visible{border-color:var(--ink)}
+.hits button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.hits .who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hits .party{color:var(--muted);font-size:13px;white-space:nowrap}
+/* Already through the door: dimmed, still tappable, because the honest reason
+   to tap it is to check what the door already recorded. */
+.hits button.in{border-color:var(--line);color:var(--muted)}
+.hits button.in .who::after{content:' · already in';color:var(--muted);font-size:13px}
+.hits button.wait .party::before{content:'waitlist · ';color:var(--brand)}
+.finder .none{color:var(--muted);font-size:13px;margin-top:14px}
+
 .mrow{display:flex;gap:10px;margin-top:18px}
 .mrow button{flex:1;background:none;border:2px solid var(--line);color:var(--muted);
   padding:12px;font-size:11px;letter-spacing:.18em}
@@ -153,7 +177,7 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
   <div class="topbar">
     <span class="ev" id="evName"></span>
     <span class="acts">
-      <button id="typeBtn" type="button">Type</button>
+      <button id="typeBtn" type="button">No code</button>
       <button id="stop" type="button">Done</button>
     </span>
   </div>
@@ -162,7 +186,7 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
 <!-- 3b. typed entry, for a browser with no QR reader or a blocked camera -->
 <div id="manual">
   <div class="setup">
-    <h1 class="masthead" style="font-size:clamp(30px,7vw,46px)">Type&nbsp;a&nbsp;code</h1>
+    <h1 class="masthead" style="font-size:clamp(30px,7vw,46px)">No&nbsp;code&nbsp;to&nbsp;scan</h1>
     <p class="lede" id="m-ev"></p>
     <p class="why" id="m-why" hidden></p>
     <p class="note">A Bluetooth scanner gun types straight into this field, so pair one, pull the
@@ -172,6 +196,18 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
     <input id="m-code" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <button class="btn" id="m-go" type="button">Check in</button>
     <p class="msg err" id="m-msg" hidden></p>
+
+    <div class="finder">
+      <label for="m-name">Or find them by name</label>
+      <input id="m-name" type="search" autocomplete="off" autocapitalize="words" autocorrect="off"
+             spellcheck="false" placeholder="Start typing">
+      <p class="note" style="margin-top:10px">For a guest whose phone is dead, or who never got the
+        email. Tap a name to check them in.</p>
+      <p class="msg err" id="m-name-msg" hidden></p>
+      <ul class="hits" id="m-hits"></ul>
+      <p class="none" id="m-none" hidden></p>
+    </div>
+
     <div class="mrow">
       <button id="m-back" type="button" hidden>Use the camera</button>
       <button id="m-done" type="button">Done</button>
@@ -504,14 +540,128 @@ function openManual(why){
   $('m-why').hidden = !why;
   $('m-back').hidden = !camReady;
   $('m-msg').hidden = true;
+  // A fresh roster every opening: the door can be switched to another event
+  // between openings, and a cached list would then belong to the wrong one.
+  clearFinder();
   $('manual').classList.add('on');
   setTimeout(() => { try { $('m-code').focus(); } catch(_) {} }, 60);
 }
 function closeManual(){
   $('manual').classList.remove('on');
   $('m-code').value = '';
+  clearFinder();
   grab();
 }
+
+/* ---------- find a guest by name ----------
+   The door runs on scanning. This is the fallback for the guest standing there
+   with a dead phone, and it is the one path that needs the guest list rather
+   than just a code, so it is the one path that needs signal. It says so plainly
+   when it has none instead of showing an empty list, which would read as "you
+   are not on it".
+
+   The list is fetched once per opening of this panel and filtered in the
+   browser: an event is tens of rows, not thousands, and a door with a bad
+   connection should pay for the network once rather than on every keystroke. */
+let ROSTER = null;
+let rosterPending = null;
+
+function clearFinder(){
+  $('m-name').value = '';
+  $('m-hits').textContent = '';
+  $('m-none').hidden = true;
+  $('m-name-msg').hidden = true;
+  ROSTER = null;
+}
+
+async function loadRoster(){
+  if (ROSTER) return ROSTER;
+  if (rosterPending) return rosterPending;
+  rosterPending = (async () => {
+    const r = await api('/api/admin/rsvps?eventId=' + encodeURIComponent(EVENT_ID));
+    if (r && r.error) throw new Error(r.error);
+    const rows = Array.isArray(r) ? r : (r.rsvps || r.rows || []);
+    // Cancelled guests are not on the list any more, and showing them invites
+    // checking in somebody who gave their seat back.
+    ROSTER = rows.filter(x => x && x.id && x.status !== 'cancelled');
+    return ROSTER;
+  })();
+  try { return await rosterPending; } finally { rosterPending = null; }
+}
+
+// Match on any word boundary, so "berment" finds "Lawrence Berment" and a guest
+// who gave their name as "Lawrence" is not buried under everyone called Lawson.
+function matches(rows, q){
+  const needle = q.trim().toLowerCase();
+  if (needle.length < 2) return [];
+  const starts = [], contains = [];
+  for (const row of rows) {
+    const name = String(row.name || '').toLowerCase();
+    if (!name) continue;
+    const words = name.split(/\s+/);
+    if (name.startsWith(needle) || words.some(w => w.startsWith(needle))) starts.push(row);
+    else if (name.includes(needle)) contains.push(row);
+  }
+  // Guests not yet through the door first: at a door, the person in front of
+  // you is almost never one you have already scanned.
+  const rank = (a, b) => (a.status === 'checked_in') - (b.status === 'checked_in');
+  return starts.sort(rank).concat(contains.sort(rank)).slice(0, 8);
+}
+
+function renderHits(rows, q){
+  const ul = $('m-hits');
+  ul.textContent = '';
+  $('m-none').hidden = true;
+  if (q.trim().length < 2) return;
+  if (!rows.length) {
+    $('m-none').textContent = 'Nobody on the list matches "' + q.trim() + '".';
+    $('m-none').hidden = false;
+    return;
+  }
+  for (const row of rows) {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    if (row.status === 'checked_in') b.classList.add('in');
+    if (row.status === 'waitlist') b.classList.add('wait');
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = row.name;
+    const party = document.createElement('span');
+    party.className = 'party';
+    party.textContent = (Number(row.guests) || 1) > 1 ? (row.guests + ' guests') : 'just them';
+    b.appendChild(who); b.appendChild(party);
+    b.addEventListener('click', () => {
+      // The same call the camera makes, with the same id the QR encodes, so a
+      // guest found by name and a guest scanned are one code path and one
+      // verdict screen — including the duplicate and the undo.
+      closeManual();
+      scan(row.id, { force: true });
+    });
+    li.appendChild(b);
+    ul.appendChild(li);
+  }
+}
+
+let findTimer = null;
+$('m-name').addEventListener('input', () => {
+  clearTimeout(findTimer);
+  const q = $('m-name').value;
+  if (q.trim().length < 2) { renderHits([], q); return; }
+  findTimer = setTimeout(async () => {
+    $('m-name-msg').hidden = true;
+    try {
+      renderHits(matches(await loadRoster(), q), q);
+    } catch (e) {
+      if (e && e.auth) { onAuthExpired(); return; }
+      $('m-hits').textContent = '';
+      $('m-none').hidden = true;
+      $('m-name-msg').textContent =
+        'Cannot reach the guest list. Scanning still works offline; finding somebody by name does not.';
+      $('m-name-msg').hidden = false;
+    }
+  }, 160);
+});
 $('typeBtn').addEventListener('click', () => openManual(''));
 $('m-back').addEventListener('click', closeManual);
 

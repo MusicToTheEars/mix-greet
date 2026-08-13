@@ -201,11 +201,26 @@ echo "deployment ready at $SITE_URL"
   npx convex env set ADMIN_PASSWORD "$ADMIN_PASSWORD" >/dev/null
   npx convex env set SITE_ORIGIN "http://127.0.0.1:8888" >/dev/null
   npx convex env set INVITE_ORIGIN "http://127.0.0.1:8888" >/dev/null
+  # The public routes are rate limited per caller, and every case in this suite
+  # is the same caller — one loopback address with no x-forwarded-for, so all of
+  # them share a single bucket. Production budgets would run out partway through
+  # and the suite would start reporting 429s as flow failures. Raised here, and
+  # the limiter itself is proved by its own case, which sets its route's budget
+  # down to two and drives a real 429 out of the real middleware.
+  npx convex env set RATE_LIMIT_RSVP "100000,100000" >/dev/null
+  npx convex env set RATE_LIMIT_PASS "100000,100000" >/dev/null
+  npx convex env set RATE_LIMIT_QR "100000,100000" >/dev/null
 )
+
+# The limiter case needs to change a budget mid-run, so it needs the CLI and the
+# directory the deployment's admin key lives in. Exported rather than hardcoded
+# in the test so the test stays a plain HTTP client with one exception.
+export E2E_CONVEX_DIR="$WORKDIR"
 
 # --- the test -----------------------------------------------------------------
 # E2E_MODULE_BASE is where the test resolves its QR decoders from: the scratch
 # install, so the repo itself never needs node_modules to run this.
 echo
 API="$SITE_URL" ADMIN_PASSWORD="$ADMIN_PASSWORD" E2E_MODULE_BASE="$WORKDIR" \
+  E2E_CONVEX_DIR="$WORKDIR" \
   node "$REPO/scripts/e2e-invite-flow.mjs"
