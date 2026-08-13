@@ -208,20 +208,36 @@ left looking at a blank screen wondering whether to admit someone.
 
 ## 8b. How the three static pages were verified
 
-Stated plainly because it is a real limit on this audit. The backend is proved
-by `npm run test:e2e`, which drives the actual routes. `checkin.html`,
-`rsvp.html` and `admin.html` are static pages with no build step, and they were
-verified three ways: their extracted scripts parse (`node --check`), their calls
-were checked against the live routes' real responses, and the contracts were
-read line by line (every scan sends `eventId`; every queued scan stores its own
-`eventId`; the QR is rendered in all four guest states; the back office reads
-`expected` with a fallback and `checkedInAt` per row).
+Stated plainly, because what was and was not exercised is the difference between
+this document and a wish.
 
-They were NOT clicked through in a live browser as part of this work. Before the
-next event, somebody should open `checkin.html` on the actual door iPad, scan one
-real pass, put the iPad in aeroplane mode, scan a second, and watch the queue
-drain when signal returns. That is fifteen minutes and it is the last thing
-standing between this and "a stranger could run the door".
+The backend is proved by `npm run test:e2e`, which drives the actual routes
+against a real deployment. The three static pages have no build step, so each
+was served locally, opened in Chrome, and driven with a stubbed `fetch` shaped
+to the real responses.
+
+`checkin.html` was walked through every verdict the API can return (in,
+waitlist_in, already, cancelled, wrong_event, undone, a known error, an unknown
+error, an unknown state, and a non-object reply), plus the offline queue across
+a page reload, a mid-scan 401, and a drain on the `online` event. The request
+bodies were read off the wire to confirm every scan and every undo carries
+`eventId`.
+
+`admin.html` was driven with a live event, a past event, a door endpoint
+returning 500, a payload with `expected` deleted, and a 390px viewport.
+
+Two things are genuinely unproven and should be checked on the night:
+
+1. **A real QR through a real camera.** `BarcodeDetector` was stubbed, because
+   the sandbox had no webcam. Everything downstream of the decoded value is
+   verified, and the decode itself is unchanged from the original file, but the
+   camera path has not seen a physical code.
+2. **The wake lock on a real iPad.** A `WakeLockSentinel` cannot be granted to a
+   background tab, so only the re-request call was verified, not the grant.
+
+Fifteen minutes before the next event closes both: open `checkin.html` on the
+door iPad, scan one real pass, put the iPad in aeroplane mode, scan a second,
+lock the screen for a minute, then let it come back and watch the queue drain.
 
 ## 9. Check-in write
 

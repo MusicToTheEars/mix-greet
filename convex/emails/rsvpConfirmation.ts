@@ -854,6 +854,42 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   // rather than at the point of use.
   const unsubUrl = safeUrl(v.unsubUrl);
 
+  // --- the door code ---------------------------------------------------------
+  // The thing a guest is actually holding when they get to the door, put in the
+  // message itself. Until now the only scannable thing this email offered was
+  // the Apple Wallet pass, so an Android guest, a guest whose Wallet declined
+  // the pass, and a guest whose pass certificate had expired server side all
+  // arrived with an email that had no code in it. The same signed token that
+  // opens the pass also renders the code as a PNG at /api/qr, so the code goes
+  // to everybody and the pass goes back to being one way to carry it rather
+  // than the only one.
+  //
+  // TWO ROUTES, DELIBERATELY, because either one on its own strands somebody:
+  //
+  //  1. THE INLINE IMAGE IS A BONUS, NEVER THE ROUTE. Gmail proxies remote
+  //     images and Apple Mail and Outlook usually ask first, so this draws for
+  //     some guests and not for others, and which ones is not knowable from
+  //     here. Its `alt` therefore carries an instruction rather than a
+  //     description: a blocked image has to point at the link, the way the
+  //     lineup thumbnails carry their initial.
+  //
+  //  2. THE LINK IS THE ROUTE, and it points at the manage page rather than at
+  //     the bare PNG. The page draws the code at full size with the guest's name
+  //     and the event beside it, a phone browser can zoom and screenshot it, and
+  //     it is the same signed address the guest already keeps for changing or
+  //     cancelling, so there is one link in the message to hold on to instead of
+  //     two. The bare PNG carries no name, no event and nothing to say when a
+  //     scanner refuses it, so it is offered underneath as the last resort for a
+  //     client that mangles the page.
+  //
+  // Nothing here prints a location, so the waitlist redaction in `splitVenue`
+  // is untouched by this block: a token is not an address.
+  //
+  // Resolved up here with the other href guards, not down beside the block it
+  // renders, because the opening line of the message makes a promise about it.
+  const qrImgUrl = safeUrl(v.qrUrl);
+  const codeUrl = safeUrl(v.manageUrl) || qrImgUrl;
+
   const tz = String(v.timezone || DEFAULT_TZ);
   const mins = eventMinutes(v.start, v.end);
 
@@ -914,9 +950,14 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   // Status is stated ONCE, here, as the line that runs into the title. No
   // badge, no rail flag, no second copy inside the ticket.
   const eyebrow = isWait ? "You're on the waitlist for" : "Your spot is held for";
+  // The second clause promises a code, so it is printed only when there is one.
+  // Every route to the code hangs off the same signed token in convex/email.ts,
+  // which hangs off UNSUB_SECRET, so all three vanish together: with the secret
+  // unset this sentence sat at the top of a message that had nothing to check
+  // anyone in with, and the door person is the one who finds out.
   const lead = isWait
     ? `We hit capacity${first ? `, ${first}` : ""}, so you're on the waitlist. Spots open up more often than you'd think, and the first email out goes to you.`
-    : `You're in${first ? `, ${first}` : ""}. Your name is on the door list, and this email is what we check you in with.`;
+    : `You're in${first ? `, ${first}` : ""}. Your name is on the door list${codeUrl ? ", and this email is what we check you in with" : ""}.`;
 
   // THE INBOX ROW IS ONE LINE. Subject and preheader are read together, in that
   // order, before anything else in the message, so rule B — every fact stated
@@ -1007,46 +1048,39 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   // whether they can come at all if a spot opens.
   if (v.notes) rows.push(ticketRow("GOOD TO KNOW", esc(v.notes)));
 
-  // --- the door code ---------------------------------------------------------
-  // The thing a guest is actually holding when they get to the door, put in the
-  // message itself. Until now the only scannable thing this email offered was
-  // the Apple Wallet pass, so an Android guest, a guest whose Wallet declined
-  // the pass, and a guest whose pass certificate had expired server side all
-  // arrived with an email that had no code in it. The same signed token that
-  // opens the pass also renders the code as a PNG at /api/qr, so the code goes
-  // to everybody and the pass goes back to being one way to carry it rather
-  // than the only one.
+  // --- the door code block ---------------------------------------------------
+  // `qrImgUrl` and `codeUrl` are resolved up with the other href guards, above
+  // the opening line of the message, because that line makes a promise about
+  // them. See the comment there for why the code has two routes out of here.
   //
-  // TWO ROUTES, DELIBERATELY, because either one on its own strands somebody:
-  //
-  //  1. THE INLINE IMAGE IS A BONUS, NEVER THE ROUTE. Gmail proxies remote
-  //     images and Apple Mail and Outlook usually ask first, so this draws for
-  //     some guests and not for others, and which ones is not knowable from
-  //     here. Its `alt` therefore carries an instruction rather than a
-  //     description: a blocked image has to point at the link, the way the
-  //     lineup thumbnails carry their initial.
-  //
-  //  2. THE LINK IS THE ROUTE, and it points at the manage page rather than at
-  //     the bare PNG. The page draws the code at full size with the guest's name
-  //     and the event beside it, a phone browser can zoom and screenshot it, and
-  //     it is the same signed address the guest already keeps for changing or
-  //     cancelling, so there is one link in the message to hold on to instead of
-  //     two. The bare PNG carries no name, no event and nothing to say when a
-  //     scanner refuses it, so it is offered underneath as the last resort for a
-  //     client that mangles the page.
-  //
-  // Nothing here prints a location, so the waitlist redaction in `splitVenue`
-  // is untouched by this block: a token is not an address.
-  const qrImgUrl = safeUrl(v.qrUrl);
-  const codeUrl = safeUrl(v.manageUrl) || qrImgUrl;
-  // Status is stated once, in the eyebrow, so this block does not restate it.
-  // The waitlist line follows the WHERE row's precedent instead and says what
-  // the code is waiting on, not what the guest is.
-  const codeWaitNote = "It starts working the moment a spot opens.";
+  // A waitlisted guest's code is LIVE, and saying otherwise strands them. An
+  // earlier draft of this line read "It starts working the moment a spot
+  // opens", which is false three times over: convex/wallet/qr.ts refuses only
+  // a cancelled RSVP and renders a real PNG for a waitlisted one, checkIn in
+  // convex/rsvps.ts accepts that scan and records it as `waitlist_in`, and the
+  // door is deliberately built to admit a waitlist walk-up and flag them as
+  // one. A guest who reads "later" does not screenshot it and turns up at a
+  // door that would have scanned them in. The code being valid is not the same
+  // as a place being free, and that is the distinction the sentence has to
+  // carry. rsvp.html already says it correctly in two places, so this is the
+  // same words rather than a second attempt at them.
+  const codeWaitNote = "It only gets you in if a spot opens.";
   // The save-it-now line. One sentence, and it claims nothing about this venue's
   // reception that could turn out to be false; it just refuses to bet on it.
   const codeSaveNote =
     "Screenshot it before you leave. Signal at the door is not a given.";
+  // What to do when the screen is cracked, the battery is flat, or the scanner
+  // simply refuses. Without it neither the guest nor the person on the door has
+  // a script for the one situation this whole block exists to survive, and the
+  // guest is standing there while a queue builds behind them. rsvp.html says
+  // the same thing when the image fails to load.
+  const codeFailNote = "If it will not scan, give your name at the door.";
+  // The QR carries a WIDTH and no HEIGHT, the same way the poster does. With
+  // both set, a client holding images back reserves the full 180x180 square and
+  // draws the alt text inside an empty white hole, which reads as a broken
+  // image at the exact moment the block is asking to be trusted. Width alone
+  // lets a blocked image collapse to its alt line, and a loaded one still
+  // scales by aspect because the code is square.
   const codeBlock = codeUrl
     ? `
         <table role="presentation" class="mg-field" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.white}" style="width:100%;margin-top:14px;background-color:${BRAND.white};border:2px solid ${BRAND.surfaceLine};">
@@ -1054,7 +1088,7 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
             <div class="mg-quiet" style="font-family:${MONO};font-size:11px;line-height:15px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:${BRAND.textMuted};">YOUR DOOR CODE</div>${
               qrImgUrl
                 ? `
-            <img src="${esc(qrImgUrl)}" width="180" height="180" alt="Your door code. The button below opens it." style="display:block;margin:14px auto 0 auto;width:180px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;background-color:${BRAND.white};font-family:${MONO};font-size:12px;line-height:18px;color:${BRAND.textSoft};text-align:center;">`
+            <img src="${esc(qrImgUrl)}" width="180" alt="Your door code. The button below opens it." style="display:block;margin:14px auto 0 auto;width:180px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;background-color:${BRAND.white};font-family:${MONO};font-size:12px;line-height:18px;color:${BRAND.textSoft};text-align:center;">`
                 : ""
             }
             <div class="mg-soft" style="margin-top:14px;font-family:${MONO};font-size:13px;line-height:19px;mso-line-height-rule:exactly;color:${BRAND.textSoft};">${esc(codeSaveNote)}${isWait ? ` ${esc(codeWaitNote)}` : ""}</div>
@@ -1066,6 +1100,7 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
             <div class="mg-quiet" style="margin-top:12px;font-family:${MONO};font-size:11px;line-height:16px;mso-line-height-rule:exactly;letter-spacing:.12em;text-transform:uppercase;color:${BRAND.textMuted};">OR OPEN <a href="${esc(qrImgUrl)}" target="_blank" rel="noopener" class="mg-accent" style="color:${BRAND.brandInk};font-weight:700;text-decoration:none;">THE CODE AS AN IMAGE</a></div>`
                 : ""
             }
+            <div class="mg-quiet" style="margin-top:12px;font-family:${MONO};font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${BRAND.textMuted};">${esc(codeFailNote)}</div>
           </td></tr>
         </table>`
     : "";
@@ -1145,7 +1180,11 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   // ecosystems are one tap away no matter which is primary.
   const calPrimary = icsUrl || googleCalUrl;
   const calLabel = isWait ? "HOLD THE DATE" : "ADD TO CALENDAR";
-  const actions: { href: string; label: string }[] = [];
+  // `ownRow: true` marks an entry that ALREADY has its own row further down the
+  // HTML. It is in this list for the plain-text half only, and the button block
+  // below filters it out. See the wallet and manage pushes for what that
+  // prevents.
+  const actions: { href: string; label: string; ownRow?: boolean }[] = [];
   if (eventUrl) {
     actions.push({
       href: eventUrl,
@@ -1158,14 +1197,27 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
   if (!isWait && mapUrl) actions.push({ href: mapUrl, label: "GET DIRECTIONS" });
   if (!actions.length && mapUrl)
     actions.push({ href: mapUrl, label: "GET DIRECTIONS" });
-  // Both of these are in the HTML as their own rows; adding them to `actions`
-  // is what carries them into the plain-text alternative, so the two halves
-  // offer a guest the same things.
+  // The buttons stop here. Everything above is a real button in the HTML;
+  // everything below is already rendered as its own row further down and is
+  // added ONLY so the plain-text alternative offers a guest the same things.
+  //
+  // These are two lists rather than one because they used to be one, and it
+  // printed the Apple Wallet button twice to every waitlisted guest. The
+  // button block renders `rest[0]` and `rest[1]` whatever they are, so as long
+  // as the wallet entry sat in the same array it just needed the slots ahead of
+  // it to be empty to slide into view: a waitlisted guest never gets GET
+  // DIRECTIONS, because the address is redacted for them, so the wallet took
+  // that slot and then rendered again in its own row underneath. A confirmed
+  // guest with a map link never showed it, which is why it survived. Splitting
+  // the lists is what makes the button block structurally unable to render a
+  // row that has its own place in the layout.
+  const textActions = actions.slice();
   // The phone is named in the label, not just in the HTML, because this line is
   // the whole of what a plain-text reader is told about the pass.
   if (v.walletUrl)
-    actions.push({ href: v.walletUrl, label: "ADD TO APPLE WALLET (IPHONE)" });
-  if (v.manageUrl) actions.push({ href: v.manageUrl, label: "CHANGE OR CANCEL YOUR RSVP" });
+    textActions.push({ href: v.walletUrl, label: "ADD TO APPLE WALLET (IPHONE)" });
+  if (v.manageUrl)
+    textActions.push({ href: v.manageUrl, label: "CHANGE OR CANCEL YOUR RSVP" });
 
   // An event with no invite link, no date and no linkable venue has nothing to
   // point at; the block collapses rather than rendering an empty button.
@@ -1490,8 +1542,13 @@ ${posterHtml}  <!-- ============ LIGHT PANEL ============ -->
       : null,
     codeUrl ? `       ${codeSaveNote}` : null,
     codeUrl && isWait ? `       ${codeWaitNote}` : null,
+    // The fallback belongs here more than anywhere: this is the half a screen
+    // reader speaks and the half a stripped-down client shows, so a guest whose
+    // client could not draw the code is likelier to be reading THIS one when
+    // the scan fails.
+    codeUrl ? `       ${codeFailNote}` : null,
     "",
-    ...actions.map((a) => `${a.label}: ${a.href}`),
+    ...textActions.map((a) => `${a.label}: ${a.href}`),
     ...calAlts.map((c) => `${calLabel} (${c.label}): ${c.href}`),
   ];
 

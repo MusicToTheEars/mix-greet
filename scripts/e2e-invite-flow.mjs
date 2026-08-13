@@ -290,6 +290,127 @@ async function main() {
 
   step("15. the confirmation email carries a code for a guest with no Apple device");
   renderEmailChecks(token);
+
+  step("16. knowing a guest's email address is not the same as being them");
+  // The invite slug is public and printed in every invite link, so an email
+  // address was the only other thing needed to be handed that guest's door
+  // code, their Wallet pass and their cancel button, all from one unsigned
+  // POST. This is the assertion that stops it coming back.
+  const victimMail = mail("victim");
+  const victim = await jsonPost("/api/rsvp", { eventId: ev.slug, name: "Vera Victim", email: victimMail, guests: 1 });
+  const victimToken = victim.body?.manageToken;
+  check("a brand new RSVP does get a token", !!victimToken);
+  const impostor = await jsonPost("/api/rsvp", { eventId: ev.slug, name: "Someone Else", email: victimMail, guests: 1 });
+  check("re-submitting a known email hands out no token at all", !impostor.body?.manageToken, JSON.stringify(impostor.body));
+  check("and still never returns the raw rsvp id", impostor.body?.rsvpId === undefined, JSON.stringify(impostor.body));
+
+  step("17. an anonymous form post cannot rewrite attendance");
+  // The manage route refuses to resize a guest who is already inside. That
+  // refusal is worthless if the public RSVP form will do it anyway.
+  const doorBefore = await adminGet(`/api/admin/door?eventId=${ev.slug}`);
+  const rewrite = await jsonPost("/api/rsvp", { eventId: ev.slug, name: "Dana Door", email: dana.email, guests: 9 });
+  const doorAfter = await adminGet(`/api/admin/door?eventId=${ev.slug}`);
+  check(
+    "re-submitting for a checked-in guest does not change the head count",
+    doorAfter.body?.checkedIn === doorBefore.body?.checkedIn,
+    JSON.stringify({ before: doorBefore.body?.checkedIn, after: doorAfter.body?.checkedIn, response: rewrite.body }),
+  );
+
+  step("18. a scan with no event named is refused, not trusted");
+  // A stale tab or a cached older copy of the scanner is exactly the caller
+  // that sends no event, so this cannot be enforced in the browser alone.
+  const wandaId = wandaTok.split(".")[0];
+  for (const [label, body] of [
+    ["no eventId key at all", { code: wandaId }],
+    ["an empty eventId", { code: wandaId, eventId: "" }],
+    ["a whitespace eventId", { code: wandaId, eventId: "   " }],
+    ["a null eventId", { code: wandaId, eventId: null }],
+  ]) {
+    const res = await adminPost("/api/admin/checkin", body);
+    check(`unscoped scan refused: ${label}`, res.status >= 400 || res.body?.state === "wrong_event", JSON.stringify(res.body));
+  }
+  const wandaRow = (await adminGet(`/api/admin/rsvps?eventId=${ev.slug}`)).body?.rsvps?.find((r) => r.name === "Wanda Wait");
+  check("none of those unscoped scans checked anybody in", wandaRow?.status === "waitlist", JSON.stringify(wandaRow));
+
+  step("19. undo really clears the arrival, it does not just change the status");
+  const solo = await jsonPost("/api/rsvp", { eventId: ev.slug, name: "Solo Sam", email: mail("sam"), guests: 1 });
+  const soloId = solo.body.manageToken.split(".")[0];
+  await adminPost("/api/admin/checkin", { code: soloId, eventId: ev.slug });
+  await adminPost("/api/admin/checkin", { code: soloId, eventId: ev.slug, undo: true });
+  const soloRow = (await adminGet(`/api/admin/rsvps?eventId=${ev.slug}`)).body?.rsvps?.find((r) => r.name === "Solo Sam");
+  check("undo returns a confirmed guest to confirmed", soloRow?.status === "confirmed", JSON.stringify(soloRow));
+  check("undo clears the arrival time", soloRow?.checkedInAt === "", JSON.stringify(soloRow?.checkedInAt));
+  const csv2 = await (await fetch(`${API}/api/admin/rsvps.csv?eventId=${ev.slug}`, { headers: { "x-admin-token": TOKEN } })).text();
+  const soloLine = csv2.split("\r\n").find((l) => l.includes("Solo Sam")) || "";
+  check("and the CSV shows no arrival for them either", /,""\s*$/.test(soloLine), soloLine);
+
+  step("20. an archived event is not a working door");
+  const oldEv = await mkEvent({ title: `E2E Archived ${stamp}`, date: "2099-03-03", rsvpMode: "hosted" });
+  const ghost = await jsonPost("/api/rsvp", { eventId: oldEv.slug, name: "Ghost Guest", email: mail("ghost"), guests: 1 });
+  const ghostId = ghost.body.manageToken.split(".")[0];
+  await adminPost("/api/events", { action: "archive", id: oldEv.id });
+  const ghostScan = await adminPost("/api/admin/checkin", { code: ghostId, eventId: oldEv.slug });
+  check("scanning into an archived event is refused", ghostScan.status >= 400 || ghostScan.body?.state !== "in", JSON.stringify(ghostScan.body));
+
+  step("21. a cancellation cannot overbook the room");
+  // Promotion used to count only the rows still sitting in "confirmed", while
+  // every other capacity sum counted the people already inside as well, so one
+  // guest dropping out could promote a party into a room that had no space.
+  const small = await mkEvent({ title: `E2E Tight Room ${stamp}`, date: "2099-04-04", rsvpMode: "hosted", capacity: 4 });
+  const singles = [];
+  for (const who of ["a", "b", "c", "d"]) {
+    const r = await jsonPost("/api/rsvp", { eventId: small.slug, name: `Single ${who}`, email: mail(`single-${who}`), guests: 1 });
+    singles.push(r.body.manageToken);
+  }
+  for (const t of singles.slice(0, 3)) {
+    await adminPost("/api/admin/checkin", { code: t.split(".")[0], eventId: small.slug });
+  }
+  const four = await jsonPost("/api/rsvp", { eventId: small.slug, name: "Party Of Four", email: mail("four"), guests: 4 });
+  check("a party of four cannot fit a room of four with three already inside", four.body?.status === "waitlist", JSON.stringify(four.body));
+  await jsonPost("/api/rsvp/manage", { t: singles[3], action: "cancel" });
+  const tight = await adminGet(`/api/admin/door?eventId=${small.slug}`);
+  check(
+    "heads holding a seat never exceed the capacity",
+    (tight.body?.checkedIn ?? 0) + (tight.body?.confirmed ?? 0) <= 4,
+    JSON.stringify(tight.body),
+  );
+
+  step("22. one waitlisted guest cannot block everyone behind them");
+  const queue = await mkEvent({ title: `E2E Queue ${stamp}`, date: "2099-05-05", rsvpMode: "hosted", capacity: 4 });
+  const big = await jsonPost("/api/rsvp", { eventId: queue.slug, name: "Big Party", email: mail("big"), guests: 4 });
+  const blocker = await jsonPost("/api/rsvp", { eventId: queue.slug, name: "Blocker", email: mail("blocker"), guests: 1 });
+  const behind = await jsonPost("/api/rsvp", { eventId: queue.slug, name: "Behind Them", email: mail("behind"), guests: 1 });
+  check("both later guests are waitlisted", blocker.body?.status === "waitlist" && behind.body?.status === "waitlist");
+  await jsonPost("/api/rsvp/manage", { t: blocker.body.manageToken, action: "guests", guests: 10 });
+  await jsonPost("/api/rsvp/manage", { t: big.body.manageToken, action: "cancel" });
+  const queueDoor = await adminGet(`/api/admin/door?eventId=${queue.slug}`);
+  check(
+    "a freed room promotes somebody rather than nobody",
+    (queueDoor.body?.confirmed ?? 0) >= 1,
+    JSON.stringify(queueDoor.body),
+  );
+
+  step("23. two iPads scanning the same guest at the same instant");
+  const twin = await jsonPost("/api/rsvp", { eventId: ev.slug, name: "Twin Scan", email: mail("twin"), guests: 3 });
+  const twinId = twin.body.manageToken.split(".")[0];
+  const both = await Promise.all([
+    adminPost("/api/admin/checkin", { code: twinId, eventId: ev.slug }),
+    adminPost("/api/admin/checkin", { code: twinId, eventId: ev.slug }),
+  ]);
+  const states = both.map((r) => r.body?.state).sort();
+  check("exactly one of the two scans is the check-in", JSON.stringify(states) === JSON.stringify(["already", "in"]), JSON.stringify(states));
+
+  step("24. closing RSVPs actually closes them");
+  await adminPost("/api/events", { action: "closeRsvps", id: other.id });
+  const closed = await jsonPost("/api/rsvp", { eventId: other.slug, name: "Too Late", email: mail("late"), guests: 1 });
+  check("a closed event refuses new RSVPs", closed.status === 400 && /closed/i.test(String(closed.body?.error)), JSON.stringify(closed.body));
+
+  step("25. a spreadsheet formula in a guest name cannot execute");
+  const nasty = await mkEvent({ title: `E2E CSV ${stamp}`, date: "2099-06-06", rsvpMode: "hosted" });
+  await jsonPost("/api/rsvp", { eventId: nasty.slug, name: `=cmd|' /C calc'!A1`, email: mail("csv"), guests: 1, notes: 'has "quotes", commas' });
+  const nastyCsv = await (await fetch(`${API}/api/admin/rsvps.csv?eventId=${nasty.slug}`, { headers: { "x-admin-token": TOKEN } })).text();
+  check("a formula cell is neutralised", nastyCsv.includes(`"'=cmd`), nastyCsv.split("\r\n")[1]);
+  check("an embedded quote is doubled", nastyCsv.includes('""quotes""'), nastyCsv.split("\r\n")[1]);
 }
 
 // The email itself cannot be posted through an HTTP route, so it is rendered

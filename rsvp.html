@@ -2127,6 +2127,10 @@ async function mgLoad(){
     $('mgHead').textContent = 'We couldn’t open this RSVP';
     $('mgLead').textContent = 'The link itself doesn’t expire, so it isn’t too late. Either it was altered somewhere between the email and here, the RSVP has been removed, or we can’t reach the server right now. Nothing has changed either way, and you’re still on the list if you were.';
     renderPass($('mgPass'), '');
+    // Nothing came back, so nothing is described. A retry that fails used to
+    // leave the previous attempt's name and party size sitting under the
+    // apology, which reads as a booking the page has just failed to confirm.
+    $('mgRecap').textContent = '';
     $('mgSave').hidden = true;
     $('mgCancel').hidden = true;
     $('mgGuests').hidden = true;
