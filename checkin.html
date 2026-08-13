@@ -66,6 +66,25 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
 .topbar button{pointer-events:auto;background:none;border:2px solid rgba(237,234,227,.5);
   color:var(--ink);padding:8px 14px;font-size:11px;letter-spacing:.18em}
 
+/* ---------- find a guest, without leaving the camera ----------
+   Pinned to the bottom of the scanning view rather than behind a panel, because
+   at a door the two things happen in the same breath: most guests are scanned,
+   and the one with the dead phone is standing in the same queue. Switching views
+   to serve them meant the camera stopped for everybody behind them.
+
+   Results rise above the field, so the list grows toward the middle of the
+   screen and the thumb stays where it started. */
+.fbar{position:absolute;left:0;right:0;bottom:0;z-index:2;
+  display:flex;flex-direction:column;gap:0;padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+  background:linear-gradient(0deg,rgba(6,6,8,.94) 60%,rgba(6,6,8,0))}
+.fbar input{width:100%;background:rgba(6,6,8,.72);border:2px solid rgba(237,234,227,.5);
+  color:var(--ink);padding:14px;font:inherit;font-size:16px}
+.fbar input::placeholder{color:rgba(237,234,227,.55)}
+.fbar input:focus{outline:none;border-color:var(--ink)}
+.fbar .hits{order:-1;margin:0 0 10px;max-height:min(46vh,340px);overflow:auto}
+.fbar .none,.fbar .msg{order:-1;margin:0 0 10px}
+.fbar .hits button{background:rgba(6,6,8,.86)}
+
 /* ---------- typed entry: the path for a browser that cannot scan ----------
    Not a second door screen, the same one with the camera taken out. It sits
    over the scanner so the camera keeps running underneath when it does work. */
@@ -150,6 +169,8 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
 #relock .inner{max-width:520px;margin:0 auto;padding:clamp(24px,10vh,90px) 20px}
 
 #hid{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
 </style>
 </head>
 <body>
@@ -186,9 +207,17 @@ body{background:var(--bg);color:var(--ink);overscroll-behavior:none}
   <div class="topbar">
     <span class="ev" id="evName"></span>
     <span class="acts">
-      <button id="typeBtn" type="button">No code</button>
+      <button id="typeBtn" type="button">Type code</button>
       <button id="stop" type="button">Done</button>
     </span>
+  </div>
+  <div class="fbar">
+    <label class="sr-only" for="s-name">Find a guest by name</label>
+    <input id="s-name" type="search" autocomplete="off" autocapitalize="words" autocorrect="off"
+           spellcheck="false" placeholder="Find a guest by name">
+    <ul class="hits" id="s-hits"></ul>
+    <p class="none" id="s-none" hidden></p>
+    <p class="msg err" id="s-msg" hidden></p>
   </div>
 </div>
 
@@ -412,6 +441,10 @@ $('start').addEventListener('click', startScanning);
 
 /* ---------- start, stop ---------- */
 async function startScanning(){
+  // Started here because this is a real tap. iOS refuses to open an AudioContext
+  // outside a user gesture, and the first verdict of the night is not one — it
+  // arrives from a camera frame, and would have been silent.
+  audio();
   const sel = $('ev'), opt = sel.options[sel.selectedIndex];
   EVENT_ID = sel.value || '';
   EVENT_LABEL = opt ? opt.textContent : '';
@@ -574,12 +607,11 @@ function closeManual(){
    connection should pay for the network once rather than on every keystroke. */
 let ROSTER = null;
 let rosterPending = null;
-
+// Both finders share one roster and are reset together: they are two views of
+// the same list, and a stale one behind the panel is a list for another event.
+const FINDERS = [];
 function clearFinder(){
-  $('m-name').value = '';
-  $('m-hits').textContent = '';
-  $('m-none').hidden = true;
-  $('m-name-msg').hidden = true;
+  for (const f of FINDERS) f.reset();
   ROSTER = null;
 }
 
@@ -623,14 +655,14 @@ function matches(rows, q){
   return starts.sort(rank).concat(contains.sort(rank)).slice(0, 8);
 }
 
-function renderHits(rows, q){
-  const ul = $('m-hits');
+function renderHits(el, rows, q){
+  const ul = el.hits;
   ul.textContent = '';
-  $('m-none').hidden = true;
+  el.none.hidden = true;
   if (q.trim().length < 2) return;
   if (!rows.length) {
-    $('m-none').textContent = 'Nobody on the list matches "' + q.trim() + '".';
-    $('m-none').hidden = false;
+    el.none.textContent = 'Nobody on the list matches "' + q.trim() + '".';
+    el.none.hidden = false;
     return;
   }
   for (const row of rows) {
@@ -665,8 +697,12 @@ function renderHits(rows, q){
     b.addEventListener('click', () => {
       // The same call the camera makes, with the same id the QR encodes, so a
       // guest found by name and a guest scanned are one code path and one
-      // verdict screen — including the duplicate and the undo.
-      closeManual();
+      // verdict screen — including the duplicate, the alert and the undo.
+      // The query is cleared rather than left standing: the verdict returns the
+      // door to its ready state on its own, and a list still hanging over the
+      // camera afterwards is the next guest's scan waiting to be missed.
+      el.reset();
+      if ($('manual').classList.contains('on')) closeManual();
       scan(row.id, { force: true });
     });
     li.appendChild(b);
@@ -674,25 +710,52 @@ function renderHits(rows, q){
   }
 }
 
-let findTimer = null;
-$('m-name').addEventListener('input', () => {
-  clearTimeout(findTimer);
-  const q = $('m-name').value;
-  if (q.trim().length < 2) { renderHits([], q); return; }
-  findTimer = setTimeout(async () => {
-    $('m-name-msg').hidden = true;
-    try {
-      renderHits(matches(await loadRoster(), q), q);
-    } catch (e) {
-      if (e && e.auth) { onAuthExpired(); return; }
-      $('m-hits').textContent = '';
-      $('m-none').hidden = true;
-      $('m-name-msg').textContent =
-        'Cannot reach the guest list. Scanning still works offline; finding somebody by name does not.';
-      $('m-name-msg').hidden = false;
-    }
-  }, 160);
-});
+// One behaviour, two places it is mounted: over the camera, where most of this
+// happens, and inside the typed-code panel, which is all a browser with no
+// camera ever sees.
+function mountFinder(ids){
+  const el = {
+    input: $(ids.input),
+    hits: $(ids.hits),
+    none: $(ids.none),
+    msg: $(ids.msg),
+    reset(){
+      el.input.value = '';
+      el.hits.textContent = '';
+      el.none.hidden = true;
+      el.msg.hidden = true;
+    },
+  };
+  let timer = null;
+  el.input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = el.input.value;
+    if (q.trim().length < 2) { renderHits(el, [], q); return; }
+    timer = setTimeout(async () => {
+      el.msg.hidden = true;
+      try {
+        renderHits(el, matches(await loadRoster(), q), q);
+      } catch (e) {
+        if (e && e.auth) { onAuthExpired(); return; }
+        el.hits.textContent = '';
+        el.none.hidden = true;
+        el.msg.textContent =
+          'Cannot reach the guest list. Scanning still works offline; finding somebody by name does not.';
+        el.msg.hidden = false;
+      }
+    }, 160);
+  });
+  // Typing a name must not be interrupted by the HID grab stealing focus back
+  // to the hidden scanner-gun field, which is what it does on every tap and
+  // every cleared verdict.
+  el.input.addEventListener('focus', () => { FINDER_FOCUS = true; });
+  el.input.addEventListener('blur', () => { FINDER_FOCUS = false; });
+  FINDERS.push(el);
+  return el;
+}
+let FINDER_FOCUS = false;
+mountFinder({ input:'s-name', hits:'s-hits', none:'s-none', msg:'s-msg' });
+mountFinder({ input:'m-name', hits:'m-hits', none:'m-none', msg:'m-name-msg' });
 $('typeBtn').addEventListener('click', () => openManual(''));
 $('m-back').addEventListener('click', closeManual);
 
@@ -723,9 +786,17 @@ const hid = $('hid');
 function grab(){
   if (!scanning || !camReady) return;
   if ($('relock').classList.contains('on') || $('manual').classList.contains('on')) return;
+  // The name field now lives on this screen, so the gun's hidden input can no
+  // longer take focus unconditionally: doing so ate every second character an
+  // operator typed and closed the keyboard under their thumb.
+  if (FINDER_FOCUS) return;
   try { hid.focus({ preventScroll: true }); } catch(_) {}
 }
-$('scanner').addEventListener('click', grab);
+// Tapping the camera returns focus to the gun; tapping the finder does not.
+$('scanner').addEventListener('click', e => {
+  if (e.target && e.target.closest && e.target.closest('.fbar')) return;
+  grab();
+});
 
 let hidTimer = null;
 function hidSubmit(){
@@ -747,6 +818,47 @@ hid.addEventListener('keydown', e => {
 
 /* ---------- the answer ---------- */
 let hideTimer = null;
+/* ---------- the sound the door makes ----------
+   A verdict at a door is read by ear before it is read by eye: the person
+   holding the iPad is looking at the guest, not the screen. The colour and the
+   buzz were both silent to anyone more than an arm away, including the operator
+   when the device is on a table.
+
+   Synthesised rather than a file, because a door with no signal still has to
+   make a noise and an <audio src> is one more thing to have failed to load.
+   Three shapes, distinguishable without being looked at: a rising pair for come
+   in, one flat note for already inside, a low double buzz for stop. */
+let AC = null;
+function audio(){
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    return AC;
+  } catch(_) { return null; }
+}
+function tone(ac, freq, start, dur, gain){
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.value = freq;
+  // Ramped, not switched: a square-edged gain change clicks, and a click at a
+  // door sounds like a fault rather than an answer.
+  g.gain.setValueAtTime(0.0001, ac.currentTime + start);
+  g.gain.exponentialRampToValueAtTime(gain, ac.currentTime + start + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + start + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(ac.currentTime + start);
+  o.stop(ac.currentTime + start + dur + 0.02);
+}
+function beep(cls){
+  const ac = audio();
+  if (!ac) return;
+  try {
+    if (cls === 'in') { tone(ac, 880, 0, 0.1, 0.22); tone(ac, 1320, 0.1, 0.16, 0.22); }
+    else if (cls === 'bad') { tone(ac, 220, 0, 0.18, 0.26); tone(ac, 165, 0.2, 0.26, 0.26); }
+    else tone(ac, 660, 0, 0.22, 0.2);
+  } catch(_) {}
+}
+
 function verdict(cls, mark, big, nm, sub, undoCode){
   const v = $('verdict');
   v.className = 'on ' + cls;
@@ -758,6 +870,7 @@ function verdict(cls, mark, big, nm, sub, undoCode){
   act.hidden = !undoCode;
   act.dataset.code = undoCode || '';
   if (navigator.vibrate) navigator.vibrate(cls === 'in' ? 40 : cls === 'bad' ? [60,50,60] : 25);
+  beep(cls);
   clearTimeout(hideTimer);
   // Clears itself: nobody at a door should have to tap to get back to scanning.
   hideTimer = setTimeout(clearVerdict, cls === 'in' ? 2200 : 3000);
