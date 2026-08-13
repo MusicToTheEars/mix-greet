@@ -203,9 +203,9 @@ test chain written to ./.wallet-test/certs
 ./.wallet-test/certs/pass.pem: OK
 
 $ node --import ./scripts/wallet/convex-resolve.mjs scripts/wallet/verify-pass.mjs
-PASS  zip opens and is non-trivial                                       15 files, 538 KB
-PASS  carries the files Apple requires                                   artwork.png, artwork@2x.png, artwork@3x.png, background.png, background@2x.png, background@3x.png, icon.png, icon@2x.png, icon@3x.png, logo.png, logo@2x.png, logo@3x.png, manifest.json, pass.json, signature
-PASS  manifest hashes every file, and every hash matches                 13 files, all SHA-1 matched
+PASS  zip opens and is non-trivial                                       12 files, 217 KB
+PASS  carries the files Apple requires                                   background.png, background@2x.png, background@3x.png, icon.png, icon@2x.png, icon@3x.png, logo.png, logo@2x.png, logo@3x.png, manifest.json, pass.json, signature
+PASS  manifest hashes every file, and every hash matches                 10 files, all SHA-1 matched
 PASS  signature is a detached PKCS#7 that verifies against the manifest  openssl smime -verify: OK
 PASS  the signed content really is this manifest, not another one        tampered manifest rejected, as it must be
 PASS  pass.json declares exactly one style, with its field dictionary    eventTicket
@@ -215,8 +215,8 @@ PASS  barcodes is a non-empty array of well-formed entries               PKBarco
 PASS  the QR payload is EXACTLY the id /api/admin/checkin expects        jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd (32 chars, matches /^[a-z0-9]{20,40}$/i)
 PASS  the payload round-trips through a real QR encoder and zbarimg      zbarimg --raw -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
 PASS  a second, independent decoder agrees                               jsQR -> jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
-PASS  every image is a real PNG at the density its filename claims       artwork.png 363x510, artwork@2x.png 726x1020, artwork@3x.png 1089x1530, background.png 180x220, background@2x.png 360x440, background@3x.png 540x660, icon.png 29x29, icon@2x.png 58x58, icon@3x.png 87x87, logo.png 160x50, logo@2x.png 320x100, logo@3x.png 480x150
-PASS  the style can actually display every image the bundle ships        eventTicket: artwork, background, icon, logo
+PASS  every image is a real PNG at the density its filename claims       background.png 180x220, background@2x.png 360x440, background@3x.png 540x660, icon.png 29x29, icon@2x.png 58x58, icon@3x.png 87x87, logo.png 160x50, logo@2x.png 320x100, logo@3x.png 480x150
+PASS  the style can actually display every image the bundle ships        eventTicket: background, icon, logo
 PASS  the card has an artwork ground, not just a flat colour             background.png at 1x, 2x and 3x
 PASS  the poster layout is not silently switched on                      preferredStyleSchemes absent, classic card, barcode on the face
 PASS  the altText under the code is something the door would accept      jh7a4mkq2xvzn9pd3wc6rt8sfe5cabkd
