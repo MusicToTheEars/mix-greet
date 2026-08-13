@@ -214,8 +214,9 @@
 .stack.tiles tr{
   border:2px solid var(--surface-line);background:var(--field);
   padding:16px 18px;border-radius:var(--radius);
-  /* Square corners and a 2px rule: the same vocabulary as the invite page and
-     the pass. No shadow — this palette does depth with edges, not blur. */
+  /* A 2px rule and a soft corner: the same vocabulary as the invite page.
+     No shadow — this palette does depth with edges, not blur. The pass keeps
+     its own square geometry and is deliberately not part of this. */
   transition:border-color .2s ease,background-color .2s ease;
 }
 .tiles td{border:0;padding:5px 0}
