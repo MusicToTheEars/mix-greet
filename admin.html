@@ -1387,6 +1387,16 @@ $('guests-csv').addEventListener('click', async e => {
   }
 });
 
+/* ---------- dates the operator reads ----------
+   MM-DD-YY, the same shape as the invite link and the invite page. Display
+   only: every stored value, every comparison against localToday(), the date
+   INPUT and the CSV filename all stay ISO, because ISO is what sorts and what
+   the backend speaks. */
+function numDate(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  return m ? `${m[2]}-${m[3]}-${m[1].slice(2)}` : (iso || '');
+}
+
 function renderPublished(events){
   const tbody = $('list');
   tbody.textContent = '';
@@ -1402,7 +1412,7 @@ function renderPublished(events){
     const tr = el('tr');
     const past = ev.date < today;
 
-    const dateTd = el('td', past ? 'muted' : null, ev.date + (past ? ' (past)' : ''));
+    const dateTd = el('td', past ? 'muted' : null, numDate(ev.date) + (past ? ' (past)' : ''));
     dateTd.dataset.label = 'Date';
     tr.appendChild(dateTd);
 
@@ -1440,7 +1450,7 @@ function renderArchive(events){
   $('arch-msg').hidden = true;
   events.forEach(ev => {
     const tr = el('tr');
-    const dateTd = el('td', 'muted', ev.date);
+    const dateTd = el('td', 'muted', numDate(ev.date));
     dateTd.dataset.label = 'Date';
     tr.appendChild(dateTd);
 

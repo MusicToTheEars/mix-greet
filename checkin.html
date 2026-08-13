@@ -407,7 +407,11 @@ async function toSetup(){
     EVENTS.forEach(e => {
       const o = document.createElement('option');
       o.value = e.slug || e.id;
-      o.textContent = e.date + ' · ' + e.title;
+      // MM-DD-YY, matching the invite link and the back office. The door
+      // picks tonight's event from this list; ISO reads as a serial number.
+      const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(e.date || ''));
+      const shown = dm ? `${dm[2]}-${dm[3]}-${dm[1].slice(2)}` : (e.date || '');
+      o.textContent = shown + ' · ' + e.title;
       sel.appendChild(o);
     });
     // Default to the soonest event that has not passed, because at a door that

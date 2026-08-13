@@ -1012,9 +1012,12 @@ function evDate(s){
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
   return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
 }
+/* Numeric, and the same shape as the invite link the guest arrived on:
+   /i/08-15-26 in the address bar, 08-15-26 on the page. A spelled month read
+   as a different fact from the URL that led here. */
 function longDate(d){
-  return d.toLocaleDateString('en-US', {weekday:'short', month:'long', day:'numeric', year:'numeric'})
-          .toUpperCase().replace(/,/g, ' ·');
+  const p = n => String(n).padStart(2, '0');
+  return p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + String(d.getFullYear()).slice(2);
 }
 function timeLine(ev){
   if (!ev.start) return '';

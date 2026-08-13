@@ -215,29 +215,6 @@ export type ConfirmationVars = {
 };
 
 // --- date helpers -------------------------------------------------------------
-const WEEKDAYS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 type Ymd = { y: number; m: number; d: number };
 
@@ -246,24 +223,37 @@ function parseYmd(date?: string): Ymd | null {
   return m ? { y: +m[1], m: +m[2], d: +m[3] } : null;
 }
 
-// "Saturday, July 11, 2026"
+// "08-15-26", everywhere a date appears in this message.
+//
+// Numeric and in one shape, matching the invite link the guest was sent
+// (/i/08-15-26) and the date on the invite page. A spelled month read as a
+// different fact from the URL that led there, and the message used to carry
+// three registers of the same day — longhand in the ticket, abbreviated in the
+// subject, poster-style in the rail — which is three chances to disagree.
+//
+// The Apple Wallet pass is deliberately NOT part of this. It keeps "AUG 15":
+// it is a physical-object design with its own typographic register, and it is
+// read at a door rather than compared against a link.
+function numericDate(ymd: Ymd): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(ymd.m)}-${p(ymd.d)}-${String(ymd.y).slice(2)}`;
+}
+
 function longDate(ymd: Ymd): string {
-  const dow = new Date(Date.UTC(ymd.y, ymd.m - 1, ymd.d)).getUTCDay();
-  return `${WEEKDAYS[dow]}, ${MONTHS[ymd.m - 1]} ${ymd.d}, ${ymd.y}`;
+  return numericDate(ymd);
 }
 
-// "Sat, Jul 11" — subject-line length
+// Subject-line length. Already short, now shorter.
 function shortDate(ymd: Ymd): string {
-  const dow = new Date(Date.UTC(ymd.y, ymd.m - 1, ymd.d)).getUTCDay();
-  return `${WEEKDAYS[dow].slice(0, 3)}, ${MONTHS[ymd.m - 1].slice(0, 3)} ${ymd.d}`;
+  return numericDate(ymd);
 }
 
-// "SAT · JULY 11 · 2026" — the poster date stamp in the dark rail. This is the
-// ONLY place the date is set in this register; the ticket's WHEN row spells it
-// out longhand instead, so the two never read as the same string twice.
+// The poster date stamp in the dark rail. Same numeric string as everywhere
+// else now: the old rule that no two places print the date identically was
+// there to stop three registers colliding, and with one register there is
+// nothing left to collide.
 function railDate(ymd: Ymd): string {
-  const dow = new Date(Date.UTC(ymd.y, ymd.m - 1, ymd.d)).getUTCDay();
-  return `${WEEKDAYS[dow].slice(0, 3)} · ${MONTHS[ymd.m - 1]} ${ymd.d} · ${ymd.y}`;
+  return numericDate(ymd);
 }
 
 // "1:00 PM" / "13:00" / "7pm" -> minutes past midnight. Null when unparseable,
