@@ -518,10 +518,61 @@ transparent logo that belongs to the card instead of sitting on top of it.
 
 ---
 
-## 7. Still needs Lawrence
+## 7. Proven on a device
 
-Nothing here was deployed. `npx convex deploy` and `scripts/deploy.sh` were not
-run, and this branch was not merged.
+The section below used to say the one thing the rig could not prove was where
+Wallet actually draws the barcode, and that it would take a phone. It has now
+been answered, on iOS 26, with the real production pass.
+
+`xcrun simctl openurl` opened `/api/pass?t=<token>` from production on a booted
+iPhone 17 Pro. iOS fetched it, PassKit accepted it, and Wallet drew its own
+add-pass sheet: the black card, the academix and MIX & GREET lockup, AUG 15 in
+the corner, STARTS and ADMIT and SPECIAL GUEST as written, the poster rings
+behind — and the QR code on the face of the card, over a white tile, with the
+payload printed underneath as altText.
+
+Then the loop was closed the only way that counts. `zbarimg` was pointed at
+Wallet's own rendered pixels, not at ours:
+
+```
+$ zbarimg --raw -q sim1.png
+jn7fzdmes899r4fxrfxf44a4618cdxjr
+
+$ curl -X POST .../api/admin/checkin -d '{"code":"jn7fzdmes899r4fxrfxf44a4618cdxjr", ...}'
+{"event":"TEST Event","guests":2,"name":"Pass Render Probe","ok":true,"state":"in"}
+
+$ # same card again
+{"at":"2026-08-13T18:37:10.226Z", ...,"ok":true,"state":"already"}
+```
+
+A code read off an iOS Wallet card opened the production door, and the second
+read of the same card was caught as a duplicate. The probe RSVP was deleted
+afterwards.
+
+Apple's own parser agrees independently. `PKPass(data:)` on macOS — the class
+Wallet itself builds a pass from — accepts the file and resolves a barcode whose
+message is exactly the RSVP id and whose encoding is 513, `kCFStringEncodingISOLatin1`:
+
+```
+Apple's PassKit ACCEPTED the file.
+  localizedName        : Event Ticket
+  localizedDescription : TEST Event, Mix & Greet
+  organizationName     : Academix BEAT Lab
+  passTypeIdentifier   : pass.com.mixandgreet.rsvp
+  message         : jn7fzdmes899r4fxrfxf44a4618cdxjr
+  altText         : jn7fzdmes899r4fxrfxf44a4618cdxjr
+```
+
+What is still not proven: the simulator is not a phone in a dark room. Nobody
+has held a real handset at a real door and had a real scanner read it off a
+screen at an angle, at low brightness, behind a case. The rendering and the
+payload are settled; the physics of the doorway are not.
+
+## 8. Still needs Lawrence
+
+The production certificate is confirmed genuine: `/api/pass` returns a 222 KB
+`application/vnd.apple.pkpass` signed by `CN=Pass Type ID: pass.com.mixandgreet.rsvp`,
+issued by Apple WWDR G4, `OU=SCFGWPBXMF`, valid to 11 Sep 2027.
 
 **1. The one thing the rig cannot prove.** Everything above is verified against
 Apple's spec, Apple's samples, and real decoders — but on a self-signed chain,
