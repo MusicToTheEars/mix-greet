@@ -13,9 +13,15 @@
 //   node scripts/wallet/make-images.mjs --no-write # render only
 //   node scripts/wallet/make-images.mjs --out DIR  # also drop the PNGs in DIR
 //
-// icon.* and logo.* are NOT regenerated: they are a mark and a wordmark, not
-// artwork composed from the event, and the ones in images.ts already read at
-// 29px. They are carried through verbatim.
+// icon.* is NOT regenerated: it is the 45rpm spindle mark, it is not composed
+// from the event, and the one in images.ts already reads at 29px. It is carried
+// through verbatim.
+//
+// logo.* IS regenerated, from the project's own academix-logo.png — as a
+// TRANSPARENT png. The old cut baked a red rectangle into the file, which put
+// the only hard edge in the card's top third onto a soft blurred ground and
+// read as a logo that had lost its alpha channel. Wallet composites the logo
+// itself; transparency is what it expects.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -88,7 +94,7 @@ async function headliner() {
 // transform that shrinks the whole composition for the small frames so the 7px
 // dot screen and the 150px grain tile stay in proportion with it, and the
 // per-frame override block appended last.
-function page({ art, w, h, css, extra = "", heavy = false }) {
+function page({ art, w, h, css, extra = "", heavy = false, brand = false }) {
   const scale = w / css; // css = the width the flyer is laid out at
   return `<!doctype html><meta charset="utf-8"><style>
 ${fontFaces()}
@@ -172,20 +178,24 @@ body{font-family:'Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;line-he
 ${extra}
 </style>
 <div id="stage">
-<div class="flyer has-art">
-  <div class="fl-l fl-art"><img src="${art.photo}" alt=""></div>
+<div class="flyer ${brand ? "" : "has-art"}">
+  ${brand ? "" : `<div class="fl-l fl-art"><img src="${art.photo}" alt=""></div>`}
   <div class="fl-l fl-ink"></div>
   <div class="fl-l fl-wash"></div>
-  ${mark(heavy)}
+  ${mark(heavy, brand)}
   <div class="fl-l fl-grain"></div>
   <div class="fl-l fl-scrim"></div>
-  <div class="fl-type">
+  ${
+    brand
+      ? ""
+      : `<div class="fl-type">
     <span class="fl-no">${esc(art.stamp)}</span>
     <div>
       <i class="fl-rule"></i>
       <p class="fl-title ${sizeClass(art.title)}">${esc(art.title)}</p>
     </div>
-  </div>
+  </div>`
+  }
 </div>
 </div>`;
 }
@@ -196,7 +206,7 @@ ${extra}
 // and a fatter hub. Same centre, same outermost and innermost radius, same
 // three arcs off the bottom-left corner — it reads as the same instrument
 // after the blur instead of dissolving into it.
-function mark(heavy) {
+function mark(heavy, brand) {
   const arcs = `
     <g class="fl-arcs" fill="none" stroke="#EC1C24" stroke-width="${heavy ? 5 : 2}" opacity=".5">
       <path d="M-40 402a150 150 0 0 1 150-150"/>
@@ -204,6 +214,35 @@ function mark(heavy) {
       <path d="M-40 494a242 242 0 0 1 242-242"/>
     </g>`;
   const open = `<svg class="fl-l fl-mark" viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" focusable="false">`;
+
+  // The brand plate's instrument. On the sharp poster the rings are a motif
+  // struck over a photograph; here they ARE the picture, so they are recentred
+  // toward the middle of the frame, opened out until the outer two run off the
+  // edges, and struck at a gauge that survives the blur as light rather than
+  // dissolving into it. The hub lands about a third down, which is the band
+  // Wallet leaves empty between the logo and the title.
+  if (brand) {
+    // The gauge is the whole trick, and it is set by the blur rather than by
+    // taste. Apple's blur is on the order of a fifth of the card's width; a
+    // line thinner than that is not softened, it is erased. The sharp poster's
+    // 1px hairlines and the earlier 4.5 "heavy" cut both came back as an even
+    // grey haze. 15 units in this 400-wide viewBox is about 6.75pt on the
+    // card, which survives as a band of light with dark either side — still
+    // legibly a ring. Four rings, widely spaced, for the same reason: rings
+    // closer together than the blur radius merge into one.
+    return `${open}
+    <circle class="fl-disc" cx="295" cy="168" r="168" fill="#EC1C24" opacity=".34"/>
+    <g class="fl-rings" fill="none" stroke="#EDEAE3" stroke-width="15" opacity=".55">
+      <circle cx="295" cy="168" r="336"/><circle cx="295" cy="168" r="244"/>
+      <circle cx="295" cy="168" r="152"/><circle cx="295" cy="168" r="66"/>
+    </g>
+    <circle class="fl-hub" cx="295" cy="168" r="26" fill="#EDEAE3" opacity=".95"/>
+    <g class="fl-arcs" fill="none" stroke="#EC1C24" stroke-width="16" opacity=".5">
+      <path d="M-40 412a160 160 0 0 1 160-160"/>
+    </g>
+  </svg>`;
+  }
+
   if (heavy) {
     return `${open}
     <g class="fl-rings" fill="none" stroke="#EDEAE3" stroke-width="4.5">
@@ -255,56 +294,80 @@ const FRAMES = {
   // The classic eventTicket ground, and therefore the asset the guest actually
   // sees. Apple: "The image is cropped slightly on all sides and blurred."
   //
-  // So this frame is composed FOR the blur rather than in spite of it. It is
-  // laid out at its own 180:220 (not squashed out of the portrait frame) and
-  // shrunk whole so the dot screen and the grain stay in proportion, then:
+  // This frame carries NO PHOTOGRAPH, and that is the whole design, for two
+  // independent reasons that happen to want the same thing.
   //
-  //  - the type comes off. Wallet prints the event, the date, the guest and
-  //    the barcode over this; a blurred cream lockup underneath its own white
-  //    fields is the one thing that makes a pass look broken.
-  //  - the 7px halftone comes off. It cannot survive a 14px blur as anything
-  //    but a slight grey lift, and that lift only lightens the ground the
-  //    barcode tile sits on.
-  //  - the mark goes heavy (see mark()), because hairlines dissolve.
+  // The first is that a blurred portrait conveys nothing. Put any red-lit
+  // photograph of any person behind a 14px blur and you get the same warm
+  // smudge; a critic comparing the finished card to the invitation could name
+  // only one legible feature in the whole plate and read it as "the background
+  // image failed to load". The rings are the opposite: large, thin, high
+  // contrast, low frequency. Blur turns them into soft concentric halos that
+  // are still unmistakably rings, and the rings are the invitation's
+  // logo-level idea — the "sound" in the poster.
+  //
+  // The second is that PASS_IMAGES is static. It is baked once and every guest
+  // of every event gets the same bytes, so a plate composed from one event's
+  // headliner is wrong for every other event. Three of the four published
+  // events have no featured artist at all; their guests would have opened a
+  // stranger's face.
+  //
+  // So the plate is the brand, not the bill: the mark opened out until it
+  // fills the frame, the red bloom, the grain, the black. The invite page has
+  // its own vocabulary for exactly this — `.flyer:not(.has-art)`, where the
+  // red disc returns and the mark carries the composition alone — and that is
+  // the state this renders.
+  //
+  // Also composed for the blur specifically:
+  //  - no type. Wallet prints the event, the date, the guest and the barcode
+  //    over this; a blurred cream lockup under its own white fields is the one
+  //    thing that makes a pass look broken.
+  //  - no 7px halftone. It cannot survive the blur as anything but a grey
+  //    lift, and that lift only lightens the ground the barcode tile sits on.
+  //  - the LEFT THIRD is pulled down to near black, because Wallet's type
+  //    column runs down it and the red field labels need a ground they clear.
   //  - the scrim's foot is deepened so the bottom third — where the barcode
-  //    lands — is near black.
-  //
-  // What is left is the low-frequency signature that does survive: the red
-  // duotone face mass, the #0B0B0D black, the bloom off the top right.
+  //    lands — is flat #0B0B0D.
   background: {
     w: 180,
     h: 220,
     css: 363,
-    heavy: true,
+    brand: true,
     budgets: [26_000, 58_000, 130_000],
     extra: `
-.flyer.has-art .fl-wash::after{display:none}
-.flyer.has-art .fl-rings{opacity:.34}
-.flyer.has-art .fl-arcs{stroke:#EDEAE3;opacity:.22}
+.fl-wash::after{display:none}
 .fl-type{display:none}
-/* The headliner's shirt carries printed type of its own, which the blur turns
-   into a second illegible smear right where the barcode tile lands, and Wallet
-   crops a few percent off every edge on top of that. So the foot of the scrim
-   is brought forward to 63% and taken all the way to opaque by 90%: the face
-   keeps the top half, the bottom third goes to flat #0B0B0D, and the shirt —
-   printed type and all — is simply not in the picture any more. */
-.flyer.has-art .fl-scrim{
-  background:linear-gradient(180deg,
-    rgba(11,11,13,.88) 0%,rgba(11,11,13,.16) 22%,
-    rgba(11,11,13,.06) 44%,rgba(11,11,13,.58) 63%,
-    rgba(11,11,13,.94) 78%,rgba(11,11,13,1) 90%);
+/* The bloom stays; it is the strongest low-frequency brand cue on the plate.
+   The cream lift from the bottom-left goes, because the bottom-left is exactly
+   where the barcode tile lands and it must stay black. */
+.fl-wash{
+  opacity:1;
+  background:radial-gradient(86% 62% at 82% 6%,rgba(236,28,36,.62),transparent 66%);
+}
+/* Wallet's fields run down the left edge and its labels are brand red. Red on
+   dark red measures about 2.5:1 and fails; red on #0B0B0D is about 4.3:1 and
+   holds. So the left third is taken down before the type ever gets there. */
+.fl-scrim{
+  background:
+    linear-gradient(90deg,
+      rgba(11,11,13,.94) 0%,rgba(11,11,13,.72) 26%,
+      rgba(11,11,13,.22) 52%,rgba(11,11,13,0) 74%),
+    linear-gradient(180deg,
+      rgba(11,11,13,.72) 0%,rgba(11,11,13,.12) 20%,
+      rgba(11,11,13,.10) 46%,rgba(11,11,13,.66) 64%,
+      rgba(11,11,13,.96) 80%,rgba(11,11,13,1) 91%);
 }`,
   },
 };
 
 async function render(browser, art, frame, scale) {
-  const { w, h, css, extra, heavy } = frame;
+  const { w, h, css, extra, heavy, brand } = frame;
   const ctx = await browser.newContext({
     viewport: { width: w, height: h },
     deviceScaleFactor: scale,
   });
   const p = await ctx.newPage();
-  await p.setContent(page({ art, w, h, css, extra, heavy }), {
+  await p.setContent(page({ art, w, h, css, extra, heavy, brand }), {
     waitUntil: "load",
   });
   await p.evaluate(async () => {
@@ -327,22 +390,28 @@ async function render(browser, art, frame, scale) {
 // The ladder starts at 160 rather than 255 deliberately. A red duotone over
 // black is a one-dimensional ramp; past ~160 entries the extra colours are
 // spent describing the grain, which triples the file for a difference nobody
-// can see, and it lets every density in a family land on the same palette
-// depth so they are the same picture rather than three similar ones.
-async function pack(buf, budget) {
+// can see.
+//
+// The ladder is walked for the FAMILY, not for each density: the depth chosen
+// is the deepest one at which all three densities clear their budgets, and all
+// three are then quantised at it. Choosing per density is what produced a set
+// where @2x was smaller than @1x — three neighbouring palettes, three slightly
+// different pictures, and the density Wallet happens to pick deciding which
+// one the guest sees.
+const LADDER = [160, 128, 96, 64, 48];
+
+async function quantise(buf, colours) {
+  return sharp(buf)
+    .png({ palette: true, colours, dither: 0.7, compressionLevel: 9, effort: 10 })
+    .toBuffer();
+}
+
+async function packFamily(raws, budgets) {
   let last = null;
-  for (const colours of [160, 128, 96, 64, 48]) {
-    const out = await sharp(buf)
-      .png({
-        palette: true,
-        colours,
-        dither: 0.7,
-        compressionLevel: 9,
-        effort: 10,
-      })
-      .toBuffer();
-    last = { out, colours };
-    if (out.length <= budget) return last;
+  for (const colours of LADDER) {
+    const outs = await Promise.all(raws.map((r) => quantise(r, colours)));
+    last = { outs, colours };
+    if (outs.every((o, i) => o.length <= budgets[i])) return last;
   }
   return last;
 }
