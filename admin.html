@@ -161,33 +161,129 @@
 .warn span{display:block;font-size:12px;line-height:1.6;color:var(--text-soft);
   overflow-wrap:anywhere}
 
-/* ---- phone: the event tables stack ----------------------------------------
-   Four columns of a data table do not fit a 390px viewport. Measured before
-   this rule: documentElement.scrollWidth 408 against innerWidth 390, the table
-   364px inside a 346px panel, and ARCHIVE / DELETE cut mid-word off the right
-   edge — on the device most likely to be running "publish, then text the link".
-   Each row becomes a block, so a row can no longer be wider than its panel. */
+/* ---- phone: the data tables stack -----------------------------------------
+   Kept for the guest list, which is a real table and stays one on a desktop.
+   Four columns do not fit a 390px viewport: measured before this rule,
+   documentElement.scrollWidth 408 against innerWidth 390, and ARCHIVE /
+   DELETE cut mid-word off the right edge — on the device most likely to be
+   running "publish, then text the link". Each row becomes a block, so a row
+   can no longer be wider than its panel. */
 @media (max-width:560px){
   .stack thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;
     overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
   .stack,.stack tbody,.stack tr,.stack td{display:block;width:100%}
-  /* 4px between rows, 2px inside one, so the eye can tell "next event" from
-     "next field of this event" without reading a word. */
+  /* 4px between rows, 2px inside one, so the eye can tell "next record" from
+     "next field of this record" without reading a word. */
   .stack tr{border-bottom:4px solid var(--surface-line);padding:16px 0}
   .stack tr:last-child{border-bottom:0}
   .stack td{border:0;padding:5px 0}
   .stack .actions{justify-content:flex-start}
   .link-cell .mini{letter-spacing:.06em}
-  /* Stacking hides the header row, which took the column names with it. The
-     link cell's buttons and the manage cell's buttons then landed as two
-     identical adjacent rows with nothing between them — DELETE reading as the
-     sixth button of a block that starts with COPY LINK. Each cell carries its
-     own column name instead, and the manage cell is ruled off from the link it
-     is not part of. */
+  /* Stacking hides the header row, which took the column names with it. Each
+     cell carries its own column name instead, and the manage cell is ruled off
+     from the link it is not part of. */
   .stack td[data-label]::before{content:attr(data-label);display:block;
     font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
     color:var(--text-muted);margin:0 0 7px}
   .stack td.manage{border-top:2px solid var(--surface-line);margin-top:11px;padding-top:12px}
+}
+
+/* ---- the two EVENT tables are tiles, at every width -----------------------
+   Only the event lists carry .tiles. The guest list above stays a table,
+   because five columns of per-person data is what a table is for and a grid of
+   guest cards would be harder to scan, not easier.
+
+   The events had the opposite problem: nothing separated one from the next but
+   a hairline, so four events read as one continuous ledger. A tile draws its
+   own edge and the eye counts events instead of parsing rows.
+
+   The markup stays a <table> on purpose. It is still tabular data, the header
+   row is still there for a screen reader, and the renderer that builds the rows
+   did not change at all. Only the presentation is a grid. */
+.tiles thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.tiles,.tiles tbody,.tiles tr,.tiles td{display:block;width:100%}
+.tiles tbody{
+  display:grid;gap:14px;
+  /* auto-fill, not auto-fit: one lone event keeps a card's width instead of
+     stretching across the whole panel by itself. */
+  grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+}
+/* .stack.tiles, not .tiles, so this beats the equal-specificity .stack rule
+   inside the phone media query above rather than depending on source order. */
+.stack.tiles tr{
+  border:2px solid var(--surface-line);background:var(--field);
+  padding:16px 18px;
+  /* Square corners and a 2px rule: the same vocabulary as the invite page and
+     the pass. No shadow — this palette does depth with edges, not blur. */
+  transition:border-color .2s ease,background-color .2s ease;
+}
+.tiles td{border:0;padding:5px 0}
+.tiles .actions{justify-content:flex-start}
+.tiles .link-cell .mini{letter-spacing:.06em}
+.tiles td[data-label]::before{content:attr(data-label);display:block;
+  font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--text-muted);margin:0 0 7px}
+.stack.tiles td.manage{border-top:2px solid var(--surface-line);margin-top:11px;padding-top:12px}
+
+/* ---- the options reveal on hover -----------------------------------------
+   Four destructive-adjacent buttons on every tile is a lot of red for a page
+   whose usual job is "copy the link and go". They fold away until the operator
+   is actually pointing at an event.
+
+   Guarded on a real pointer. A touch device has no hover, so on a phone or an
+   iPad the options simply stay open — a reveal that needs a hover the device
+   cannot produce is a button that does not exist. :focus-within opens it for
+   the keyboard, or tabbing would move focus into a collapsed box.
+
+   The height animates via grid-template-rows 0fr -> 1fr, which is the one way
+   to transition to content height without hardcoding a max-height that clips
+   the tallest tile. */
+@media (hover:hover) and (pointer:fine){
+  .stack.tiles td.manage{
+    display:grid;grid-template-rows:0fr;
+    opacity:0;margin-top:0;padding-top:0;border-top-color:transparent;
+    transition:grid-template-rows .3s cubic-bezier(.4,0,.2,1),
+               opacity .22s ease,margin-top .3s cubic-bezier(.4,0,.2,1),
+               padding-top .3s cubic-bezier(.4,0,.2,1),border-top-color .3s ease;
+  }
+  .tiles td.manage > .actions{overflow:hidden;min-height:0}
+  .stack.tiles tr:hover td.manage,
+  .stack.tiles tr:focus-within td.manage{
+    grid-template-rows:1fr;opacity:1;
+    margin-top:11px;padding-top:12px;border-top-color:var(--surface-line);
+  }
+  /* The tile itself answers the pointer, so the reveal reads as one movement
+     rather than as buttons appearing out of nowhere. */
+  .stack.tiles tr:hover,.stack.tiles tr:focus-within{border-color:var(--brand-ink);background:var(--surface)}
+  /* The buttons rise the last few pixels into place, staggered just enough to
+     read as one gesture. Capped at the fifth so no tile takes over ~250ms. */
+  .tiles td.manage .mini{
+    opacity:0;transform:translateY(6px);
+    transition:opacity .22s ease,transform .28s cubic-bezier(.4,0,.2,1);
+  }
+  .tiles tr:hover td.manage .mini,
+  .tiles tr:focus-within td.manage .mini{opacity:1;transform:none}
+  .tiles td.manage .mini:nth-child(2){transition-delay:.04s}
+  .tiles td.manage .mini:nth-child(3){transition-delay:.08s}
+  .tiles td.manage .mini:nth-child(4){transition-delay:.12s}
+  .tiles td.manage .mini:nth-child(n+5){transition-delay:.16s}
+}
+
+/* Motion off: the options are simply always there. Fading them in without
+   movement would still be a state change the operator has to wait for. */
+@media (prefers-reduced-motion:reduce){
+  .stack.tiles tr,.tiles td.manage,.tiles td.manage .mini{transition:none}
+  .stack.tiles td.manage{grid-template-rows:1fr;opacity:1;margin-top:11px;padding-top:12px;
+    border-top-color:var(--surface-line)}
+  .tiles td.manage .mini{opacity:1;transform:none}
+}
+
+/* One column below the width a tile can hold its two-line URL without the
+   grid squeezing it. */
+@media (max-width:560px){
+  .tiles tbody{grid-template-columns:1fr;gap:12px}
+  .stack.tiles tr{padding:14px 15px}
 }
 
 /* lineup strip inside the event tables */
@@ -287,7 +383,7 @@
         <b>Check the invite host</b>
         <span id="origin-warn-text"></span>
       </div>
-      <table class="stack">
+      <table class="stack tiles">
         <thead><tr><th>Date</th><th>Event</th><th>Invite link</th><th></th></tr></thead>
         <tbody id="list"></tbody>
       </table>
@@ -327,7 +423,7 @@
 
     <div class="panel">
       <div class="head"><h2>Archive · past events</h2><span class="count" id="arch-count"></span></div>
-      <table class="stack">
+      <table class="stack tiles">
         <thead><tr><th>Date</th><th>Event</th><th>Invite link</th><th></th></tr></thead>
         <tbody id="archive"></tbody>
       </table>
