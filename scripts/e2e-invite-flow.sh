@@ -77,10 +77,16 @@ echo "installing backend deps in $WORKDIR"
 }
 
 # --- bring the deployment up --------------------------------------------------
+# `--typecheck enable` is deliberate and is why this step can take a minute: it
+# runs tsc over the whole convex/ tree against freshly generated types. Nothing
+# else in this repo typechecks the backend, convex/_generated is gitignored, and
+# a push with types disabled will happily ship a function whose response shape
+# no longer matches what the routes destructure. If tsc fails, so does this
+# script, before a single assertion runs.
 echo "starting a local Convex deployment (anonymous, no login, no cloud)"
 (
   cd "$WORKDIR"
-  CONVEX_AGENT_MODE=anonymous npx convex dev --typecheck disable --tail-logs disable
+  CONVEX_AGENT_MODE=anonymous npx convex dev --typecheck enable --tail-logs disable
 ) >"$WORKDIR/convex-dev.log" 2>&1 &
 CONVEX_PID=$!
 
