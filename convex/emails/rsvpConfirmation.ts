@@ -194,6 +194,10 @@ export type ConfirmationVars = {
   // whichever of the three the guest ends up holding. See the door code block
   // in the renderer for why this is rendered as an image AND as a link.
   qrUrl?: string;
+  // Absolute URL of the animated LED meter GIF. Optional: without it the meter
+  // falls back to the table of coloured cells, which is what shipped before and
+  // is still what a client with images off sees.
+  meterUrl?: string;
   mapUrl?: string; // overrides the derived Google Maps search link
   // The event's own flyer, resolved from events.posterId in convex/email.ts.
   // This is the only thing in the message that changes shape between events,
@@ -681,7 +685,32 @@ export function buildRsvpIcs(v: ConfirmationVars): string {
 // --- small HTML builders ------------------------------------------------------
 // A 26-segment LED meter, the site's signature divider, rebuilt as a table so
 // it survives Outlook. Static frame: 16 green, 3 amber lit, the rest dark.
-function meterHtml(): string {
+function meterHtml(gifUrl?: string): string {
+  // The animated version, when the caller gave us somewhere to load it from.
+  //
+  // A GIF and not CSS: Gmail strips @keyframes outright and the Word engine
+  // behind Outlook for Windows never had them, so an animated GIF is the only
+  // motion every major client agrees on. It is built from brand.css itself by
+  // scripts/build-meter-gif.mjs, so it cannot drift from the site's meter.
+  //
+  // Two fallbacks are already handled and neither needs markup here:
+  //   - Outlook for Windows draws frame 1 and stops. Frame 1 is the resting,
+  //     fully-lit state, which is why the capture starts there.
+  //   - Images off leaves the <td>'s bgcolor, the LED case colour, at the same
+  //     height as the bar — an unlit meter rather than a broken-image icon.
+  //     alt is empty on purpose: this is a divider, and a screen reader
+  //     announcing "LED meter" here would be reading out the furniture.
+  //
+  // 544px to sit on the same measure as the poster, at 1200px native, so it is
+  // not soft on a retina phone.
+  if (gifUrl) {
+    return `<table role="presentation" aria-hidden="true" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.ledCase}" style="width:100%;border-collapse:collapse;background-color:${BRAND.ledCase};">
+  <tr><td align="center" bgcolor="${BRAND.ledCase}" style="background-color:${BRAND.ledCase};font-size:0;line-height:0;padding:0;">
+    <img src="${esc(gifUrl)}" width="${POSTER_WIDTH}" alt="" style="display:block;width:100%;max-width:${POSTER_WIDTH}px;height:auto;border:0;outline:none;text-decoration:none;background-color:${BRAND.ledCase};">
+  </td></tr>
+</table>`;
+  }
+
   const cells: string[] = [];
   for (let i = 1; i <= 26; i++) {
     const bg =
@@ -1406,7 +1435,7 @@ export function renderRsvpConfirmation(v: ConfirmationVars): {
 
   <!-- ============ LED METER (site signature) ============ -->
   <tr><td class="mg-pad mg-band" bgcolor="${BRAND.white}" style="background-color:${BRAND.white};padding:26px 28px ${posterUrl ? "22px" : "24px"} 28px;">
-    ${meterHtml()}
+    ${meterHtml(safeUrl(v.meterUrl))}
   </td></tr>
 
 ${posterHtml}  <!-- ============ LIGHT PANEL ============ -->

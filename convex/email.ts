@@ -211,8 +211,13 @@ export const sendRsvpConfirmation = internalAction({
     // it; the template renders it as an image AND links the code, so no guest
     // depends on their client agreeing to load a remote image.
     const qrUrl = mgTok ? `${apiOrigin}/api/qr?t=${encodeURIComponent(mgTok)}` : undefined;
+    // The animated LED meter, served as a static file off the site rather than
+    // by this deployment. It is the same asset for every guest and every event,
+    // so it belongs on the CDN that already serves brand.css, not on a function
+    // invocation. Site origin, not apiOrigin — this one is not an API route.
+    const meterUrl = `${inviteOrigin()}/meter.gif`;
 
-    const rendered = renderRsvpConfirmation({ ...vars, icsUrl, walletUrl, manageUrl, qrUrl });
+    const rendered = renderRsvpConfirmation({ ...vars, icsUrl, walletUrl, manageUrl, qrUrl, meterUrl });
 
     let enqueued = false;
     try {

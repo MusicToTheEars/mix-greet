@@ -201,16 +201,28 @@ function buildPassJson(p: PassInput) {
   }
   if (p.endIso) semantics.eventEndDate = p.endIso;
 
+  // No altText, deliberately.
+  //
+  // Wallet prints altText as a line inside the white barcode tile, and that
+  // line is the only reason the tile is not an even frame around the code: it
+  // adds a row of type under the QR and nothing above it, so the white block
+  // reads as bottom-heavy on the card. Dropping it lets Wallet close the tile
+  // up symmetrically, which is what it does when a barcode carries a message
+  // and nothing else.
+  //
+  // What it costs, said plainly because it is a real loss: a 32-character id
+  // under the code is what a member of door staff reads aloud, or types, when a
+  // scanner will not cooperate, and it is what VoiceOver announces. Both still
+  // have an answer — the door can now find a guest by name (checkin.html), and
+  // the same code is served as a plain PNG at /api/qr for a guest with no
+  // Wallet — but neither is the code itself, printed on the card, in the hand
+  // of the person standing at the door. Restore this line if that trade turns
+  // out to be the wrong one; it is one field and nothing else depends on its
+  // absence.
   const barcode = {
     format: QR_FORMAT,
     message: p.authToken,
     messageEncoding: "iso-8859-1",
-    // Printed under the code for a human to read out when a scanner will not
-    // cooperate. It must therefore be the payload itself, not the serial: the
-    // serial is `mg-<id>`, and the hyphen makes it fail /api/admin/checkin's
-    // own /^[a-z0-9]{20,40}$/ test, so a door typing what it saw would be told
-    // the code was unrecognised.
-    altText: p.authToken,
   };
 
   return {

@@ -613,19 +613,34 @@ check("the poster layout is not silently switched on", () => {
   return JSON.stringify(schemes);
 });
 
-check("the altText under the code is something the door would accept", () => {
-  // It exists so a human can read the code out when a scanner will not
-  // cooperate. Printing anything /api/admin/checkin rejects makes that fallback
-  // fail at exactly the moment it is needed.
+check("the barcode tile carries the code and nothing else", () => {
+  // altText is the line Wallet prints inside the white tile under the QR. It is
+  // deliberately absent: it made the tile bottom-heavy instead of an even frame
+  // around the code. See the note in convex/wallet/pkpass.ts.
+  //
+  // Asserted rather than skipped. The previous version of this check read "if
+  // (!b.altText) continue", so the day the field was dropped the rig went green
+  // and said nothing — the exact silent pass §4 of docs/wallet-gauntlet.md
+  // listed as one of the things it could not catch. Now the absence is the
+  // thing under test, and putting altText back fails here until this check is
+  // updated too, which is the point: it is a design decision with a cost, so it
+  // should not be reversible by accident in either direction.
   for (const b of pass.barcodes) {
-    if (!b.altText) continue;
     assert(
-      CHECKIN_ACCEPTS.test(b.altText) || b.altText === RSVP_ID,
-      `altText ${JSON.stringify(b.altText)} fails the checkin route's regex, ` +
-        "so staff typing what they see would be told the code is unrecognised",
+      b.altText === undefined,
+      `barcode carries altText ${JSON.stringify(b.altText)}; the tile is meant to ` +
+        "hold the code alone. If this is intentional, update this check and the " +
+        "note in pkpass.ts together.",
     );
   }
-  return pass.barcodes.map((b) => b.altText).join(", ");
+  if (pass.barcode) {
+    assert(
+      pass.barcode.altText === undefined,
+      "the legacy `barcode` key still carries altText; iOS versions that read it " +
+        "would print a line the modern `barcodes` entry does not",
+    );
+  }
+  return "no altText on any barcode entry";
 });
 
 check("semantics carry the four tags Apple requires of an event pass", () => {
