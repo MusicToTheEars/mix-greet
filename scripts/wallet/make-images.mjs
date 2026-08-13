@@ -94,7 +94,7 @@ async function headliner() {
 // transform that shrinks the whole composition for the small frames so the 7px
 // dot screen and the 150px grain tile stay in proportion with it, and the
 // per-frame override block appended last.
-function page({ art, w, h, css, extra = "", heavy = false, brand = false }) {
+function page({ art, w, h, css, extra = "", heavy = false, brand = false, blurRings = false }) {
   const scale = w / css; // css = the width the flyer is laid out at
   return `<!doctype html><meta charset="utf-8"><style>
 ${fontFaces()}
@@ -182,7 +182,7 @@ ${extra}
   ${brand ? "" : `<div class="fl-l fl-art"><img src="${art.photo}" alt=""></div>`}
   <div class="fl-l fl-ink"></div>
   <div class="fl-l fl-wash"></div>
-  ${mark(heavy, brand)}
+  ${mark(heavy, blurRings)}
   <div class="fl-l fl-grain"></div>
   <div class="fl-l fl-scrim"></div>
   ${
@@ -206,7 +206,7 @@ ${extra}
 // and a fatter hub. Same centre, same outermost and innermost radius, same
 // three arcs off the bottom-left corner — it reads as the same instrument
 // after the blur instead of dissolving into it.
-function mark(heavy, brand) {
+function mark(heavy, blurRings) {
   const arcs = `
     <g class="fl-arcs" fill="none" stroke="#EC1C24" stroke-width="${heavy ? 5 : 2}" opacity=".5">
       <path d="M-40 402a150 150 0 0 1 150-150"/>
@@ -221,7 +221,7 @@ function mark(heavy, brand) {
   // edges, and struck at a gauge that survives the blur as light rather than
   // dissolving into it. The hub lands about a third down, which is the band
   // Wallet leaves empty between the logo and the title.
-  if (brand) {
+  if (blurRings) {
     // The gauge is the whole trick, and it is set by the blur rather than by
     // taste. Apple's blur is on the order of a fifth of the card's width; a
     // line thinner than that is not softened, it is erased. The sharp poster's
@@ -289,7 +289,53 @@ const FRAMES = {
   // the invitation's flyer as it is. Only rendered if the poster scheme is
   // ever switched on, so it is the forward-compatible asset, not the shipping
   // one.
-  artwork: { w: 363, h: 510, css: 363, budgets: [110_000, 260_000, 560_000] },
+  // The iOS 18 poster event ticket's full-bleed ground, sharp. Nothing renders
+  // it while the poster scheme is off, so it is the forward-compatible asset,
+  // not the shipping one.
+  //
+  // It carries no photograph either, for the same reason background.* does not:
+  // PASS_IMAGES is baked once for every event, and most of the events on the
+  // calendar have no featured artist to bake. The difference between the two is
+  // only that this one is never blurred, so it keeps the full mark — every
+  // hairline of the ring stack, the red disc, the three arcs — at the gauge the
+  // invitation draws them, instead of the four heavy rings the blur needs.
+  //
+  // The grain is pulled back hard here. At .55 it was tuned to sit over a
+  // photograph, where it disappears into the picture's own texture; over the
+  // flat gradients of a plate it is the only high-frequency content in the
+  // frame, so it both reads as dirt and costs more bytes than everything else
+  // combined — 818 KB of the 1089x1530, against 120 KB for the whole blurred
+  // family. .18 keeps the press feel and gives the file back.
+  //
+  // NOT BUILT BY DEFAULT. Pass --with-artwork to include it.
+  //
+  // Nothing renders artwork.* while the poster scheme is off, and the poster
+  // scheme is off deliberately and permanently for a ticket that is scanned at
+  // a door — Apple: "Poster event tickets aren't compatible with tickets that
+  // require a QR code or barcode for entry." Shipping it anyway cost 1.31 MB of
+  // a 1.53 MB bundle, at three densities, for a picture no guest can ever see.
+  //
+  // The grain is why it is so expensive: at 1089x1530 the feTurbulence tile is
+  // real per-pixel noise, and over a plate rather than a photograph it is the
+  // only high-frequency content in the frame, so PNG cannot compress it and
+  // dithering cannot help. The blurred family, which does ship, is 0.26 MB for
+  // all three.
+  //
+  // If the poster layout is ever switched on, regenerate with --with-artwork.
+  // That is a rebuild rather than a config change, which is the honest trade:
+  // the bundle stays small for the layout that actually ships.
+  ...(argv.includes("--with-artwork")
+    ? {
+        artwork: {
+          w: 363,
+          h: 510,
+          css: 363,
+          brand: true,
+          budgets: [40_000, 130_000, 300_000],
+          extra: `.fl-grain{opacity:.18}`,
+        },
+      }
+    : {}),
 
   // The classic eventTicket ground, and therefore the asset the guest actually
   // sees. Apple: "The image is cropped slightly on all sides and blurred."
@@ -333,6 +379,7 @@ const FRAMES = {
     h: 220,
     css: 363,
     brand: true,
+    blurRings: true,
     budgets: [26_000, 58_000, 130_000],
     extra: `
 .fl-wash::after{display:none}
@@ -361,13 +408,13 @@ const FRAMES = {
 };
 
 async function render(browser, art, frame, scale) {
-  const { w, h, css, extra, heavy, brand } = frame;
+  const { w, h, css, extra, heavy, brand, blurRings } = frame;
   const ctx = await browser.newContext({
     viewport: { width: w, height: h },
     deviceScaleFactor: scale,
   });
   const p = await ctx.newPage();
-  await p.setContent(page({ art, w, h, css, extra, heavy, brand }), {
+  await p.setContent(page({ art, w, h, css, extra, heavy, brand, blurRings }), {
     waitUntil: "load",
   });
   await p.evaluate(async () => {
@@ -398,14 +445,47 @@ async function render(browser, art, frame, scale) {
 // where @2x was smaller than @1x — three neighbouring palettes, three slightly
 // different pictures, and the density Wallet happens to pick deciding which
 // one the guest sees.
-const LADDER = [160, 128, 96, 64, 48];
+// The ladder has exactly two rungs, and that is not laziness — it is the only
+// two values sharp actually honours.
+//
+// sharp's `colours` does not select a palette size; it selects a BIT DEPTH
+// bucket. Measured against a truecolour source:
+//
+//   colours: 16  -> 16-entry palette, 4-bit
+//   colours: 64  -> 16-entry palette, 4-bit
+//   colours: 128 -> 16-entry palette, 4-bit
+//   colours: 160 -> 256-entry palette, 8-bit
+//   colours: 256 -> 256-entry palette, 8-bit
+//
+// Everything from 17 to 159 collapses to sixteen colours. The old ladder was
+// [160, 128, 96, 64, 48], so the moment a frame missed its budget at 160 it
+// fell straight off a cliff to 16 — and it reported "128 colours" while doing
+// it, because it logged the rung rather than the result.
+//
+// Sixteen colours is not a compression setting, it is a different picture. A
+// critic comparing the artwork to the invitation measured the damage: the red
+// ramp reduced to nine steps, a flat black region carrying exactly one
+// luminance value and no grain at all, highlights clipping at 194 so the beard
+// went to a single plate, the 8px arcs breaking into 6px and 2px+4px stipple,
+// ring strokes flickering between two greys along one continuous line, the
+// #EC1C24 rule bar dulling to (194,26,33), and the cool grey date stamp turning
+// warm rose because the palette held no neutral.
+//
+// So: 256 or nothing. If a frame cannot make its budget at full depth, the
+// answer is to make the picture cheaper, not to posterise it.
+const LADDER = [256];
 
 async function quantise(buf, colours) {
   return sharp(buf)
-    .png({ palette: true, colours, dither: 0.7, compressionLevel: 9, effort: 10 })
+    .png({ palette: true, colours, dither: 0.2, compressionLevel: 9, effort: 10 })
     .toBuffer();
 }
 
+// The depth is chosen for the FAMILY, not per density: the deepest rung at
+// which all three clear their budgets, applied to all three. Choosing per
+// density is what produced a set where @2x was smaller than @1x — three
+// neighbouring palettes, three subtly different pictures, and whichever density
+// Wallet happened to pick deciding which one the guest saw.
 async function packFamily(raws, budgets) {
   let last = null;
   for (const colours of LADDER) {
@@ -414,6 +494,176 @@ async function packFamily(raws, budgets) {
     if (outs.every((o, i) => o.length <= budgets[i])) return last;
   }
   return last;
+}
+
+// --- the wordmark -----------------------------------------------------------
+
+// The lockup is not drawn either. academix-logo.png is the project's own
+// wordmark, the same file the invite page hangs in its partner row, and it
+// arrives correctly as transparent ink: "acade" in white, "mix" and the spindle
+// over the i in brand red. Only the white is touched, and only to warm it to
+// the card's cream — Wallet's foregroundColor is #EDEAE3, and a pure-white
+// wordmark next to cream fields reads as two different whites.
+const CREAM = [0xed, 0xea, 0xe3];
+
+async function wordmark() {
+  const src = path.join(ROOT, "academix-logo.png");
+  const { data, info } = await sharp(src)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
+    // The red ink is the only saturated colour in the file; everything else is
+    // the neutral wordmark. Leave the red exactly as drawn.
+    if (Math.max(r, g, b) - Math.min(r, g, b) > 40) continue;
+    const k = Math.max(r, g, b) / 255;
+    data[i] = Math.round(CREAM[0] * k);
+    data[i + 1] = Math.round(CREAM[1] * k);
+    data[i + 2] = Math.round(CREAM[2] * k);
+  }
+  const png = await sharp(data, { raw: info }).png().toBuffer();
+  return `data:image/png;base64,${png.toString("base64")}`;
+}
+
+// Wallet composites the logo onto the card itself, so the file it wants is ink
+// on nothing. The cut this replaces baked a red rectangle in: on a soft blurred
+// ground it was the only hard edge in the whole top third, which is precisely
+// what a logo that lost its alpha channel looks like — and the plate was 160
+// wide for a wordmark that stopped at 30, so the mark sat in the corner of its
+// own box with a hand's width of empty red beside it.
+//
+// So: no plate, ink only, and the two lines set to one measured width so the
+// lockup is a rectangle of type with nothing to pad unevenly. The red stays,
+// but as the mark it always was — the "mix" of academix, and the ampersand.
+async function renderLogo(browser, wm) {
+  const W = 520;
+  const H = 220;
+  const ctx = await browser.newContext({
+    viewport: { width: W, height: H },
+    deviceScaleFactor: 3,
+  });
+  const p = await ctx.newPage();
+  await p.setContent(
+    `<!doctype html><meta charset="utf-8"><style>
+${fontFaces()}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:transparent}
+#lock{position:absolute;left:40px;top:40px;width:400px}
+#wm{display:block;width:100%;height:auto}
+#gg{
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;
+  text-transform:uppercase;color:#EDEAE3;line-height:1;white-space:nowrap;
+  letter-spacing:.085em;margin-top:9px;font-size:60px;
+}
+#gg .amp{color:#EC1C24}
+</style>
+<div id="lock">
+  <img id="wm" src="${wm}" alt="">
+  <div id="gg">MIX <span class="amp">&amp;</span> GREET</div>
+</div>`,
+    { waitUntil: "load" },
+  );
+  await p.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(
+      [...document.images].map((i) => (i.complete ? null : i.decode())),
+    );
+    // Set the second line to the wordmark's own width. Big Shoulders is
+    // condensed and its advance is not linear enough to solve in one step, so
+    // measure and correct — the trailing letter-space is discounted, or the
+    // line lands short of flush by exactly one gap.
+    const gg = document.getElementById("gg");
+    const target = 400;
+    let fs = 60;
+    for (let i = 0; i < 8; i++) {
+      gg.style.fontSize = `${fs}px`;
+      const ink = gg.scrollWidth - 0.085 * fs;
+      fs = (fs * target) / ink;
+    }
+    gg.style.fontSize = `${fs}px`;
+    await document.fonts.ready;
+  });
+  const shot = await p.screenshot({ omitBackground: true });
+  await ctx.close();
+  return shot;
+}
+
+// Trim to the ink, then re-centre in the frame. sharp's own trim keys off a
+// background colour; this keys off alpha, which is the only thing that means
+// "not the logo" in a transparent PNG.
+async function inkBox(buf) {
+  const { data, info } = await sharp(buf)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let x0 = info.width, y0 = info.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      if (data[(y * info.width + x) * 4 + 3] > 8) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < 0) throw new Error("logo render is empty");
+  return { left: x0, top: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
+}
+
+// One frame, one trim, one set of margins scaled by density: the three files
+// are the same lockup at three sizes rather than three separate layouts. The
+// margin is a percentage of the frame, so the optical padding is identical at
+// every density and equal on all four sides.
+const LOGO = { w: 160, h: 50, padX: 0.03, padY: 0.06 };
+
+async function logoFamily(browser) {
+  const shot = await renderLogo(browser, await wordmark());
+  const box = await inkBox(shot);
+  const ink = await sharp(shot).extract(box).png().toBuffer();
+  const outs = [];
+  for (const d of [3, 2, 1]) {
+    const W = LOGO.w * d;
+    const H = LOGO.h * d;
+    const px = Math.round(W * LOGO.padX);
+    const py = Math.round(H * LOGO.padY);
+    const inner = await sharp(ink)
+      .resize(W - 2 * px, H - 2 * py, {
+        fit: "inside",
+        kernel: "lanczos3",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .png()
+      .toBuffer();
+    const m = await sharp(inner).metadata();
+    const out = await sharp({
+      create: {
+        width: W,
+        height: H,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    })
+      .composite([
+        {
+          input: inner,
+          left: Math.round((W - m.width) / 2),
+          top: Math.round((H - m.height) / 2),
+        },
+      ])
+      // 64 entries is more than a two-ink wordmark plus its antialiasing needs,
+      // and libimagequant keeps the alpha ramp in the palette, so the file
+      // stays transparent where Wallet expects the card to show through.
+      .png({ palette: true, colours: 64, dither: 0, compressionLevel: 9, effort: 10 })
+      .toBuffer();
+    if (!(await sharp(out).metadata()).hasAlpha) {
+      throw new Error("logo lost its alpha channel in packing");
+    }
+    outs.push({ d, out });
+  }
+  return outs;
 }
 
 async function main() {
@@ -425,18 +675,26 @@ async function main() {
 
   for (const [name, frame] of Object.entries(FRAMES)) {
     const at3 = await render(browser, art, frame, 3);
-    for (const d of [3, 2, 1]) {
-      const key = d === 1 ? `${name}.png` : `${name}@${d}x.png`;
-      const w = frame.w * d;
-      const h = frame.h * d;
-      const raw =
+    // Render once at @3x and step down, so the three densities are the same
+    // picture at three sizes rather than three renders that merely resemble
+    // each other.
+    const raws = [];
+    for (const d of [1, 2, 3]) {
+      raws.push(
         d === 3
           ? at3
           : await sharp(at3)
-              .resize(w, h, { kernel: "lanczos3" })
+              .resize(frame.w * d, frame.h * d, { kernel: "lanczos3" })
               .png()
-              .toBuffer();
-      const { out, colours } = await pack(raw, frame.budgets[d - 1]);
+              .toBuffer(),
+      );
+    }
+    const { outs, colours } = await packFamily(raws, frame.budgets);
+    for (const d of [1, 2, 3]) {
+      const key = d === 1 ? `${name}.png` : `${name}@${d}x.png`;
+      const w = frame.w * d;
+      const h = frame.h * d;
+      const out = outs[d - 1];
       const dim = pngSize(out);
       if (dim.w !== w || dim.h !== h) {
         throw new Error(`${key} rendered ${dim.w}x${dim.h}, wanted ${w}x${h}`);
@@ -445,16 +703,32 @@ async function main() {
       meta.push({ key, w, h, bytes: out.length, colours });
     }
   }
+
+  for (const { d, out } of await logoFamily(browser)) {
+    const key = d === 1 ? "logo.png" : `logo@${d}x.png`;
+    const w = LOGO.w * d;
+    const h = LOGO.h * d;
+    const dim = pngSize(out);
+    if (dim.w !== w || dim.h !== h) {
+      throw new Error(`${key} rendered ${dim.w}x${dim.h}, wanted ${w}x${h}`);
+    }
+    files[key] = out;
+    meta.push({ key, w, h, bytes: out.length, colours: "alpha" });
+  }
   await browser.close();
 
-  // icon.* and logo.* survive untouched.
+  // icon.* survives untouched: it is the 45rpm spindle mark rather than
+  // artwork, and it already reads at 29px.
   const prev = readImagesTs();
   for (const k of Object.keys(prev)) {
-    if (/^(icon|logo)(@[23]x)?\.png$/.test(k)) files[k] = prev[k];
+    if (/^icon(@[23]x)?\.png$/.test(k)) files[k] = prev[k];
   }
 
   const order = [
-    "artwork.png", "artwork@2x.png", "artwork@3x.png",
+    // Only present with --with-artwork; see the artwork frame for why.
+    ...(files["artwork.png"]
+      ? ["artwork.png", "artwork@2x.png", "artwork@3x.png"]
+      : []),
     "background.png", "background@2x.png", "background@3x.png",
     "icon.png", "icon@2x.png", "icon@3x.png",
     "logo.png", "logo@2x.png", "logo@3x.png",

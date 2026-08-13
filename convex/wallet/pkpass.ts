@@ -62,11 +62,14 @@
 // the barcode wins and the pass stays a classic eventTicket.
 //
 // The artwork still lands: on a classic event ticket Apple scales background.png
-// to fill the card and blurs it, so the invite's poster becomes the ground the
-// fields sit on rather than a flat colour block. artwork.png at 1x/2x/3x ships
-// alongside it so that flipping WALLET_STYLE_SCHEMES to the poster scheme — the
-// day an NFC entitlement exists, or for a pass that does not need a door — is a
-// config change and not a rebuild.
+// to fill the card and blurs it, so the card has a designed ground rather than a
+// flat colour block.
+//
+// artwork.png is NOT in the bundle. Only the poster layout draws it, that layout
+// is off, and shipping it cost 1.31 MB of a 1.53 MB pass for a picture no guest
+// could see. `scripts/wallet/make-images.mjs --with-artwork` puts it back, so
+// enabling the poster scheme is a rebuild rather than a config change — which is
+// the right trade while the door is what matters.
 
 import forge from "node-forge";
 import JSZip from "jszip";
@@ -305,10 +308,8 @@ export async function buildPkpass(p: PassInput): Promise<Uint8Array> {
   const files: Record<string, Buffer> = {};
 
   files["pass.json"] = Buffer.from(JSON.stringify(buildPassJson(p)), "utf8");
-  // Every asset in the set ships. artwork.* is the poster layout's ground,
-  // background.* the classic layout's; Wallet picks whichever its scheme uses
-  // and ignores the other. There is deliberately no thumbnail and no guest
-  // photograph: the names are the billing, the artwork is the background.
+  // Whatever the image set holds. There is deliberately no thumbnail and no
+  // guest photograph: the names are the billing, the mark is the ground.
   for (const [name, b64] of Object.entries(PASS_IMAGES)) {
     files[name] = Buffer.from(b64, "base64");
   }
