@@ -1638,11 +1638,19 @@ async function buildSocialCard(ev){
   x.fillStyle = '#0B0B0D';
   x.fillRect(0, 0, OG_W, OG_H);
   try {
-    const img = await new Promise((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i); i.onerror = rej;
-      i.src = '/hero-poster.jpg?v=og';
-    });
+    // Raced against a timer, not just onerror. An <img> that neither loads nor
+    // errors — a hung connection, a CDN stalling on a cold edge — leaves the
+    // promise pending forever, and this runs inside the save path: the button
+    // stays disabled and the operator's event is never written. onerror only
+    // covers the failures the browser is willing to admit to.
+    const img = await Promise.race([
+      new Promise((res, rej) => {
+        const i = new Image();
+        i.onload = () => res(i); i.onerror = rej;
+        i.src = '/hero-poster.jpg?v=og';
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('poster timeout')), 4000)),
+    ]);
     const s = Math.max(OG_W / img.width, OG_H / img.height);
     const w = img.width * s, h = img.height * s;
     x.drawImage(img, (OG_W - w) / 2, (OG_H - h) / 2, w, h);
@@ -1666,7 +1674,15 @@ async function buildSocialCard(ev){
 
   // 3. Brand rule, then the type. Big Shoulders is already loaded by this page;
   //    await it explicitly or the first card of a session draws in the fallback.
-  try { await document.fonts.ready; } catch (_) {}
+  //    Also raced: document.fonts.ready is a promise the page controls, and a
+  //    font that never resolves would stall the same save the image timeout
+  //    above exists to protect. A card in the fallback face beats no event.
+  try {
+    await Promise.race([
+      document.fonts.ready,
+      new Promise((r) => setTimeout(r, 2500)),
+    ]);
+  } catch (_) {}
 
   const PAD = 72;
   x.fillStyle = '#EC1C24';
