@@ -1660,16 +1660,22 @@ async function buildSocialCard(ev){
   //    for type, and a left-weighted one because every line below is set from
   //    the left edge and a busy frame under the first few words is what makes
   //    a card look like a screenshot rather than a design.
+  //    Tuned by looking at the output, not by picking numbers: the first cut
+  //    stacked 0.55->0.97 over 0.92->0.10 and the room underneath was gone —
+  //    a photograph nobody can see is just an expensive black rectangle, and
+  //    the whole point of using the header still is that the card looks like
+  //    the party. These let the right two-thirds read while keeping the left
+  //    column, where every line is set, dark enough for cream type.
   const v = x.createLinearGradient(0, 0, 0, OG_H);
-  v.addColorStop(0, 'rgba(11,11,13,0.55)');
-  v.addColorStop(0.45, 'rgba(11,11,13,0.78)');
-  v.addColorStop(1, 'rgba(11,11,13,0.97)');
+  v.addColorStop(0, 'rgba(11,11,13,0.30)');
+  v.addColorStop(0.5, 'rgba(11,11,13,0.46)');
+  v.addColorStop(1, 'rgba(11,11,13,0.88)');
   x.fillStyle = v; x.fillRect(0, 0, OG_W, OG_H);
 
   const hgrad = x.createLinearGradient(0, 0, OG_W, 0);
-  hgrad.addColorStop(0, 'rgba(11,11,13,0.92)');
-  hgrad.addColorStop(0.55, 'rgba(11,11,13,0.35)');
-  hgrad.addColorStop(1, 'rgba(11,11,13,0.10)');
+  hgrad.addColorStop(0, 'rgba(11,11,13,0.86)');
+  hgrad.addColorStop(0.42, 'rgba(11,11,13,0.34)');
+  hgrad.addColorStop(1, 'rgba(11,11,13,0)');
   x.fillStyle = hgrad; x.fillRect(0, 0, OG_W, OG_H);
 
   // 3. Brand rule, then the type. Big Shoulders is already loaded by this page;
@@ -1726,7 +1732,11 @@ async function buildSocialCard(ev){
   x.fillText('MIXANDGREET.COM', PAD, OG_H - 44);
   x.letterSpacing = '0px';
 
-  return await new Promise((res) => c.toBlob(res, 'image/png'));
+  // JPEG, not PNG. This is a photograph with type over it: the PNG came out at
+  // 806 KB, the JPEG at a tenth of that with nothing visible lost. Preview bots
+  // fetch this over whatever connection the reader is on, and every platform
+  // takes JPEG.
+  return await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.86));
 }
 
 // Draw it, upload it, hand back the storage id. Never throws: a card is a nice
@@ -1737,7 +1747,7 @@ async function makeSocialCardId(ev){
     const blob = await buildSocialCard(ev);
     if (!blob) return undefined;
     const { uploadUrl } = await api({ action:'uploadUrl' });
-    const up = await fetch(uploadUrl, { method:'POST', headers:{'content-type':'image/png'}, body: blob });
+    const up = await fetch(uploadUrl, { method:'POST', headers:{'content-type':'image/jpeg'}, body: blob });
     if (!up.ok) return undefined;
     const { storageId } = await up.json();
     return storageId;
