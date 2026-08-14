@@ -36,6 +36,41 @@ function ogWrap(ctx, text, maxW, maxLines){
   return lines;
 }
 
+// Load an image, or give up. Raced against a timer rather than trusting
+// onerror alone: an <img> that neither loads nor errors leaves the promise
+// pending forever, and this runs inside a save.
+function ogImage(src, ms){
+  return Promise.race([
+    new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i); i.onerror = rej;
+      i.src = src;
+    }),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('image timeout')), ms || 4000)),
+  ]);
+}
+
+// The title, with the ampersand in brand red.
+//
+// The mark is MIX & GREET with a red ampersand — the same lockup the Wallet
+// pass carries and the invite page sets. Drawn segment by segment because a
+// canvas fillText is one colour: the parts are measured as they are drawn so
+// the red & sits exactly where it would if the string were drawn in one go.
+function drawTitle(x, text, left, baseline){
+  const parts = String(text).split('&');
+  let cx = left;
+  for (let i = 0; i < parts.length; i++) {
+    if (i > 0) {
+      x.fillStyle = '#EC1C24';
+      x.fillText('&', cx, baseline);
+      cx += x.measureText('&').width;
+    }
+    x.fillStyle = '#EDEAE3';
+    x.fillText(parts[i], cx, baseline);
+    cx += x.measureText(parts[i]).width;
+  }
+}
+
 async function buildSocialCard(ev){
   const c = document.createElement('canvas');
   c.width = OG_W; c.height = OG_H;
@@ -52,14 +87,7 @@ async function buildSocialCard(ev){
     // promise pending forever, and this runs inside the save path: the button
     // stays disabled and the operator's event is never written. onerror only
     // covers the failures the browser is willing to admit to.
-    const img = await Promise.race([
-      new Promise((res, rej) => {
-        const i = new Image();
-        i.onload = () => res(i); i.onerror = rej;
-        i.src = '/hero-poster.jpg?v=og';
-      }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('poster timeout')), 4000)),
-    ]);
+    const img = await ogImage('/hero-poster.jpg?v=og', 4000);
     const s = Math.max(OG_W / img.width, OG_H / img.height);
     const w = img.width * s, h = img.height * s;
     x.drawImage(img, (OG_W - w) / 2, (OG_H - h) / 2, w, h);
@@ -103,18 +131,34 @@ async function buildSocialCard(ev){
   x.fillStyle = '#EC1C24';
   x.fillRect(PAD, 96, 96, 8);
 
-  x.fillStyle = 'rgba(237,234,227,.72)';
-  x.font = '600 22px "Plex Mono", ui-monospace, monospace';
-  x.letterSpacing = '6px';
-  x.fillText('ACADEMIX BEAT LAB', PAD, 158);
+  // The academix wordmark itself, not the words typed out. It is a logo with a
+  // red spindle over the i and its own letterforms; setting "ACADEMIX BEAT LAB"
+  // in Plex Mono was a caption about the brand rather than the brand.
+  //
+  // Falls back to the typed line if the file will not load, because a card with
+  // no identifying mark at all is worse than a card with a plain one.
+  let headBottom = 172;
+  try {
+    const wm = await ogImage('/academix-logo.png?v=og', 3000);
+    const h = 46;
+    const w = wm.width * (h / wm.height);
+    x.drawImage(wm, PAD, 126, w, h);
+    headBottom = 126 + h;
+  } catch (_) {
+    x.fillStyle = 'rgba(237,234,227,.72)';
+    x.font = '600 22px "Plex Mono", ui-monospace, monospace';
+    x.letterSpacing = '6px';
+    x.fillText('ACADEMIX BEAT LAB', PAD, 158);
+    x.letterSpacing = '0px';
+  }
 
   x.letterSpacing = '0px';
   x.fillStyle = '#EDEAE3';
   const titleSize = 96;
   x.font = `800 ${titleSize}px "Big Shoulders", Impact, sans-serif`;
   const lines = ogWrap(x, String(ev.title || 'Mix & Greet').toUpperCase(), OG_W - PAD * 2, 2);
-  let y = 300;
-  for (const ln of lines) { x.fillText(ln, PAD, y); y += titleSize * 0.94; }
+  let y = Math.max(300, headBottom + titleSize + 18);
+  for (const ln of lines) { drawTitle(x, ln, PAD, y); y += titleSize * 0.94; }
 
   if (ev.subtitle) {
     x.fillStyle = 'rgba(237,234,227,.86)';
