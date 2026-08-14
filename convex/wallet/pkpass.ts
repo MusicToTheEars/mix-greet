@@ -117,6 +117,24 @@ const BRAND = "rgb(236, 28, 36)"; // #EC1C24
 // underscored spelling is not a PassKit format and costs you the whole barcode.
 const QR_FORMAT = "PKBarcodeFormatQR";
 
+// "2026-08-15T14:00:00-07:00" + 6 -> "2026-08-15T20:00:00-07:00"
+//
+// The offset is preserved rather than normalised to UTC. Apple accepts either,
+// but relevantDate on the same pass carries the venue's local offset, and two
+// dates on one pass written in two zones is the kind of difference nobody sees
+// until they are debugging why a pass expired an hour early in November.
+function plusHours(iso: string, hours: number): string {
+  const m = /^(.*T\d{2}:\d{2}:\d{2})([+-]\d{2}:\d{2}|Z)?$/.exec(iso);
+  if (!m) return iso;
+  const zone = m[2] ?? "";
+  // Parsed as UTC, shifted, and re-stamped with the original offset: the wall
+  // clock moves by exactly `hours` in the venue's own time.
+  const base = new Date(`${m[1]}Z`);
+  if (Number.isNaN(base.getTime())) return iso;
+  base.setUTCHours(base.getUTCHours() + hours);
+  return base.toISOString().replace(/\.\d{3}Z$/, "") + zone;
+}
+
 function buildPassJson(p: PassInput) {
   const artistLabel =
     p.artists && p.artists.length > 1 ? "SPECIAL GUESTS" : "SPECIAL GUEST";
@@ -278,6 +296,23 @@ function buildPassJson(p: PassInput) {
             { startDate: p.whenIso, ...(p.endIso ? { endDate: p.endIso } : {}) },
           ],
         }
+      : {}),
+    // When the pass stops being a ticket.
+    //
+    // Without this a pass stays live in Wallet forever: months after the night
+    // it is still sitting in the stack, still surfacing, still looking like
+    // something that gets you in. iOS greys an expired pass out and files it
+    // under Expired Passes, which is the "no longer needed" behaviour a guest
+    // actually wants — the pass tidies itself away instead of the guest having
+    // to notice and remove it.
+    //
+    // Six hours past the end time, or past the start when the event has no end.
+    // Not midnight: a night that runs late must not have every ticket expire
+    // while the room is still full, and the door reads the QR rather than the
+    // pass's own state, so an expired pass still scans if somebody arrives at
+    // the very end. Expiry is a tidy-up, never a lock.
+    ...(p.endIso || p.whenIso
+      ? { expirationDate: plusHours((p.endIso || p.whenIso)!, 6) }
       : {}),
     barcodes: [barcode],
     // Deprecated singular form, still read by iOS 8 and earlier. Apple's own

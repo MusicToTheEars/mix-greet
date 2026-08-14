@@ -643,6 +643,45 @@ check("the barcode tile carries the code and nothing else", () => {
   return "no altText on any barcode entry";
 });
 
+check("the pass expires itself after the night, and not before it", () => {
+  // Without expirationDate a pass sits live in Wallet forever, months after the
+  // event, still looking like something that gets you in. With it, iOS greys it
+  // out and files it under Expired Passes on its own.
+  //
+  // The two failure directions are opposite and both matter, so both are
+  // asserted: no expiry at all means the pass never tidies itself away; an
+  // expiry at or before the event means every ticket in the room goes grey
+  // while the door is still running.
+  const exp = pass.expirationDate;
+  assert(typeof exp === "string" && exp.length, "pass.json has no expirationDate");
+  const t = Date.parse(exp);
+  assert(!Number.isNaN(t), `expirationDate ${JSON.stringify(exp)} is not a date iOS can parse`);
+
+  const startsAt = pass.relevantDate ? Date.parse(pass.relevantDate) : NaN;
+  if (!Number.isNaN(startsAt)) {
+    assert(
+      t > startsAt,
+      `expirationDate ${exp} is not after the event start ${pass.relevantDate}`,
+    );
+    const hours = (t - startsAt) / 36e5;
+    assert(
+      hours >= 4,
+      `expiry is only ${hours.toFixed(1)}h after the start — a night that runs ` +
+        "late would grey out every ticket while the room is still full",
+    );
+  }
+  // Same offset as relevantDate: two dates on one pass written in two zones is
+  // the difference nobody sees until a pass expires an hour early in November.
+  const zoneOf = (v) => (/([+-]\d{2}:\d{2}|Z)$/.exec(String(v)) || [])[1] || "none";
+  if (pass.relevantDate) {
+    assert(
+      zoneOf(exp) === zoneOf(pass.relevantDate),
+      `expirationDate is in ${zoneOf(exp)} but relevantDate is in ${zoneOf(pass.relevantDate)}`,
+    );
+  }
+  return exp;
+});
+
 check("semantics carry the four tags Apple requires of an event pass", () => {
   const s = pass.semantics || {};
   for (const k of ["eventName", "venueName", "venueRegionName", "venueRoom"]) {
