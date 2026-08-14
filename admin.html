@@ -303,6 +303,32 @@
    line under it: at an invite-only session this is who the person IS, and the
    host scans for it. */
 .g-trade{margin-top:3px;font-size:12px;color:var(--text-soft);letter-spacing:.02em}
+
+/* ---------- New event dialog ----------
+   The form is the rarest thing an operator does here and it was the first and
+   tallest block on the page, so the events it creates started below the fold.
+   Behind a button now. */
+.office-bar{display:flex;justify-content:flex-end;margin-bottom:18px}
+.office-bar .btn{margin-top:0}
+
+.modal{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;
+  justify-content:center;overflow-y:auto;padding:clamp(12px,4vh,48px) 16px}
+.modal[hidden]{display:none}
+.modal-scrim{position:fixed;inset:0;background:rgba(11,11,13,.72);
+  backdrop-filter:blur(2px)}
+/* The panel keeps every style it already had; the dialog only positions it. */
+.modal #form-panel{position:relative;z-index:1;width:100%;max-width:760px;margin-top:0}
+.modal-x{
+  position:absolute;top:10px;right:10px;width:38px;height:38px;padding:0;
+  background:none;border:2px solid var(--surface-line);color:var(--text-muted);
+  font-size:20px;line-height:1;border-radius:var(--radius-ctl);
+}
+.modal-x:hover,.modal-x:focus-visible{border-color:var(--text);color:var(--text)}
+/* The close control overlaps the heading's line on a narrow screen, so the
+   heading is given the room rather than the button being moved. */
+.modal #form-title{padding-right:46px}
+/* Scroll the page behind the dialog, not both at once. */
+body.modal-open{overflow:hidden}
 </style>
 </head>
 <body>
@@ -336,7 +362,18 @@
   </div>
 
   <div id="office" hidden>
-    <div class="panel" id="form-panel">
+
+    <!-- The form is the least-used thing on this page and it was the first and
+         tallest thing on it, so the events it creates were always below the
+         fold. It lives in a dialog now and the page opens on the list. -->
+    <div class="office-bar">
+      <button class="btn" id="new-event" type="button">New event</button>
+    </div>
+
+    <div class="modal" id="form-modal" hidden>
+      <div class="modal-scrim" data-close="1"></div>
+      <div class="panel" id="form-panel" role="dialog" aria-modal="true" aria-labelledby="form-title">
+      <button class="modal-x" id="form-close" type="button" aria-label="Close the form">&times;</button>
       <h2 id="form-title">Publish a new event</h2>
       <div class="row">
         <div><label for="f-title">Event title *</label><input id="f-title" placeholder="Mix &amp; Greet Vol. 2"></div>
@@ -388,6 +425,7 @@
         </div>
       </div>
       <p class="hint">Published events appear on the main page immediately, sorted by date with the soonest first. Events automatically disappear from the main page the day after they happen — archive one to pull it down early.</p>
+      </div>
     </div>
 
     <div class="panel">
@@ -870,13 +908,17 @@ function loadIntoForm(ev){
   $('form-panel').classList.add('editing');
   $('pub-msg').hidden = true;
   showInvite(ev);
-  $('form-panel').scrollIntoView({ behavior:'smooth', block:'start' });
+  // The panel is a dialog now, so EDIT opens it rather than scrolling the page
+  // to a block that was always sitting there.
+  openForm();
 }
 
 $('cancel-edit').addEventListener('click', () => {
-  resetForm();
   $('pub-msg').hidden = true;
   $('invite-box').hidden = true;
+  // closeForm resets the form itself, so cancelling an edit cannot leave the
+  // next New event click holding somebody else's row.
+  closeForm();
 });
 
 $('publish').addEventListener('click', async () => {
@@ -1688,6 +1730,35 @@ async function makeSocialCardId(ev){
   }
 }
 
+
+/* ---------- the new-event dialog ----------
+   openForm() is the single entry: the New event button opens it empty, and the
+   EDIT button on a tile opens it already loaded. Everything that used to call
+   resetForm() or loadIntoForm() directly still works — they are unchanged, and
+   this only puts the panel on screen around them. */
+function openForm(){
+  $('form-modal').hidden = false;
+  document.body.classList.add('modal-open');
+  // Focus the first field, not the dialog, so an operator can start typing.
+  setTimeout(() => { try { $('f-title').focus(); } catch(_) {} }, 40);
+}
+function closeForm(){
+  $('form-modal').hidden = true;
+  document.body.classList.remove('modal-open');
+  // Leaving a half-finished edit open would mean the next New event click
+  // reopened somebody else's row.
+  resetForm();
+}
+$('new-event').addEventListener('click', () => { resetForm(); openForm(); });
+$('form-close').addEventListener('click', closeForm);
+// Click the scrim, not the panel. data-close marks the only element that means
+// "outside", so a click that starts on the panel and drifts does not close it.
+$('form-modal').addEventListener('click', (e) => {
+  if (e.target && e.target.dataset && e.target.dataset.close) closeForm();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('form-modal').hidden) closeForm();
+});
 </script>
 </body>
 </html>
