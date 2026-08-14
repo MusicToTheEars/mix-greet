@@ -291,6 +291,11 @@ async function shape(ctx: QueryCtx | MutationCtx, e: Doc<"events">) {
     capacity: e.capacity ?? null,
     status: e.status,
     createdAt: e.legacyCreatedAt ?? new Date(e._creationTime).toISOString(),
+    // Absolute, because the only consumer is an og:image tag and a crawler
+    // will not resolve a relative one. Convex storage URLs already are.
+    socialCardUrl: e.socialCardId
+      ? await ctx.storage.getUrl(e.socialCardId)
+      : null,
     featured,
   };
 }
@@ -444,6 +449,10 @@ const eventInput = v.object({
   inviteOnly: v.optional(v.boolean()),
   capacity: v.optional(v.number()),
   featured: v.optional(featuredInput),
+  // The link-preview card, already uploaded by the back office. An id, not
+  // bytes: the browser PUTs the PNG straight to Convex storage and sends only
+  // the handle, the same way featured[].imageId works.
+  socialCardId: v.optional(v.id("_storage")),
 });
 
 const clamp = (s: unknown, max: number) => String(s ?? "").trim().slice(0, max);
@@ -534,6 +543,7 @@ export const create = internalMutation({
       inviteOnly: !!event.inviteOnly,
       capacity: event.capacity,
       status: "published",
+      socialCardId: event.socialCardId,
       featured: normalizeFeatured(event.featured) ?? [],
     });
     return { ...(await adminLists(ctx)), saved: await shapeById(ctx, id) };
@@ -554,6 +564,17 @@ export const update = internalMutation({
     const rsvpUrl = httpUrl(event.rsvpUrl);
     const featured = normalizeFeatured(event.featured);
     if (featured) await deleteDroppedImages(ctx, existing.featured, featured);
+    // A regenerated card replaces the old one, so the old file is now
+    // unreachable. Deleted rather than left behind: these are ~200 KB each and
+    // an event edited a dozen times would otherwise leave a dozen orphans that
+    // nothing references and nothing will ever clean up.
+    if (
+      event.socialCardId &&
+      existing.socialCardId &&
+      existing.socialCardId !== event.socialCardId
+    ) {
+      await ctx.storage.delete(existing.socialCardId).catch(() => {});
+    }
 
     await ctx.db.patch(id, {
       title,
@@ -571,6 +592,10 @@ export const update = internalMutation({
       rsvpMode: resolveMode(event.rsvpMode, rsvpUrl),
       inviteOnly: !!event.inviteOnly,
       capacity: event.capacity,
+      // Only when a new one was generated. A save that did not regenerate the
+      // card must not blank the one already stored — the back office omits the
+      // field entirely in that case, and `undefined` here would erase it.
+      ...(event.socialCardId ? { socialCardId: event.socialCardId } : {}),
       ...(featured ? { featured } : {}),
     });
     return { ...(await adminLists(ctx)), saved: await shapeById(ctx, id) };

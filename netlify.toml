@@ -1,8 +1,25 @@
 # Static site — no build step. Publish the repo root.
 #
-# There is no [functions] block on purpose. All data lives in Convex
-# (good-labrador-980) and is reached over its HTTP API; the old
-# netlify/functions/events.mjs Blobs store was retired in the 2026-08-06
-# cutover and the directory no longer exists.
+# There is no [functions] block: all data lives in Convex (good-labrador-980)
+# and is reached over its HTTP API. The old netlify/functions/events.mjs Blobs
+# store was retired in the 2026-08-06 cutover and that directory is gone.
+#
+# There IS one edge function, and it is the single exception. Link-preview bots
+# do not run JavaScript, so an invite served as a static file previews as the
+# same generic card for every event no matter what the page fetches at runtime.
+# netlify/edge-functions/invite.ts rewrites six meta tags in the response on the
+# way past; the page itself is still the static file off the CDN.
+#
+# REDIRECTS STAY IN `_redirects`, NOT HERE. Redirects declared in netlify.toml
+# have been dropped silently on this account before. For the /i/* rule that
+# means every invite link in circulation 404s with nothing in the build log to
+# say why, so it lives in the publish root where it has proven reliable.
 [build]
   publish = "."
+
+# Declared rather than relying on the in-file `export const config`, so the
+# path this runs on is visible in the deploy config next to everything else
+# that decides routing.
+[[edge_functions]]
+  path = "/i/*"
+  function = "invite"

@@ -917,6 +917,12 @@ $('publish').addEventListener('click', async () => {
   }
   const wasEditing = editingId;
   $('publish').disabled = true;
+  // Generated before the write so the row lands with its card already attached
+  // and there is no window where a link previews as the generic image.
+  msg.textContent = 'Drawing the share card…';
+  msg.className = 'msg'; msg.hidden = false;
+  const cardId = await makeSocialCardId(event);
+  if (cardId) event.socialCardId = cardId;
   try {
     const lists = wasEditing
       ? await api({ action:'update', id: wasEditing, event })
@@ -1538,6 +1544,150 @@ async function loadAll(){
 
 syncRsvpMode();
 if (TOKEN) { $('gate').hidden = true; $('office').hidden = false; loadAll(); }
+
+/* ---------- the event's own link-preview card ----------
+   Drawn here, in the browser, at save time, and uploaded as a real PNG.
+
+   It has to be a file that already exists at a stable URL, not something
+   composed on request, because the only thing that ever reads it is a
+   link-preview bot: iMessage, WhatsApp, Slack and Facebook fetch the URL once,
+   never run JavaScript, and cache what they get. By the time somebody pastes
+   the link, the image has to be sitting there.
+
+   Browser rather than server for the same reason the door scanner is a browser:
+   the fonts, the poster still and the brand colours are all already loaded on
+   this page, and a canvas gets them for free. A server would need a headless
+   browser or a font pipeline to draw the same thing.
+
+   1200x630 is the size every platform crops from. */
+const OG_W = 1200, OG_H = 630;
+
+function ogDateLine(ev){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ev.date || ''));
+  const d = m ? `${m[2]}-${m[3]}-${m[1].slice(2)}` : (ev.date || '');
+  const t = ev.start ? ev.start + (ev.end ? ' – ' + ev.end : '') : '';
+  return [d, t].filter(Boolean).join('  ·  ');
+}
+
+// Wrap on words, and hard-break a single word that is longer than the measure
+// rather than letting it run off the card.
+function ogWrap(ctx, text, maxW, maxLines){
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const next = line ? line + ' ' + w : w;
+    if (ctx.measureText(next).width <= maxW || !line) { line = next; continue; }
+    lines.push(line); line = w;
+    if (lines.length === maxLines) break;
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  return lines;
+}
+
+async function buildSocialCard(ev){
+  const c = document.createElement('canvas');
+  c.width = OG_W; c.height = OG_H;
+  const x = c.getContext('2d');
+
+  // 1. The header video's own still, cover-fitted. Falls through to flat black
+  //    if it will not load, so a card is produced either way — a save must
+  //    never fail because an image 404'd.
+  x.fillStyle = '#0B0B0D';
+  x.fillRect(0, 0, OG_W, OG_H);
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i); i.onerror = rej;
+      i.src = '/hero-poster.jpg?v=og';
+    });
+    const s = Math.max(OG_W / img.width, OG_H / img.height);
+    const w = img.width * s, h = img.height * s;
+    x.drawImage(img, (OG_W - w) / 2, (OG_H - h) / 2, w, h);
+  } catch (_) {}
+
+  // 2. The gradient. Two of them: a vertical one so the foot is solid enough
+  //    for type, and a left-weighted one because every line below is set from
+  //    the left edge and a busy frame under the first few words is what makes
+  //    a card look like a screenshot rather than a design.
+  const v = x.createLinearGradient(0, 0, 0, OG_H);
+  v.addColorStop(0, 'rgba(11,11,13,0.55)');
+  v.addColorStop(0.45, 'rgba(11,11,13,0.78)');
+  v.addColorStop(1, 'rgba(11,11,13,0.97)');
+  x.fillStyle = v; x.fillRect(0, 0, OG_W, OG_H);
+
+  const hgrad = x.createLinearGradient(0, 0, OG_W, 0);
+  hgrad.addColorStop(0, 'rgba(11,11,13,0.92)');
+  hgrad.addColorStop(0.55, 'rgba(11,11,13,0.35)');
+  hgrad.addColorStop(1, 'rgba(11,11,13,0.10)');
+  x.fillStyle = hgrad; x.fillRect(0, 0, OG_W, OG_H);
+
+  // 3. Brand rule, then the type. Big Shoulders is already loaded by this page;
+  //    await it explicitly or the first card of a session draws in the fallback.
+  try { await document.fonts.ready; } catch (_) {}
+
+  const PAD = 72;
+  x.fillStyle = '#EC1C24';
+  x.fillRect(PAD, 96, 96, 8);
+
+  x.fillStyle = 'rgba(237,234,227,.72)';
+  x.font = '600 22px "Plex Mono", ui-monospace, monospace';
+  x.letterSpacing = '6px';
+  x.fillText('ACADEMIX BEAT LAB', PAD, 158);
+
+  x.letterSpacing = '0px';
+  x.fillStyle = '#EDEAE3';
+  const titleSize = 96;
+  x.font = `800 ${titleSize}px "Big Shoulders", Impact, sans-serif`;
+  const lines = ogWrap(x, String(ev.title || 'Mix & Greet').toUpperCase(), OG_W - PAD * 2, 2);
+  let y = 300;
+  for (const ln of lines) { x.fillText(ln, PAD, y); y += titleSize * 0.94; }
+
+  if (ev.subtitle) {
+    x.fillStyle = 'rgba(237,234,227,.86)';
+    x.font = '800 40px "Big Shoulders", Impact, sans-serif';
+    x.fillText(String(ev.subtitle).toUpperCase(), PAD, y + 8);
+    y += 56;
+  }
+
+  x.fillStyle = '#EDEAE3';
+  x.font = '700 34px "Plex Mono", ui-monospace, monospace';
+  x.fillText(ogDateLine(ev), PAD, Math.max(y + 42, OG_H - 132));
+
+  if (ev.location) {
+    x.fillStyle = 'rgba(237,234,227,.68)';
+    x.font = '400 24px "Plex Mono", ui-monospace, monospace';
+    // Street only. The card is a public link preview and the suite number is
+    // an invite-only detail — the same split the waitlist email makes.
+    x.fillText(String(ev.location).split(',')[0].trim(), PAD, OG_H - 88);
+  }
+
+  x.fillStyle = 'rgba(237,234,227,.55)';
+  x.font = '700 20px "Plex Mono", ui-monospace, monospace';
+  x.letterSpacing = '4px';
+  x.fillText('MIXANDGREET.COM', PAD, OG_H - 44);
+  x.letterSpacing = '0px';
+
+  return await new Promise((res) => c.toBlob(res, 'image/png'));
+}
+
+// Draw it, upload it, hand back the storage id. Never throws: a card is a nice
+// preview, not the event, and a save that fails because a canvas misbehaved
+// would be a worse bug than a generic preview image.
+async function makeSocialCardId(ev){
+  try {
+    const blob = await buildSocialCard(ev);
+    if (!blob) return undefined;
+    const { uploadUrl } = await api({ action:'uploadUrl' });
+    const up = await fetch(uploadUrl, { method:'POST', headers:{'content-type':'image/png'}, body: blob });
+    if (!up.ok) return undefined;
+    const { storageId } = await up.json();
+    return storageId;
+  } catch (_) {
+    return undefined;
+  }
+}
+
 </script>
 </body>
 </html>

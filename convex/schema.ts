@@ -43,6 +43,19 @@ export default defineSchema({
     // validating and so an event without artwork simply omits the band.
     posterId: v.optional(v.id("_storage")),
 
+    // The link-preview card for THIS event: a still from the header video with
+    // a gradient over it and the event's own name, date and venue on top.
+    //
+    // Generated in the back office at save time and stored like any other
+    // upload, rather than composed on the fly, because the thing that reads it
+    // is a link-preview bot: iMessage, WhatsApp and Slack fetch the URL once,
+    // never run JavaScript, and cache what they get. It has to already exist,
+    // as a real PNG at a stable URL, before the first person pastes the link.
+    //
+    // Optional: pre-existing rows have none, and an event without one falls
+    // back to the site-wide /social-card.jpg rather than previewing nothing.
+    socialCardId: v.optional(v.id("_storage")),
+
     // Featured artists / speakers / companies shown on the event flyer.
     // Optional so pre-existing rows keep validating. Images live in Convex
     // file storage; imageId is resolved to a URL at read time.
