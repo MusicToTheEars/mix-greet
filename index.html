@@ -206,15 +206,20 @@ section{padding:clamp(8px,2vw,16px) 0}
 .flyer h4{font-family:'Plex Mono';font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#16161A;margin:30px 0 0;padding-bottom:10px;border-bottom:2px solid var(--line-lt)}
 .acts{display:flex;flex-direction:column;gap:20px;margin-top:20px}
 .act{display:flex;gap:16px;align-items:flex-start}
-.act img{width:74px;height:74px;flex:0 0 74px;object-fit:cover;border-radius:50%;border:2px solid var(--line-lt);background:#FFF}
-.act img.logo{border-radius:6px;object-fit:contain;padding:4px}
+/* A rounded rectangle, not a circle, and the same shape rsvp.html gives the
+   same person: a portrait cropped to a circle loses the top of the head and
+   the shoulders, which is most of what makes a press shot recognisable.
+   4:5 rather than square — headshots are shot portrait, and a square crop of
+   a portrait either cuts the chin or strands the subject in the middle. */
+.act img{width:78px;height:98px;flex:0 0 78px;object-fit:cover;object-position:center top;border-radius:var(--radius-sm);border:2px solid var(--line-lt);background:#FFF}
+.act img.logo{height:78px;border-radius:6px;object-fit:contain;object-position:center;padding:4px}
 .act .nm{font-family:'Big Shoulders';font-weight:800;text-transform:uppercase;font-size:24px;line-height:1;color:#16161A}
 .act .rl{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber-ink);font-weight:600;margin-top:5px}
 .act .bo{font-size:13.5px;line-height:1.55;color:#3A3A42;margin-top:8px}
 .act a.lk{font-size:12px;letter-spacing:.1em;color:var(--amber-ink);display:inline-block;margin-top:7px}
 .flyer .btn{margin-top:30px}
 body.no-scroll{overflow:hidden}
-@media(max-width:520px){.act img{width:58px;height:58px;flex:0 0 58px}.act .nm{font-size:20px}}
+@media(max-width:520px){.act img{width:62px;height:78px;flex:0 0 62px}.act .nm{font-size:20px}}
 .no-events{border-radius:var(--radius);grid-column:1/-1;border:2px dashed var(--line-lt);padding:38px 24px;text-align:center;color:var(--muted-lt);font-size:14px;letter-spacing:.08em}
 .event-card .btn.soon{background:transparent;border-color:var(--line-lt);color:var(--muted-lt);pointer-events:none;cursor:default}
 
