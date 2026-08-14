@@ -166,6 +166,20 @@ function buildPassJson(p: PassInput) {
     // The field is kept even when empty rather than removed: Wallet reserves
     // its band either way, and dropping it slid every secondary field up into
     // the lockup.
+    // Blank when the title IS the brand: "Mix&Greet" in Wallet's face directly
+    // under a lockup that already says MIX&GREET in ours is the same words
+    // twice in two typefaces. Every other event gets its name here, in the slot
+    // Wallet gives the most room to.
+    //
+    // Kept as an empty field rather than omitted, and that was TESTED rather
+    // than assumed: dropping primaryFields entirely produced a pixel-identical
+    // card. Wallet reserves the band either way, so an empty value costs
+    // nothing and keeps the shape of this object the same for every event.
+    //
+    // The corollary is worth recording, because it is the answer to "can the
+    // barcode sit higher": no. Wallet fixes the barcode's position on a classic
+    // eventTicket. Removing a field above it does not move it, which is exactly
+    // what that experiment showed.
     primaryFields: [
       {
         key: "event",
@@ -179,7 +193,14 @@ function buildPassJson(p: PassInput) {
     // to the back.
     secondaryFields: [
       { key: "when", label: "STARTS", value: p.whenLabel },
-      { key: "admit", label: "ADMIT", value: `${p.guestName} · ${p.partyLabel}` },
+      // "SCETCH +1" for a party, "SCETCH" alone for one. The separator is a
+      // space rather than the middot the rest of the card uses, because "+1"
+      // is a suffix on the name, not a second fact beside it.
+      {
+        key: "admit",
+        label: "ADMIT",
+        value: p.partyLabel ? `${p.guestName} ${p.partyLabel}` : p.guestName,
+      },
     ],
     auxiliaryFields: [
       ...(p.artists && p.artists.length
@@ -197,7 +218,14 @@ function buildPassJson(p: PassInput) {
     backFields: [
       ...(p.subtitle ? [{ key: "sub", label: "Session", value: p.subtitle }] : []),
       ...(p.location ? [{ key: "where", label: "Venue", value: p.location }] : []),
-      { key: "party", label: "Party size", value: p.partyLabel },
+      // The back of the pass spells it out. "+1" is right on the face, where
+      // the door is counting people at a glance; on a reference screen a guest
+      // opens deliberately, a number reads better than a notation.
+      {
+        key: "party",
+        label: "Party size",
+        value: p.partyLabel ? `${Number(p.partyLabel.replace("+", "")) + 1} people` : "Just you",
+      },
       { key: "guest", label: "Guest", value: p.guestName },
       {
         key: "status",

@@ -80,7 +80,18 @@ export const buildForToken = internalAction({
       timeShort: ev.start || undefined,
       location: ev.location || "",
       guestName: data.rsvp.name,
-      partyLabel: g > 1 ? `${g} guests` : "Just you",
+      // "SCETCH +1", not "SCETCH · 2 guests", and just "SCETCH" for one.
+      //
+      // The door reads this line to know how many people to let through, and
+      // "+1" is the notation it already uses out loud. "2 guests" also invites
+      // the wrong arithmetic: staff read the number as people BESIDES the
+      // holder about as often as including them, and the two answers differ by
+      // one person at the only moment it matters.
+      //
+      // A party of one gets nothing after the name. "Just you" was reassurance
+      // on a card nobody reads for reassurance, and it made a solo guest's
+      // line longer than a plus-one's.
+      partyLabel: g > 1 ? `+${g - 1}` : "",
       status: data.rsvp.status === "waitlist" ? "waitlist" : "confirmed",
       inviteUrl: undefined,
       venueLine,
