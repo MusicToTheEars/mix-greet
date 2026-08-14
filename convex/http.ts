@@ -295,6 +295,23 @@ const events = httpAction(async (ctx, req) => {
     }
     // Short-lived URL the browser POSTs a headshot/logo straight to, so image
     // bytes never pass through this action. Returns { storageId } to the caller.
+    // Attach an already-uploaded card to an event. One field, on purpose — see
+    // the note on events.setSocialCard.
+    if (action === "socialCard") {
+      const id = clean(body.id, 120);
+      const storageId = clean(body.socialCardId, 200);
+      if (!id || !storageId) return json({ error: "id and socialCardId required" }, 400);
+      try {
+        return json(
+          await ctx.runMutation(internal.events.setSocialCard, {
+            id: id as any,
+            socialCardId: storageId as any,
+          }),
+        );
+      } catch (e: any) {
+        return json({ error: String(e?.message || e) }, 400);
+      }
+    }
     if (action === "uploadUrl") {
       return json({ uploadUrl: await ctx.storage.generateUploadUrl() });
     }

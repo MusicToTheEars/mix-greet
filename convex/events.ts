@@ -521,6 +521,29 @@ function resolveMode(
 // Every admin mutation returns the refreshed back-office lists so the UI can
 // re-render from one round trip. Create/update additionally return `saved`: the
 // shaped event that was just written, which is how the UI gets its invite link.
+// Attach a link-preview card to an event, and nothing else.
+//
+// Deliberately narrow. The obvious way to backfill cards for events that
+// predate the feature is to re-run `update` with the event read back and one
+// field added — and that round trip is exactly where a backfill goes wrong: it
+// re-normalises featured rows, re-resolves rsvpMode from a URL, and re-clamps
+// every string, so a script whose only job is to attach an image can silently
+// rewrite an event's RSVP behaviour. This touches one field.
+export const setSocialCard = internalMutation({
+  args: { id: v.id("events"), socialCardId: v.id("_storage") },
+  handler: async (ctx, { id, socialCardId }) => {
+    const existing = await ctx.db.get(id);
+    if (!existing) throw new Error("event not found");
+    await ctx.db.patch(id, { socialCardId });
+    // Same orphan cleanup the update path does: a replaced card is a file
+    // nothing can reach again.
+    if (existing.socialCardId && existing.socialCardId !== socialCardId) {
+      await ctx.storage.delete(existing.socialCardId).catch(() => {});
+    }
+    return { ok: true as const, id, socialCardId };
+  },
+});
+
 export const create = internalMutation({
   args: { event: eventInput },
   handler: async (ctx, { event }) => {
