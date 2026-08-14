@@ -180,19 +180,24 @@ function buildPassJson(p: PassInput) {
     // barcode sit higher": no. Wallet fixes the barcode's position on a classic
     // eventTicket. Removing a field above it does not move it, which is exactly
     // what that experiment showed.
+    // ONE field in the primary row, and it is the guest.
+    //
+    // Two things were learned on device here, in order:
+    //
+    //  1. Wallet reserves the primary band whether or not a field occupies it.
+    //     Removing primaryFields entirely produced a pixel-identical card. So
+    //     on a Mix & Greet event, where the title is blanked because the lockup
+    //     already says it, that band was a hole and every fact sat below it
+    //     with a hand's width of nothing above.
+    //
+    //  2. A classic eventTicket renders only the FIRST primary field. Putting
+    //     STARTS and ADMIT there together silently dropped ADMIT — the guest's
+    //     name left the card entirely, which is the one thing the door reads.
+    //
+    // So: the guest goes in the primary band, alone. It closes the gap, it is
+    // the largest thing on the card after the lockup, and it is what a member
+    // of door staff is looking for. Everything else drops to the row below.
     primaryFields: [
-      {
-        key: "event",
-        label: "",
-        value: isBrandTitle(p.eventTitle) ? "" : p.eventTitle,
-      },
-    ],
-    // Wallet lays each group out as a horizontal ROW, so a field only gets the
-    // full width when it is alone in its group. The guests need that width to
-    // stack, which is why they own auxiliaryFields outright and the venue moved
-    // to the back.
-    secondaryFields: [
-      { key: "when", label: "STARTS", value: p.whenLabel },
       // "SCETCH +1" for a party, "SCETCH" alone for one. The separator is a
       // space rather than the middot the rest of the card uses, because "+1"
       // is a suffix on the name, not a second fact beside it.
@@ -201,6 +206,17 @@ function buildPassJson(p: PassInput) {
         label: "ADMIT",
         value: p.partyLabel ? `${p.guestName} ${p.partyLabel}` : p.guestName,
       },
+    ],
+    // Wallet lays each group out as a horizontal ROW, so a field only gets the
+    // full width when it is alone in its group.
+    secondaryFields: [
+      { key: "when", label: "STARTS", value: p.whenLabel },
+      // The event's own name, and only when it is not the brand: a session with
+      // a title of its own still carries it, and "Mix&Greet" is not printed
+      // under a lockup that already says MIX&GREET.
+      ...(p.eventTitle && !isBrandTitle(p.eventTitle)
+        ? [{ key: "event", label: "EVENT", value: p.eventTitle }]
+        : []),
     ],
     auxiliaryFields: [
       ...(p.artists && p.artists.length
@@ -338,7 +354,19 @@ function buildPassJson(p: PassInput) {
             .filter(Boolean),
         }
       : {}),
-    eventTicket: fields,
+    // WALLET_STYLE lets the card be rendered as a storeCard for comparison.
+    //
+    // The three things below are ONE package and cannot be mixed: the ticket
+    // notch, the full-card background, and where Apple puts the barcode are all
+    // consequences of the eventTicket style. storeCard drops the notch and the
+    // ground — it takes a wide strip banner instead — and its card is short
+    // enough that the barcode sits near the middle.
+    //
+    // Unset means eventTicket, which is what ships. This exists so the choice
+    // can be made from two screenshots rather than two descriptions.
+    ...(process.env.WALLET_STYLE === "storeCard"
+      ? { storeCard: fields }
+      : { eventTicket: fields }),
     semantics,
     // Surfaces the pass on the lock screen as the event approaches. The array
     // form is what iOS 18 reads; the singular relevantDate stays for older

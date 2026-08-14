@@ -352,6 +352,33 @@ const FRAMES = {
       }
     : {}),
 
+  // The storeCard/coupon banner, built only for the layout comparison behind
+  // WALLET_STYLE. Those styles have no full-card ground — they get a wide short
+  // strip at the top and a flat colour below — so the same red-to-black ramp is
+  // compressed into 375x144pt. Apple does not blur the strip, so this one is
+  // sharp; it is the same gradient purely so the two candidates differ in
+  // LAYOUT rather than in art direction.
+  ...(argv.includes("--with-strip")
+    ? {
+        strip: {
+          w: 375,
+          h: 144,
+          css: 375,
+          brand: true,
+          blurRings: true,
+          budgets: [30_000, 80_000, 180_000],
+          extra: `
+.fl-mark,.fl-wash,.fl-grain,.fl-halftone,.fl-type,.fl-ink{display:none}
+.fl-scrim{
+  opacity:1;
+  background:linear-gradient(180deg,
+    #0B0B0D 0%,#0B0B0D 18%,#1F0B0D 34%,#460F14 52%,
+    #7C1319 68%,#9C151C 80%,#C1181F 90%,#EC1C24 100%);
+}`,
+        },
+      }
+    : {}),
+
   // The classic eventTicket ground, and therefore the asset the guest actually
   // sees. Apple: "The image is cropped slightly on all sides and blurred."
   //
@@ -796,6 +823,10 @@ async function main() {
       ? ["artwork.png", "artwork@2x.png", "artwork@3x.png"]
       : []),
     "background.png", "background@2x.png", "background@3x.png",
+    // Only present with --with-strip. storeCard/coupon have no full-card
+    // ground; they take this banner instead. Built for the layout comparison
+    // behind WALLET_STYLE and harmless to eventTicket, which ignores it.
+    ...(files["strip.png"] ? ["strip.png", "strip@2x.png", "strip@3x.png"] : []),
     "icon.png", "icon@2x.png", "icon@3x.png",
     "logo.png", "logo@2x.png", "logo@3x.png",
   ];
