@@ -38,7 +38,7 @@ body{background:#FFFFFF;color:#16161A;font-family:'Plex Mono',ui-monospace,monos
 :root{--amber-ink:#B87700;--line-lt:#E5E3DE;--muted-lt:#84848C;
   /* This page does not load brand.css, so the surface radius is repeated
      here. brand.css is the source of truth — change both together. */
-  --radius:14px;--radius-sm:10px}
+  --radius:14px;--radius-sm:10px;--radius-ctl:8px}
 .wrap{max-width:1080px;margin:0 auto;padding:0 clamp(20px,5vw,72px)}
 a{color:var(--amber)}
 img{display:block;max-width:100%}
@@ -69,7 +69,7 @@ h1 .l2{display:block;color:var(--ink);font-size:clamp(37px,9vw,108px);margin-top
 .hero-meta{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:26px;font-size:clamp(12px,1.6vw,15px);letter-spacing:.12em;font-weight:500}
 .hero-meta .amber{color:var(--amber)}
 .hero-meta .red{color:var(--red)}
-.btn{display:inline-block;margin-top:32px;padding:16px 34px;border:2px solid var(--brand);color:#FFFFFF;background:var(--brand);
+.btn{display:inline-block;margin-top:32px;padding:16px 34px;border:2px solid var(--brand);color:#FFFFFF;background:var(--brand);border-radius:var(--radius-ctl);
      font-family:'Plex Mono';font-weight:700;font-size:15px;letter-spacing:.22em;text-decoration:none;text-transform:uppercase;transition:background .15s,color .15s}
 .btn:hover,.btn:focus-visible{background:transparent;color:var(--brand)}
 .btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
@@ -168,8 +168,8 @@ section{padding:clamp(8px,2vw,16px) 0}
 
 /* events */
 .events-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;margin-top:clamp(28px,4vw,40px)}
-.event-card{border-radius:8px;position:relative;border:2px solid var(--line-lt);background:#F5F4F1;padding:clamp(24px,3.5vw,34px);display:flex;flex-direction:column;align-items:flex-start;gap:12px}
-.event-card .flag{border-radius:0 6px 0 6px;position:absolute;top:0;right:0;background:var(--red);color:#FFF;font-size:11px;letter-spacing:.2em;font-weight:700;padding:7px 12px;text-transform:uppercase}
+.event-card{border-radius:var(--radius);position:relative;border:2px solid var(--line-lt);background:#F5F4F1;padding:clamp(24px,3.5vw,34px);display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.event-card .flag{border-radius:0 12px 0 var(--radius-ctl);position:absolute;top:0;right:0;background:var(--red);color:#FFF;font-size:11px;letter-spacing:.2em;font-weight:700;padding:7px 12px;text-transform:uppercase}
 .event-card .when{color:var(--amber-ink);font-size:13px;letter-spacing:.16em;font-weight:600;text-transform:uppercase}
 /* Date and time each own a line. As one run they wrapped mid-phrase
    ("1:00 PM –" / "4:00 PM"), which broke the time range across the fold. */
@@ -188,7 +188,7 @@ section{padding:clamp(8px,2vw,16px) 0}
 .lineup .faces{display:flex}
 .lineup .faces img{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #F5F4F1;margin-left:-10px;background:#FFF}
 .lineup .faces img:first-child{margin-left:0}
-.lineup .faces img.logo{border-radius:0;object-fit:contain;padding:2px}
+.lineup .faces img.logo{border-radius:6px;object-fit:contain;padding:2px}
 .lineup .names{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber-ink);font-weight:600;margin-left:10px;line-height:1.35}
 .tapme{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-lt)}
 
@@ -207,7 +207,7 @@ section{padding:clamp(8px,2vw,16px) 0}
 .acts{display:flex;flex-direction:column;gap:20px;margin-top:20px}
 .act{display:flex;gap:16px;align-items:flex-start}
 .act img{width:74px;height:74px;flex:0 0 74px;object-fit:cover;border-radius:50%;border:2px solid var(--line-lt);background:#FFF}
-.act img.logo{border-radius:0;object-fit:contain;padding:4px}
+.act img.logo{border-radius:6px;object-fit:contain;padding:4px}
 .act .nm{font-family:'Big Shoulders';font-weight:800;text-transform:uppercase;font-size:24px;line-height:1;color:#16161A}
 .act .rl{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber-ink);font-weight:600;margin-top:5px}
 .act .bo{font-size:13.5px;line-height:1.55;color:#3A3A42;margin-top:8px}
@@ -215,7 +215,7 @@ section{padding:clamp(8px,2vw,16px) 0}
 .flyer .btn{margin-top:30px}
 body.no-scroll{overflow:hidden}
 @media(max-width:520px){.act img{width:58px;height:58px;flex:0 0 58px}.act .nm{font-size:20px}}
-.no-events{border-radius:8px;grid-column:1/-1;border:2px dashed var(--line-lt);padding:38px 24px;text-align:center;color:var(--muted-lt);font-size:14px;letter-spacing:.08em}
+.no-events{border-radius:var(--radius);grid-column:1/-1;border:2px dashed var(--line-lt);padding:38px 24px;text-align:center;color:var(--muted-lt);font-size:14px;letter-spacing:.08em}
 .event-card .btn.soon{background:transparent;border-color:var(--line-lt);color:var(--muted-lt);pointer-events:none;cursor:default}
 
 /* partners carousel */
@@ -520,27 +520,38 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !lb.hidden
 /* ==== dynamic events (published from /admin.html) ==== */
 const evGrid = document.querySelector('.events-grid');
 function evEl(tag, cls, text){ const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
-function evWhen(e){
-  let s = e.date;
-  try {
-    s = new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', {weekday:'short', month:'long', day:'numeric', year:'numeric'}).toUpperCase().replace(/,/g, ' ·');
-  } catch(_) {}
-  if (e.start) s += ' · ' + e.start + (e.end ? ' – ' + e.end : '');
-  return s;
+/* ---------- one date format, one time format, everywhere ----------
+   MM-DD-YY, the same string the invite link carries (/i/08-15-26), the invite
+   page prints and the confirmation email sends.
+
+   This page had been printing two OTHER formats: the flyer spelled it out
+   ("SAT · AUGUST 15 · 2026") and the tiles used dots and a four-digit year
+   ("08.15.2026"). Three formats for one fact across one product, and a guest
+   moving from a tile to an invite to an email saw the date change shape twice.
+
+   Split from the stored "YYYY-MM-DD" rather than parsed into a Date: the digits
+   are all that is needed, and constructing a Date reintroduces exactly the
+   timezone shift the old 'T12:00:00' hack existed to dodge. */
+function evDateStr(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  return m ? `${m[2]}-${m[3]}-${m[1].slice(2)}` : String(iso || '');
 }
-// Tiles get the numeric date; the flyer keeps the written-out one above.
-// Split the "YYYY-MM-DD" string rather than building a Date: the tile only
-// needs the stored digits, and parsing would reintroduce the timezone shift
-// the 'T12:00:00' above exists to dodge.
-// Returns a <p class="when"> carrying the date and the time on their own lines,
-// rather than a string, so the time range can never wrap mid-phrase.
+function evTimeStr(e){
+  return e.start ? e.start + (e.end ? ' – ' + e.end : '') : '';
+}
+function evWhen(e){
+  const t = evTimeStr(e);
+  return evDateStr(e.date) + (t ? ' · ' + t : '');
+}
+// A <p class="when"> with the date and the time on their own lines, rather than
+// a string, so the time range can never wrap mid-phrase — and so the tile reads
+// date-over-time, the order the invite page uses.
 function evWhenEl(e){
   const p = evEl('p', 'when');
-  let d = String(e.date || '');
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
-  if (m) d = m[2] + '.' + m[3] + '.' + m[1];
+  const d = evDateStr(e.date);
   if (d) p.appendChild(evEl('span', 'd', d));
-  if (e.start) p.appendChild(evEl('span', 't', e.start + (e.end ? ' – ' + e.end : '')));
+  const t = evTimeStr(e);
+  if (t) p.appendChild(evEl('span', 't', t));
   return p;
 }
 function evTitle(t){
