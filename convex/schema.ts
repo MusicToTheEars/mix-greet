@@ -87,6 +87,17 @@ export default defineSchema({
       v.literal("canva"),
     ),
     notes: v.optional(v.string()),
+    // Who the guest is, professionally, and who vouched for them. This is an
+    // invite-only room, so these are the fields that make the door list useful
+    // the morning after: who came, what they do, and which guest brought them.
+    //
+    // All optional, and that is deliberate rather than lax. Existing rows have
+    // none of them and must keep validating, and a guest who leaves one blank
+    // must still get in — an RSVP that fails because somebody did not want to
+    // name their employer is an RSVP the room loses.
+    company: v.optional(v.string()),
+    creativeField: v.optional(v.string()),
+    invitedBy: v.optional(v.string()),
     dedupeKey: v.string(), // `${eventId}:${email}`
     confirmationSentAt: v.optional(v.number()),
     // When the guest was scanned through the door. Optional so every existing

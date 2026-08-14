@@ -382,6 +382,9 @@ const rsvp = httpAction(async (ctx, req) => {
     phone: clean(body.phone, 40) || undefined,
     guests: Number(body.guests) || 1,
     notes: clean(body.notes, 500) || undefined,
+    company: clean(body.company, 120) || undefined,
+    creativeField: clean(body.creativeField, 120) || undefined,
+    invitedBy: clean(body.invitedBy, 120) || undefined,
   });
   // Hand back a signed manage token on success so the page that just took the
   // RSVP can offer "edit or cancel" instead of a second RSVP form. The rsvpId
@@ -444,9 +447,9 @@ const adminRsvps = httpAction(async (ctx, req) => {
     // column an existing saved sheet or import already points at keeps its
     // position. It is the column that answers "who actually came".
     const header =
-      "name,email,phone,guests,status,source,notes,createdAt,confirmationSentAt,checkedInAt";
+      "name,email,phone,company,creativeField,invitedBy,guests,status,source,notes,createdAt,confirmationSentAt,checkedInAt";
     const rows = data.rsvps.map((r) =>
-      [r.name, r.email, r.phone, r.guests, r.status, r.source, r.notes, r.createdAt, r.confirmationSentAt, r.checkedInAt]
+      [r.name, r.email, r.phone, r.company, r.creativeField, r.invitedBy, r.guests, r.status, r.source, r.notes, r.createdAt, r.confirmationSentAt, r.checkedInAt]
         .map(csvCell)
         .join(","),
     );

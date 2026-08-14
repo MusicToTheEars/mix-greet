@@ -651,6 +651,14 @@ body.has-sticky{padding-bottom:84px}
   .track{animation:none}
   .carousel{overflow-x:auto}
 }
+
+/* A note attached to one field, not a paragraph of its own: it explains why we
+   are asking for a phone number, which is the question a guest silently asks
+   before typing one into an invite form. */
+.fieldnote{
+  margin-top:6px;font-size:11px;line-height:1.5;color:var(--text-muted);
+  letter-spacing:.02em;text-transform:none;font-weight:400;
+}
 </style>
 </head>
 <body>
@@ -808,6 +816,43 @@ body.has-sticky{padding-bottom:84px}
 
             <div class="row">
               <div>
+                <label for="f-company">Company</label>
+                <input id="f-company" name="company" autocomplete="organization" autocapitalize="words" maxlength="120" enterkeyhint="next">
+              </div>
+              <div>
+                <label for="f-field">Creative field</label>
+                <input id="f-field" name="creativeField" list="fieldList" autocapitalize="words" maxlength="120" enterkeyhint="next">
+                <!-- A datalist, not a select: these are the disciplines that
+                     actually walk through this door, offered as suggestions,
+                     while anyone whose work is not on the list can still type
+                     it. A closed dropdown would force a creative to file
+                     themselves under "Other" on the way into a room built for
+                     them. -->
+                <datalist id="fieldList">
+                  <option value="Producer"></option>
+                  <option value="Artist"></option>
+                  <option value="Songwriter"></option>
+                  <option value="DJ"></option>
+                  <option value="Engineer"></option>
+                  <option value="A&amp;R"></option>
+                  <option value="Manager"></option>
+                  <option value="Photographer"></option>
+                  <option value="Videographer"></option>
+                  <option value="Designer"></option>
+                  <option value="Marketing"></option>
+                  <option value="Label"></option>
+                  <option value="Publisher"></option>
+                  <option value="Educator"></option>
+                  <option value="Student"></option>
+                </datalist>
+              </div>
+            </div>
+
+            <label for="f-invitedby">Invited by</label>
+            <input id="f-invitedby" name="invitedBy" autocomplete="off" autocapitalize="words" maxlength="120" enterkeyhint="next">
+
+            <div class="row">
+              <div>
                 <label for="f-guests">Party size</label>
                 <select id="f-guests" name="guests">
                   <option value="1" selected>Just me</option>
@@ -820,6 +865,7 @@ body.has-sticky{padding-bottom:84px}
               <div>
                 <label for="f-phone">Phone (optional)</label>
                 <input id="f-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="40">
+                <p class="fieldnote">So we can text you about future sessions.</p>
               </div>
             </div>
 
@@ -1823,6 +1869,9 @@ $('rsvpForm').addEventListener('submit', async (e) => {
         email,
         guests,
         phone: $('f-phone').value.trim(),
+        company: $('f-company').value.trim(),
+        creativeField: $('f-field').value.trim(),
+        invitedBy: $('f-invitedby').value.trim(),
         notes: $('f-notes').value.trim(),
         website: $('f-website').value
       })

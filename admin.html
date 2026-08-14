@@ -298,6 +298,11 @@
 .who{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--text-muted)}
 .who img{width:26px;height:26px;object-fit:cover;border:2px solid var(--surface-line);border-radius:50%;background:var(--field)}
 .who img.logo{border-radius:6px;object-fit:contain}
+
+/* The guest's discipline and employer. Inked rather than muted like the email
+   line under it: at an invite-only session this is who the person IS, and the
+   host scans for it. */
+.g-trade{margin-top:3px;font-size:12px;color:var(--text-soft);letter-spacing:.02em}
 </style>
 </head>
 <body>
@@ -1142,6 +1147,17 @@ function guestRow(r, eventDate){
   who.appendChild(el('span', null, r.name));
   const mail = el('div', 'g-mail', r.email + (r.phone ? ' · ' + r.phone : ''));
   who.appendChild(mail);
+
+  // Who they are professionally, on its own line. Joined with · and filtered
+  // first, so a guest who filled in one of the three does not get a line of
+  // orphaned separators — which is what happens if you template these in.
+  const trade = [r.creativeField, r.company].filter(Boolean).join(' · ');
+  if (trade) who.appendChild(el('div', 'g-trade', trade));
+  // Kept separate from the trade line and labelled, because "Invited by Dana"
+  // and "Photographer · Sony" answer different questions and a host scanning
+  // this list is usually asking only one of them.
+  if (r.invitedBy) who.appendChild(el('div', 'g-mail', 'Invited by ' + r.invitedBy));
+
   if (r.notes) who.appendChild(el('div', 'g-mail', '“' + r.notes + '”'));
   tr.appendChild(who);
 

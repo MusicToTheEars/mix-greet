@@ -499,6 +499,45 @@ async function main() {
   check("a formula cell is neutralised", nastyCsv.includes(`"'=cmd`), nastyCsv.split("\r\n")[1]);
   check("an embedded quote is doubled", nastyCsv.includes('""quotes""'), nastyCsv.split("\r\n")[1]);
 
+  step("25b. the RSVP form's own fields survive the round trip");
+  // Collected on the invite form, stored, and read back by the back office and
+  // the CSV. Asserted end to end rather than at the mutation, because the three
+  // places they can be dropped are all in between: the HTTP route that has to
+  // forward them, the shaper that has to return them, and the CSV column order.
+  const who = await mkEvent({ title: `E2E Fields ${stamp}`, date: "2099-08-08", rsvpMode: "hosted" });
+  const person = {
+    eventId: who.slug, name: "Dana Field", email: mail("fields"), guests: 1,
+    company: "Sony Music", creativeField: "Photographer", invitedBy: "Lawrence Berment",
+    phone: "+1 213 555 0134",
+  };
+  await jsonPost("/api/rsvp", person);
+  const back = await adminGet(`/api/admin/rsvps?eventId=${who.slug}`);
+  const rows0 = Array.isArray(back.body) ? back.body : back.body?.rsvps || back.body?.rows || [];
+  const filled = rows0.find((r) => r.email === person.email);
+  check("the back office reads back company, field and invited-by", !!filled &&
+    filled.company === person.company &&
+    filled.creativeField === person.creativeField &&
+    filled.invitedBy === person.invitedBy,
+    JSON.stringify(filled));
+
+  const fieldsCsv = await (await fetch(`${API}/api/admin/rsvps.csv?eventId=${who.slug}`, { headers: { "x-admin-token": TOKEN } })).text();
+  const [csvHead, csvRow] = fieldsCsv.split("\r\n");
+  const cols = csvHead.split(",");
+  // Position, not presence: a header that lists a column the row does not fill
+  // in the same slot is the failure that silently shifts every later column.
+  const at = (name) => (csvRow.split(",")[cols.indexOf(name)] || "").replace(/^"|"$/g, "");
+  check("the CSV puts them under their own headers", 
+    at("company") === person.company &&
+    at("creativeField") === person.creativeField &&
+    at("invitedBy") === person.invitedBy,
+    csvHead + "\n" + csvRow);
+
+  // Optional means optional: a guest who fills in none of them still gets in.
+  const bare = await jsonPost("/api/rsvp", { eventId: who.slug, name: "No Details", email: mail("bare"), guests: 1 });
+  check("a guest who leaves them blank is still confirmed",
+    bare.body?.ok === true && bare.body?.status === "confirmed",
+    JSON.stringify(bare.body));
+
   step("26. the public routes have a ceiling");
   // Every other case in this file runs with the budgets raised out of the way,
   // because they all share one loopback caller and would otherwise exhaust a

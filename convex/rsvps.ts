@@ -62,6 +62,9 @@ export const submit = internalMutation({
     phone: v.optional(v.string()),
     guests: v.optional(v.number()),
     notes: v.optional(v.string()),
+    company: v.optional(v.string()),
+    creativeField: v.optional(v.string()),
+    invitedBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const eventId = ctx.db.normalizeId("events", args.eventId);
@@ -82,6 +85,12 @@ export const submit = internalMutation({
     const guests = Math.min(10, Math.max(1, Math.round(Number(args.guests) || 1)));
     const phone = clamp(args.phone, 40) || undefined;
     const notes = clamp(args.notes, 500) || undefined;
+    // Clamped like every other free-text field. 120 matches the name cap: these
+    // are a company and a discipline, not a biography, and an unbounded string
+    // here is a row that breaks the CSV and the guest list on one bad paste.
+    const company = clamp(args.company, 120) || undefined;
+    const creativeField = clamp(args.creativeField, 120) || undefined;
+    const invitedBy = clamp(args.invitedBy, 120) || undefined;
 
     // Dedupe: a repeat submission updates the existing RSVP; no second email.
     const dedupeKey = `${eventId}:${email}`;
@@ -105,6 +114,9 @@ export const submit = internalMutation({
           phone,
           guests,
           notes,
+          company,
+          creativeField,
+          invitedBy,
           status,
           checkedInAt: undefined,
           statusBeforeCheckIn: undefined,
@@ -171,7 +183,7 @@ export const submit = internalMutation({
         };
       }
 
-      await ctx.db.patch(existing._id, { name, phone, guests, notes });
+      await ctx.db.patch(existing._id, { name, phone, guests, notes, company, creativeField, invitedBy });
       // Deliberately no rsvpId, which is what /api/rsvp mints the manage token
       // from. The invite slug is public and an email address is not a secret,
       // so minting one here handed anybody who could guess a guest's address
@@ -195,6 +207,9 @@ export const submit = internalMutation({
       status,
       source: "site",
       notes,
+      company,
+      creativeField,
+      invitedBy,
       dedupeKey,
     });
 
@@ -281,6 +296,9 @@ export const listForEvent = internalQuery({
         name: r.name,
         email: r.email,
         phone: r.phone ?? "",
+        company: r.company ?? "",
+        creativeField: r.creativeField ?? "",
+        invitedBy: r.invitedBy ?? "",
         guests: r.guests,
         status: r.status,
         source: r.source,
