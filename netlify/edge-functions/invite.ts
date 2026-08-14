@@ -73,7 +73,21 @@ export default async function invite(request: Request, context: Context) {
   if (!ev || typeof ev !== "object" || !ev.title) return res;
 
   const origin = new URL(request.url).origin;
-  const title = `${ev.title}${ev.subtitle ? ` · ${ev.subtitle}` : ""} · Mix & Greet`;
+
+  // "Mix&Greet · Mix & Greet" is what naive suffixing produced for an event
+  // named after the brand, which is most of them. The suffix exists to tell a
+  // stranger what "TEST Event" is; when the title already says it, it is noise
+  // in the one line a preview card gives you.
+  const isBrand = /^mixandgreet$/.test(
+    String(ev.title ?? "").toLowerCase().replace(/&/g, "and").replace(/[^a-z]/g, ""),
+  );
+  const title = [
+    String(ev.title),
+    ev.subtitle ? String(ev.subtitle) : "",
+    isBrand ? "" : "Mix & Greet",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const when = [
     numericDate(String(ev.date ?? "")),
