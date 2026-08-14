@@ -63,12 +63,26 @@ function fontFaces() {
   return out.join("\n");
 }
 
+// The headliner is only ever used by the frames that draw a PHOTOGRAPH, which
+// today means `artwork` and only under --with-artwork. The frames that actually
+// ship — background.* — are the brand plate and carry no photo at all, by
+// design (see the note on the background frame).
+//
+// So a missing headliner is not an error unless something needs one. It threw
+// before, and the day the only event with a featured artist was archived the
+// whole image build stopped working — for assets that never wanted the photo.
+// Returns null instead; the caller decides whether that matters.
 async function headliner() {
-  const ev = await (await fetch(EVENT_API)).json();
+  let ev = {};
+  try {
+    ev = await (await fetch(EVENT_API)).json();
+  } catch {
+    return null;
+  }
   const f = (ev.featured || []).find(
     (x) => x.kind !== "company" && x.imageUrl,
   );
-  if (!f) throw new Error("event has no featured artist with a photo");
+  if (!f) return null;
   const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ev.date || ""));
   const photo = PHOTO_ARG
     ? fs.readFileSync(PHOTO_ARG)
@@ -404,36 +418,46 @@ const FRAMES = {
 /* Everything the plate used to draw, off. The mark, the bloom, the grain, the
    halftone and the baked type all go; the gradient below is the whole image. */
 .fl-mark,.fl-wash,.fl-grain,.fl-halftone,.fl-type,.fl-ink{display:none}
-/* Two layers, and the second one is not decoration.
+/* Black at the top, red at the foot, and blended rather than stepped.
    
-   Vertical: red at the top, black by 46%, flat #0B0B0D from there down, which
-   is what the white barcode tile needs to sit on.
+   Flipped from red-at-the-top, and the flip is what the card wanted all along:
+   every piece of type Wallet prints runs down the UPPER half — the logo with
+   its red "mix", the event title, and the STARTS / ADMIT labels, which are
+   brand red. Red ink on a red ground measures about 2.5:1. With the black at
+   the top all of it now sits on near-black, and the red is spent in the lower
+   half where the only thing over it is the white barcode tile, which is high
+   contrast on any ground.
    
-   Horizontal: the left column is taken back toward black. Every piece of type
-   on this card runs down that column, and two of them are RED — the "mix" of
-   the academix wordmark, and the STARTS / ADMIT labels. Red ink on a red ground
-   measures about 2.5:1, and the first cut of this gradient proved it: the
-   wordmark's "mix" all but vanished into the plate. The red is still the top of
-   the card, it just does not run under the type. */
+   Eleven stops rather than four. Apple blurs this image, and a blur smooths a
+   gradient it can already resolve — what it cannot fix is banding, which is
+   what a four-stop ramp across 220px produced. The stops are eased rather than
+   linear so the transition reads as one wash instead of a seam.
+   
+   No horizontal layer any more. It existed to darken the type column against a
+   red top; with the top already black it was only muddying the corner. */
+.fl-mark,.fl-wash,.fl-grain,.fl-halftone,.fl-type,.fl-ink{display:none}
 .fl-scrim{
   opacity:1;
-  background:
-    linear-gradient(90deg,
-      rgba(11,11,13,.92) 0%,rgba(11,11,13,.78) 22%,
-      rgba(11,11,13,.34) 48%,rgba(11,11,13,0) 72%),
-    linear-gradient(180deg,
-      #EC1C24 0%,
-      #C2151C 14%,
-      #7E1014 28%,
-      #3A0A0C 38%,
-      #0B0B0D 46%,
-      #0B0B0D 100%);
-}
-`,
+  background:linear-gradient(180deg,
+    #0B0B0D 0%,
+    #0B0B0D 26%,
+    #14090A 38%,
+    #1F0B0D 47%,
+    #300F12 55%,
+    #460F14 63%,
+    #5E1117 71%,
+    #7C1319 79%,
+    #9C151C 87%,
+    #C1181F 94%,
+    #EC1C24 100%);
+}`,
   }
 };
 
 async function render(browser, art, frame, scale) {
+  // The brand plate ignores `art` entirely; only the photographic frame reads
+  // it, and that frame is not built unless a headliner was found.
+  art = art || { title: "", stamp: "", photo: "" };
   const { w, h, css, extra, heavy, brand, blurRings } = frame;
   const ctx = await browser.newContext({
     viewport: { width: w, height: h },
@@ -587,7 +611,9 @@ html,body{margin:0;padding:0;background:transparent}
 </style>
 <div id="lock">
   <img id="wm" src="${wm}" alt="">
-  <div id="gg">MIX <span class="amp">&amp;</span> GREET</div>
+  <!-- No spaces around the ampersand. The mark is MIX&GREET set solid; the
+       spaced version read as three words rather than one lockup. -->
+  <div id="gg">MIX<span class="amp">&amp;</span>GREET</div>
 </div>`,
     { waitUntil: "load" },
   );
@@ -700,7 +726,15 @@ async function logoFamily(browser) {
 
 async function main() {
   const art = await headliner();
-  console.log(`headliner: ${art.title}   stamp: ${art.stamp}`);
+  if (art) {
+    console.log(`headliner: ${art.title}   stamp: ${art.stamp}`);
+  } else if (argv.includes("--with-artwork")) {
+    // Only the photographic frame needs one, and it is opt-in.
+    console.error("--with-artwork needs a published event with a featured artist photo.");
+    process.exit(2);
+  } else {
+    console.log("no headliner photo available — not needed for the shipping frames");
+  }
   const browser = await chromium.launch();
   const files = {};
   const meta = [];

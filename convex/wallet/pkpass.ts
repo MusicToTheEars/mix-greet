@@ -155,19 +155,24 @@ function buildPassJson(p: PassInput) {
     headerFields: p.dateShort
       ? [{ key: "date", label: "", value: p.dateShort }]
       : [],
-    // EMPTY on purpose. The card's title is now the MIX & GREET lockup baked
-    // into background.png, because Wallet cannot put a graphic in a field and
-    // this band is where that lockup belongs. Printing the event title here as
-    // well gave a Mix & Greet event a plain-text "Mix&Greet" directly under a
-    // brand lockup that already said it, in a different face, twice.
+    // The event's own name, large and unlabelled — the slot Wallet gives the
+    // most room to and the one a guest reads first.
     //
-    // The field itself stays rather than being deleted: Wallet reserves its
-    // band either way, and removing it slid every secondary field up into the
-    // lockup. An empty value holds the space the artwork is drawn into.
+    // Blank when the title IS the brand, and only then. "Mix&Greet" set here in
+    // Wallet's own face, directly under a lockup that already says MIX&GREET in
+    // ours, is the same words twice in two typefaces. Every other event —
+    // "TEST Event", a one-off session — gets its name.
     //
-    // The event's own name is not lost — it moves to the auxiliary row below,
-    // so a session with a title of its own ("TEST Event") still carries it.
-    primaryFields: [{ key: "event", label: "", value: "" }],
+    // The field is kept even when empty rather than removed: Wallet reserves
+    // its band either way, and dropping it slid every secondary field up into
+    // the lockup.
+    primaryFields: [
+      {
+        key: "event",
+        label: "",
+        value: isBrandTitle(p.eventTitle) ? "" : p.eventTitle,
+      },
+    ],
     // Wallet lays each group out as a horizontal ROW, so a field only gets the
     // full width when it is alone in its group. The guests need that width to
     // stack, which is why they own auxiliaryFields outright and the venue moved
@@ -177,13 +182,6 @@ function buildPassJson(p: PassInput) {
       { key: "admit", label: "ADMIT", value: `${p.guestName} · ${p.partyLabel}` },
     ],
     auxiliaryFields: [
-      // The event's own name, where the primary field used to print it. Skipped
-      // when the title IS the brand: "MIX & GREET" is already the largest thing
-      // on the card, and repeating it in 11pt caps underneath is the same
-      // duplication moved down a row.
-      ...(p.eventTitle && !isBrandTitle(p.eventTitle)
-        ? [{ key: "session", label: "EVENT", value: p.eventTitle }]
-        : []),
       ...(p.artists && p.artists.length
         ? [
             {
