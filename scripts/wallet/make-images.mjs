@@ -381,31 +381,56 @@ const FRAMES = {
     css: 363,
     brand: true,
     blurRings: true,
+    // Red to black, and nothing else.
+    //
+    // What this replaces: an opened-out ring mark, a red bloom, print grain and
+    // a two-axis scrim, all tuned to survive Apple's blur. It read well and it
+    // was the wrong picture — behind a 14px blur the rings became soft halos
+    // that a viewer reads as "the background image failed to load", and the
+    // grain was the most expensive thing in the bundle for texture nobody can
+    // resolve through the blur anyway.
+    //
+    // A gradient is the one thing a blur cannot damage: it is already the
+    // lowest-frequency image there is, so the card looks identical whether
+    // Apple blurs it or not.
+    //
+    // The stops are placed against Wallet's own layout, not by eye. The red is
+    // spent in the top third, behind the logo and the title, and is black by
+    // 46% — because the STARTS and ADMIT labels are brand red and red type on
+    // a red ground measures about 2.5:1. Below that it is flat #0B0B0D, which
+    // is what the white barcode tile needs to sit on.
     budgets: [26_000, 58_000, 130_000],
     extra: `
-.fl-wash::after{display:none}
-.fl-type{display:none}
-/* The bloom stays; it is the strongest low-frequency brand cue on the plate.
-   The cream lift from the bottom-left goes, because the bottom-left is exactly
-   where the barcode tile lands and it must stay black. */
-.fl-wash{
-  opacity:1;
-  background:radial-gradient(86% 62% at 82% 6%,rgba(236,28,36,.62),transparent 66%);
-}
-/* Wallet's fields run down the left edge and its labels are brand red. Red on
-   dark red measures about 2.5:1 and fails; red on #0B0B0D is about 4.3:1 and
-   holds. So the left third is taken down before the type ever gets there. */
+/* Everything the plate used to draw, off. The mark, the bloom, the grain, the
+   halftone and the baked type all go; the gradient below is the whole image. */
+.fl-mark,.fl-wash,.fl-grain,.fl-halftone,.fl-type,.fl-ink{display:none}
+/* Two layers, and the second one is not decoration.
+   
+   Vertical: red at the top, black by 46%, flat #0B0B0D from there down, which
+   is what the white barcode tile needs to sit on.
+   
+   Horizontal: the left column is taken back toward black. Every piece of type
+   on this card runs down that column, and two of them are RED — the "mix" of
+   the academix wordmark, and the STARTS / ADMIT labels. Red ink on a red ground
+   measures about 2.5:1, and the first cut of this gradient proved it: the
+   wordmark's "mix" all but vanished into the plate. The red is still the top of
+   the card, it just does not run under the type. */
 .fl-scrim{
+  opacity:1;
   background:
     linear-gradient(90deg,
-      rgba(11,11,13,.94) 0%,rgba(11,11,13,.72) 26%,
-      rgba(11,11,13,.22) 52%,rgba(11,11,13,0) 74%),
+      rgba(11,11,13,.92) 0%,rgba(11,11,13,.78) 22%,
+      rgba(11,11,13,.34) 48%,rgba(11,11,13,0) 72%),
     linear-gradient(180deg,
-      rgba(11,11,13,.72) 0%,rgba(11,11,13,.12) 20%,
-      rgba(11,11,13,.10) 46%,rgba(11,11,13,.66) 64%,
-      rgba(11,11,13,.96) 80%,rgba(11,11,13,1) 91%);
-}`,
-  },
+      #EC1C24 0%,
+      #C2151C 14%,
+      #7E1014 28%,
+      #3A0A0C 38%,
+      #0B0B0D 46%,
+      #0B0B0D 100%);
+}
+`,
+  }
 };
 
 async function render(browser, art, frame, scale) {
@@ -649,8 +674,14 @@ async function logoFamily(browser) {
     })
       .composite([
         {
+          // LEFT, not centred. Wallet draws the logo at the card's left inset
+          // and every field below it starts on that same edge, so a centred
+          // mark inside its own transparent box floats a few pixels right of
+          // the column it is supposed to head — small, and the kind of small
+          // that reads as a mistake rather than as a decision. Vertically it
+          // stays centred: nothing else shares that band.
           input: inner,
-          left: Math.round((W - m.width) / 2),
+          left: px,
           top: Math.round((H - m.height) / 2),
         },
       ])
