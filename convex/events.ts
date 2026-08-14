@@ -20,14 +20,26 @@ import { v } from "convex/values";
 // DEPLOY CONTRACT, and it is load-bearing: nothing in rsvp.html reads the path.
 // That page's only key reader is `new URLSearchParams(location.search).get(
 // 'event')`. `/i/<key>` therefore resolves for exactly one reason — the host
-// rewrites it to `/rsvp.html?event=<key>` before the page runs. That rewrite
-// lives in vercel.json and NOWHERE ELSE. A host without it serves 404 for every
-// invite link in circulation, so any change of hosting has to port the rewrite
-// first. (`netlify.toml` is still tracked in this repo and declares no
-// redirects at all; it is a leftover of the pre-Vercel deploy and would 404 the
-// whole `/i/` scheme if it were ever used again.) Links minted before this
-// change pointed straight at `/rsvp?event=<key>` and still work: same reader,
-// no rewrite needed.
+// rewrites it to `/rsvp.html?event=<key>` before the page runs.
+//
+// THE SITE IS ON NETLIFY. That rewrite lives in `_redirects` at the repo root:
+//
+//     /i/*    /rsvp.html?event=:splat    200
+//
+// and `_redirects` is where it has to stay. It is in the publish root on
+// purpose — redirects declared in netlify.toml have been dropped silently on
+// this account before, which for this rule means every invite link in
+// circulation 404s with nothing in the build log to say why.
+//
+// `vercel.json` is also still tracked and declares the same rewrite. It is
+// inert: Netlify never reads it. Left in place rather than deleted so a future
+// move back is a config choice rather than an archaeology exercise, but it is
+// NOT the file to edit — an earlier version of this comment named it as the
+// only one that mattered, which was true for exactly as long as the site was on
+// Vercel and is a good way to spend an afternoon editing a file nothing reads.
+//
+// Links minted before this change pointed straight at `/rsvp?event=<key>` and
+// still work: same reader, no rewrite needed.
 //
 // This shape is effectively permanent: the slug is deliberately immutable so
 // circulating links keep working, which means links already in the wild can
