@@ -318,7 +318,15 @@ function buildPassJson(p: PassInput) {
     passTypeIdentifier: process.env.PASS_TYPE_ID,
     teamIdentifier: process.env.PASS_TEAM_ID,
     organizationName: "Academix BEAT Lab",
-    description: `${p.eventTitle}, Mix & Greet`,
+    // iOS prints this verbatim as the title of the add-pass sheet. Suffixing
+    // the brand onto an event already named after it produced "Mix&Greet,
+    // Mix & Greet" across the top of the sheet — the same duplication the card
+    // itself was fixed for, in the one place a guest sees before they tap Add.
+    // The suffix stays for a session with a title of its own, where it is what
+    // tells a stranger whose ticket this is.
+    description: isBrandTitle(p.eventTitle)
+      ? "Mix & Greet"
+      : `${p.eventTitle}, Mix & Greet`,
     serialNumber: p.serial,
     // Groups every Mix & Greet ticket under one stack in Wallet instead of
     // scattering them, which is what a guest with three events wants.
