@@ -59,6 +59,17 @@ export const buildForToken = internalAction({
 
     // Street only on the face; the full address is on the back of the pass.
     const venueLine = (ev.location || "").split(",")[0].trim();
+    // The suite gets its own slot beside the street, because at this venue it
+    // is the half of the address that actually finds the room: 1933 S. Broadway
+    // is a whole building and the session is on the twelfth floor. Matched
+    // rather than assumed to be the second segment, so an address written
+    // without one puts the city there instead of a label reading "SUITE
+    // Los Angeles".
+    const venueSuite =
+      (ev.location || "")
+        .split(",")
+        .map((s: string) => s.trim())
+        .find((s: string) => /^(ste|suite|unit|apt|apartment|fl|floor|#)\b/i.test(s)) || "";
 
     const bytes = await buildPkpass({
       // Stable per RSVP: re-adding replaces the pass instead of stacking copies.
@@ -78,6 +89,8 @@ export const buildForToken = internalAction({
       whenLabel,
       dateShort,
       timeShort: ev.start || undefined,
+      endShort: ev.end || undefined,
+      parking: ev.parking || undefined,
       location: ev.location || "",
       guestName: data.rsvp.name,
       // "SCETCH +1", not "SCETCH · 2 guests", and just "SCETCH" for one.
@@ -95,6 +108,7 @@ export const buildForToken = internalAction({
       status: data.rsvp.status === "waitlist" ? "waitlist" : "confirmed",
       inviteUrl: undefined,
       venueLine,
+      venueSuite,
     });
     // base64, not Array.from(bytes): a half-megabyte pass becomes ~500k JSON
     // numbers that way, which is orders of magnitude larger on the wire than

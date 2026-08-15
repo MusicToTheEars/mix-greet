@@ -96,12 +96,15 @@ export type PassInput = {
   whenLabel: string;
   dateShort?: string; // "AUG 15" — the header stamp
   timeShort?: string; // "1:00 PM"
+  endShort?: string; // "4:00 PM"
+  parking?: string; // "Street Meter or Private Lot $15"
   location: string;
   guestName: string;
   partyLabel: string;
   status: "confirmed" | "waitlist";
   inviteUrl?: string;
   venueLine?: string; // street only — the full address is on the back
+  venueSuite?: string; // "Ste 1202", when the address carries one
 };
 
 // Brand values, matching brand.css. Wallet takes CSS-style rgb() only.
@@ -147,6 +150,36 @@ function isBrandTitle(title: string): boolean {
 function buildPassJson(p: PassInput) {
   const artistLabel =
     p.artists && p.artists.length > 1 ? "SPECIAL GUESTS" : "SPECIAL GUEST";
+
+  // The second auxiliary row, packed by priority rather than declared inline,
+  // because what belongs there differs per event and Wallet crowds a row that
+  // is given more than two fields.
+  //
+  // Order is who-is-playing, then what-this-session-is, then how-to-park. The
+  // first two are absent from most Mix & Greet events — the billing is often
+  // empty and the title IS the brand — which is exactly why parking is here:
+  // it is the last real fact the event holds, it is the thing a guest wants
+  // while they are still in the car, and on a plain house night it is the
+  // difference between a filled row and a band of empty gradient.
+  const auxRow1: Array<Record<string, unknown>> = [];
+  if (p.artists && p.artists.length) {
+    auxRow1.push({
+      key: "artists",
+      label: artistLabel,
+      // Newline-joined so several names read as a column, one under the next,
+      // rather than running together on one line.
+      value: p.artists.join("\n"),
+      row: 1,
+    });
+  }
+  // A session with a title of its own carries it; "Mix&Greet" is not printed
+  // under a lockup that already says MIX&GREET.
+  if (p.eventTitle && !isBrandTitle(p.eventTitle)) {
+    auxRow1.push({ key: "event", label: "EVENT", value: p.eventTitle, row: 1 });
+  }
+  if (p.parking && auxRow1.length < 2) {
+    auxRow1.push({ key: "parking", label: "PARKING", value: p.parking, row: 1 });
+  }
 
   const fields = {
     // Over the poster art. The date is the one thing a guest checks at a
@@ -209,27 +242,38 @@ function buildPassJson(p: PassInput) {
     ],
     // Wallet lays each group out as a horizontal ROW, so a field only gets the
     // full width when it is alone in its group.
+    //
+    // THE SPACING PROBLEM THESE TWO GROUPS SOLVE. Measured off a production
+    // render: content stopped 26% down the card and the barcode began at 63%,
+    // leaving a 37% band of empty gradient — over a third of the face, doing
+    // nothing. The barcode cannot be raised into it (three experiments, see
+    // above), and Wallet reserves each field band whether or not anything
+    // occupies it. So the only way to close the gap is to put something real in
+    // the bands that were sitting empty, and the card was carrying two of them:
+    // a half-used secondary row and a completely empty auxiliary one.
+    //
+    // What goes there is not filler. STARTS/ENDS and WHERE/SUITE are the four
+    // facts a guest standing outside 1933 S. Broadway actually needs, and until
+    // now the address was only on the BACK of the pass — a flip a guest has to
+    // know exists, at the exact moment they are looking for a door.
     secondaryFields: [
-      { key: "when", label: "STARTS", value: p.whenLabel },
-      // The event's own name, and only when it is not the brand: a session with
-      // a title of its own still carries it, and "Mix&Greet" is not printed
-      // under a lockup that already says MIX&GREET.
-      ...(p.eventTitle && !isBrandTitle(p.eventTitle)
-        ? [{ key: "event", label: "EVENT", value: p.eventTitle }]
-        : []),
+      // The time alone, not "AUG 29 · 1:00 PM": the header field already stamps
+      // the date two inches above this line, and printing it twice was both a
+      // repetition and the reason this row needed the full width for one fact.
+      { key: "when", label: "STARTS", value: p.timeShort || p.whenLabel },
+      ...(p.endShort ? [{ key: "until", label: "ENDS", value: p.endShort }] : []),
     ],
+    // Two rows, packed deliberately. `row` is an eventTicket-only key that
+    // Wallet honours on auxiliary fields; row 0 is the address, which every
+    // guest needs, and row 1 carries whatever this particular event has to say.
     auxiliaryFields: [
-      ...(p.artists && p.artists.length
-        ? [
-            {
-              key: "artists",
-              label: artistLabel,
-              // Newline-joined so several names read as a column, one under the
-              // next, rather than running together on one line.
-              value: p.artists.join("\n"),
-            },
-          ]
+      ...(p.venueLine
+        ? [{ key: "where", label: "WHERE", value: p.venueLine, row: 0 }]
         : []),
+      ...(p.venueSuite
+        ? [{ key: "suite", label: "SUITE", value: p.venueSuite, row: 0 }]
+        : []),
+      ...auxRow1,
     ],
     backFields: [
       ...(p.subtitle ? [{ key: "sub", label: "Session", value: p.subtitle }] : []),
