@@ -88,8 +88,8 @@ export type PassInput = {
   authToken: string; // also the QR payload the door scans
   eventTitle: string;
   subtitle?: string;
-  // Every non-company name on the bill, in order. Plural because an event can
-  // have several and they are printed as a column.
+  // Every non-company name on the bill, in order. Printed across one line on
+  // the face — see the join where this is read.
   artists?: string[];
   whenIso?: string; // ISO 8601 with offset; drives the lock-screen relevance
   endIso?: string;
@@ -151,34 +151,47 @@ function buildPassJson(p: PassInput) {
   const artistLabel =
     p.artists && p.artists.length > 1 ? "SPECIAL GUESTS" : "SPECIAL GUEST";
 
-  // The second auxiliary row, packed by priority rather than declared inline,
-  // because what belongs there differs per event and Wallet crowds a row that
-  // is given more than two fields.
+  // The second auxiliary row, and it is allocated rather than shared.
   //
-  // Order is who-is-playing, then what-this-session-is, then how-to-park. The
-  // first two are absent from most Mix & Greet events — the billing is often
-  // empty and the title IS the brand — which is exactly why parking is here:
-  // it is the last real fact the event holds, it is the thing a guest wants
-  // while they are still in the car, and on a plain house night it is the
-  // difference between a filled row and a band of empty gradient.
+  // THE SPECIAL GUEST OWNS THIS ROW WHENEVER THERE IS ONE. Wallet sizes a
+  // field by how much of its row it gets: alone it is set large, beside
+  // another it shrinks to about half. So a billed artist sharing this row with
+  // PARKING is printed at the same weight as a parking instruction, which is
+  // exactly backwards — the guest is the reason anybody RSVP'd. Given the row
+  // to itself it is the largest thing on the card after the holder's own name,
+  // which is the billing a booked artist should expect to see.
+  //
+  // Everything else yields to it and nothing is lost by yielding: the session
+  // title is already the heading of the sheet a guest taps Add on, and parking
+  // is spelled out on the back of the pass, which is where both of them go
+  // when an event has a name on the bill.
+  const artists = p.artists?.filter(Boolean) ?? [];
   const auxRow1: Array<Record<string, unknown>> = [];
-  if (p.artists && p.artists.length) {
+  if (artists.length) {
     auxRow1.push({
       key: "artists",
       label: artistLabel,
-      // Newline-joined so several names read as a column, one under the next,
-      // rather than running together on one line.
-      value: p.artists.join("\n"),
+      // Middot-joined rather than newline-joined. A field on the FACE of a pass
+      // is a single line — only backFields wrap — so a newline here was never
+      // going to produce the column it was written for. Middots are how the
+      // rest of this card already separates facts on one line. CONFIRMED on
+      // device on a throwaway event billing two artists: it takes row 1 alone,
+      // full width, and two names read across it without truncating.
+      value: artists.join(" · "),
       row: 1,
     });
-  }
-  // A session with a title of its own carries it; "Mix&Greet" is not printed
-  // under a lockup that already says MIX&GREET.
-  if (p.eventTitle && !isBrandTitle(p.eventTitle)) {
-    auxRow1.push({ key: "event", label: "EVENT", value: p.eventTitle, row: 1 });
-  }
-  if (p.parking && auxRow1.length < 2) {
-    auxRow1.push({ key: "parking", label: "PARKING", value: p.parking, row: 1 });
+  } else {
+    // No billing, so the row goes to whatever this event does have. Capped at
+    // two because Wallet crowds a row given more than that.
+    //
+    // A session with a title of its own carries it; "Mix&Greet" is not printed
+    // under a lockup that already says MIX&GREET.
+    if (p.eventTitle && !isBrandTitle(p.eventTitle)) {
+      auxRow1.push({ key: "event", label: "EVENT", value: p.eventTitle, row: 1 });
+    }
+    if (p.parking && auxRow1.length < 2) {
+      auxRow1.push({ key: "parking", label: "PARKING", value: p.parking, row: 1 });
+    }
   }
 
   const fields = {
@@ -278,6 +291,11 @@ function buildPassJson(p: PassInput) {
     backFields: [
       ...(p.subtitle ? [{ key: "sub", label: "Session", value: p.subtitle }] : []),
       ...(p.location ? [{ key: "where", label: "Venue", value: p.location }] : []),
+      // Always on the back, whether or not it also made the face. The face
+      // gives its second auxiliary row to a billed artist when there is one,
+      // and parking is the thing that yields — so this is what stops it from
+      // disappearing on exactly the events guests are most likely to drive to.
+      ...(p.parking ? [{ key: "parking", label: "Parking", value: p.parking }] : []),
       // The back of the pass spells it out. "+1" is right on the face, where
       // the door is counting people at a glance; on a reference screen a guest
       // opens deliberately, a number reads better than a notation.
