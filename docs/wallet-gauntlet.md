@@ -605,3 +605,106 @@ branch shows no `.pem`, no `.key`, nothing base64-encoded but the artwork.
 `GET /api/qr`, is deliberately untouched — `git diff` against `e350fce` shows no
 change to `convex/wallet/qr.ts` or `convex/http.ts`. It encodes the same bare
 RSVP id the pass does, so both routes check in identically at the same door.
+
+---
+
+## 7. The card as it shipped, and what fixes its layout in place
+
+§6 ended on an open question — whether Wallet puts the barcode where we expect.
+It does, and answering it opened the only design question left: the card was
+mostly empty. This section records where that landed, because every constraint
+below was found on a device and none of them is guessable from the spec.
+
+### The barcode cannot be moved. This is settled.
+
+It sits about **79% down the card** and nothing in the pass changes that. Three
+independent experiments, each on a real render:
+
+1. **Remove `primaryFields` entirely** — the render came back *pixel-identical*.
+   Wallet reserves the band whether or not a field occupies it.
+2. **Add `thumbnail.png`** — visibly changed the field layout, and the barcode
+   band stayed at exactly `y=1593..2621` in both renders.
+3. **Switch the whole style to `storeCard`** — a shorter card, no notch, and the
+   barcode still landed **80% down**, i.e. the same place proportionally.
+
+The corollary matters more than the finding: **the notch, the full-card
+background and the barcode position are one package.** All three are
+consequences of `eventTicket`. You cannot keep the gradient ground and drop the
+notch, and you cannot raise the code by taking anything away from above it.
+
+`WALLET_STYLE=storeCard` remains in `pkpass.ts` as a one-env-var switch so that
+choice can be re-made from two screenshots rather than two descriptions. **Leave
+it unset.** storeCard also has no full-card ground — it takes a wide strip
+banner instead, which `make-images.mjs --with-strip` builds — so flipping it
+without rebuilding the images ships an eventTicket carrying both `strip.png` and
+`background.png`, a combination the rig rejects.
+
+### So the empty third was closed from the other direction
+
+Measured off a production render: content stopped **26%** down the face and the
+barcode began at **63%**. The 37% between them was empty gradient.
+
+Since Wallet reserves each field band regardless, the fix was to fill the bands
+that were already being paid for. Two were sitting idle — a secondary row
+spending its full width on one fact, and an auxiliary row that was empty on
+every event without a billed artist, which is most of them.
+
+```
+header        AUG 29
+primary       ADMIT    Guest Name +1
+secondary     STARTS 1:00 PM          ENDS 4:00 PM
+auxiliary r0  WHERE 1933 S. Broadway  SUITE Ste 1202
+auxiliary r1  SPECIAL GUESTS ...  |  EVENT + PARKING
+```
+
+Empty band: **37% → 15%**, same device, same measurement.
+
+`STARTS` also dropped the date it was repeating — the header field stamps it two
+inches above that line.
+
+### Three rules for anyone editing these fields
+
+**A classic `eventTicket` renders only the FIRST primary field.** Putting
+`STARTS` and `ADMIT` in that group together silently dropped `ADMIT` — the
+guest's name left the card entirely, which is the one thing the door reads. The
+guest goes in the primary band, alone.
+
+**A field on the FACE is a single line. Only `backFields` wrap.** Artist names
+were newline-joined to make a column and could never have produced one; two
+names would have rendered as one clipped name. They are middot-joined now.
+
+**A field's size is set by how much of its row it gets** — alone it is large,
+beside another it shrinks to roughly half. This is why the second auxiliary row
+is *allocated* rather than shared: when an event has anyone on the bill,
+`SPECIAL GUEST` takes that row outright and prints larger than every other fact
+except the holder's name. `EVENT` and `PARKING` stand down for it, and parking
+is written to `backFields` unconditionally so it survives the events guests are
+most likely to drive to.
+
+### `description` is the add-sheet title
+
+iOS prints it verbatim across the top of the sheet a guest taps **Add** on. It
+was built by suffixing the brand onto the event title, so an event actually
+named "Mix&Greet" read `Mix&Greet, Mix & Greet`. `isBrandTitle()` — the same
+test the fields use — drops the suffix when the title already carries the brand.
+
+### Verifying a layout change
+
+The rig cannot see where Wallet draws anything; it validates structure. Layout
+needs a device:
+
+```bash
+xcrun simctl list devices available          # iPhone 17 Pro was used throughout
+xcrun simctl openurl <udid> "https://good-labrador-980.convex.site/api/pass?t=<manageToken>"
+xcrun simctl io <udid> screenshot card.png
+```
+
+A `manageToken` comes back from a **first** `POST /api/rsvp` for an address; a
+repeat post for the same address returns `duplicate:true` and no token, by
+design. Always probe with `@example.test` — it sends no mail, and a repeat post
+against a real event **patches the existing row**, which once overwrote a real
+guest's name.
+
+Testing a billing needs an event that has one. Create a throwaway dated `2099`,
+render it, delete it — the pattern `scripts/e2e-invite-flow.mjs` already uses.
+Archived events refuse RSVPs, so an old event will not do.
