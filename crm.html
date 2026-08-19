@@ -185,6 +185,9 @@ body.modal-open{overflow:hidden}
 /* Two numbers that must never be read as one. Green is who receives it, red is
    who cannot, and a campaign that says 52 while sending to 40 is the exact lie
    this pair exists to prevent. */
+/* Set small and muted on purpose: it has to travel with the number without
+   competing with it. */
+.caveat{font-size:11px;line-height:1.65;color:var(--text-muted);margin-top:10px;max-width:68ch}
 .tot{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 .tot div{flex:1 1 120px;min-width:0;border:2px solid var(--surface-line);
   border-radius:var(--radius-sm);padding:10px 12px}
@@ -358,6 +361,16 @@ body.modal-open{overflow:hidden}
           <div class="tags" id="ct-interests"></div>
         </div>
 
+        <!-- Does this person read what we send. The question worth answering
+             before writing to them again, and the reason it sits above the
+             reply box rather than under the timeline. -->
+        <div class="sec" id="ct-engage-sec" hidden>
+          <b>Do they open our email</b>
+          <div class="tot" id="ct-engage"></div>
+          <p class="caveat">Same caveat as the campaign report: an open is a pixel being
+            fetched, and Apple and Gmail fetch it whether or not anyone looked.</p>
+        </div>
+
         <div class="sec">
           <b>Questionnaire submissions</b>
           <div id="ct-subs"></div>
@@ -448,6 +461,14 @@ body.modal-open{overflow:hidden}
           <b>Results</b>
           <div class="tot" id="cp-stats"></div>
           <p class="lede" id="cp-stats-note"></p>
+          <!-- Printed next to the number, not buried in a doc, because the open
+               rate is the figure most likely to end up in a partner deck as if
+               it were a headcount. -->
+          <p class="caveat" id="cp-stats-caveat" hidden>An open is a tracking pixel being
+            fetched. Apple Mail Privacy Protection pre-fetches it for every message it
+            receives whether or not a person looked, and Gmail proxies it, so opens run high
+            everywhere. Read this as a trend against your own past sends, not as a headcount.
+            Clicks are the honest signal.</p>
           <div class="prev" id="cp-sends"></div>
         </div>
 
@@ -1241,9 +1262,38 @@ function paintContact(d){
   (c.interests || []).forEach(t => iv.appendChild(el('span', 'tag on', t)));
   if (!(c.interests || []).length) iv.appendChild(el('span', 'none', 'Nothing ticked yet.'));
 
+  paintEngagement(d.engagement);
   paintSubs($('ct-subs'), d.submissions);
   loadNotes('contact', c._id, 'ct-notes', 'contact-msg');
   paintTimeline(d.timeline);
+}
+
+/* Counted across every email this address has ever been sent, campaign and
+   transactional alike, because the question is whether this person reads us at
+   all and a confirmation they opened is evidence of that.
+
+   Hidden entirely when nothing has been sent yet: an open rate of 0% over zero
+   emails reads as "they ignore us" when the truth is that nobody has written. */
+function paintEngagement(e){
+  const sec = $('ct-engage-sec');
+  const box = $('ct-engage');
+  box.textContent = '';
+  if (!e || !e.sent) { sec.hidden = true; return; }
+  sec.hidden = false;
+  statTile(box, e.sent, 'Sent to them', null);
+  statTile(box, e.opened || 0, 'Opened',
+    pct(e.openRate) + ((e.totalOpens || 0) > (e.opened || 0)
+      ? ' · ' + e.totalOpens + ' opens in total' : ''),
+    (e.opened ? 'yes' : null));
+  statTile(box, e.clicked || 0, 'Clicked a link', null, (e.clicked ? 'yes' : null));
+  if (e.lastOpenedAt) {
+    // The date is the tile, the clock is the footnote. Printing the full
+    // crmWhenExact string in both places said the date twice and read as a
+    // rendering fault.
+    const d = new Date(e.lastOpenedAt);
+    statTile(box, crmWhen(e.lastOpenedAt), 'Last opened',
+      d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }));
+  }
 }
 
 async function openContact(id){
@@ -1256,8 +1306,9 @@ async function openContact(id){
   // notes on screen while a different person's record loads is how one record
   // gets read as another.
   ['ct-name','ct-title','ct-phone','ct-company','ct-tags','ct-note'].forEach(k => { $(k).value = ''; });
-  ['ct-interests','ct-subs','ct-notes','ct-tl','ct-id'].forEach(k => { $(k).textContent = ''; });
+  ['ct-interests','ct-subs','ct-notes','ct-tl','ct-id','ct-engage'].forEach(k => { $(k).textContent = ''; });
   $('ct-supp').hidden = true;
+  $('ct-engage-sec').hidden = true;
   try {
     const d = await crmPost({ op:'contact', id });
     // A second row clicked while this read was out. Painting now would put one
@@ -1877,6 +1928,8 @@ function paintResults(d){
   }
   $('cp-stats-note').textContent = Object.keys(byStatus).sort()
     .map(k => byStatus[k] + ' ' + k).join(' · ');
+  // Only shown when there is an open figure on screen to qualify.
+  $('cp-stats-caveat').hidden = !stats;
 
   // Openers first, which is how the backend already sorts it: the reason to
   // open this screen is to find out who is interested, and that list must not
@@ -1923,6 +1976,7 @@ function resetCampaign(){
   $('cp-event').value = '';
   ['cp-found','cp-suggest','cp-stats','cp-sends'].forEach(k => { $(k).textContent = ''; });
   $('cp-stats-note').textContent = '';
+  $('cp-stats-caveat').hidden = true;
   $('cp-results').hidden = true;
   $('camp-title').textContent = 'New campaign';
   $('cp-del').hidden = true;
