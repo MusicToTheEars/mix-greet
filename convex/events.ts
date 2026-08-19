@@ -275,6 +275,9 @@ async function shape(ctx: QueryCtx | MutationCtx, e: Doc<"events">) {
     // The operator's own pasted override, kept separate so the edit form can
     // round-trip it without ever mistaking our own link for an external one.
     rsvpExternalUrl: e.rsvpUrl ?? "",
+    // Read back so the edit form can round-trip the tags, and so the campaign
+    // builder can propose an audience from the event it is already showing.
+    interestTags: e.interestTags ?? [],
     // Legacy field name the public page reads to build its RSVP button. A
     // hosted event points it at our invite page; an external one keeps the
     // pasted URL; a closed one stays empty and the page shows "Opens Soon".
@@ -449,6 +452,9 @@ const eventInput = v.object({
   inviteOnly: v.optional(v.boolean()),
   capacity: v.optional(v.number()),
   featured: v.optional(featuredInput),
+  // What this event is FOR, in the brand questionnaire's own vocabulary. Read
+  // by the campaign builder to propose an audience; see schema.ts.
+  interestTags: v.optional(v.array(v.string())),
   // The link-preview card, already uploaded by the back office. An id, not
   // bytes: the browser PUTs the PNG straight to Convex storage and sends only
   // the handle, the same way featured[].imageId works.
@@ -456,6 +462,20 @@ const eventInput = v.object({
 });
 
 const clamp = (s: unknown, max: number) => String(s ?? "").trim().slice(0, max);
+
+// Interest tags are matched against contacts by exact string, so they are
+// trimmed and de-duplicated but never case-folded: the labels come from the
+// questionnaire's own option lists and have to survive the round trip
+// character for character or the match silently finds nobody.
+function normalizeTags(tags?: string[]): string[] | undefined {
+  if (!tags) return undefined;
+  const out: string[] = [];
+  for (const t of tags.slice(0, 60)) {
+    const clean = clamp(t, 200);
+    if (clean && !out.includes(clean)) out.push(clean);
+  }
+  return out;
+}
 const httpUrl = (s: unknown, max = 400) =>
   /^https?:\/\//i.test(clamp(s, max)) ? clamp(s, max) : undefined;
 
@@ -568,6 +588,7 @@ export const create = internalMutation({
       status: "published",
       socialCardId: event.socialCardId,
       featured: normalizeFeatured(event.featured) ?? [],
+      interestTags: normalizeTags(event.interestTags),
     });
     return { ...(await adminLists(ctx)), saved: await shapeById(ctx, id) };
   },
@@ -620,6 +641,9 @@ export const update = internalMutation({
       // field entirely in that case, and `undefined` here would erase it.
       ...(event.socialCardId ? { socialCardId: event.socialCardId } : {}),
       ...(featured ? { featured } : {}),
+      // Same rule as featured: only touched when the caller sends it, so a save
+      // from a form that predates the field cannot wipe the tags.
+      ...(event.interestTags ? { interestTags: normalizeTags(event.interestTags) } : {}),
     });
     return { ...(await adminLists(ctx)), saved: await shapeById(ctx, id) };
   },

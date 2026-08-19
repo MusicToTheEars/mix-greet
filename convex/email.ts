@@ -312,6 +312,21 @@ export const recordAndEnqueue = internalMutation({
   },
 });
 
+// An open or a click is the contact doing something, so it counts as activity
+// and floats them up the CRM list. Guarded on contactId: transactional sends
+// are bound to an rsvp row, not a contact, and there is nothing to float.
+async function markEngaged(
+  ctx: MutationCtx,
+  contactId: Id<"contacts"> | undefined,
+  at: number,
+) {
+  if (!contactId) return;
+  const c = await ctx.db.get(contactId);
+  if (!c) return;
+  if ((c.lastActivityAt ?? 0) >= at) return;
+  await ctx.db.patch(contactId, { lastActivityAt: at });
+}
+
 // Add an address to the global do-not-send list and mark its contact.
 async function suppress(
   ctx: MutationCtx,
@@ -387,8 +402,42 @@ export const handleEmailEvent = internalMutation({
         await ctx.db.patch(send._id, { status: "complained", providerMessageId });
         await suppress(ctx, send.toEmail, "complaint", send._id);
         break;
+      // Opens and clicks are counted, and `status` is deliberately left alone.
+      // See the note on emailSends in schema.ts: an open is a different axis
+      // from delivery, and a message that is delivered and opened is still
+      // delivered.
+      //
+      // WHAT AN OPEN ACTUALLY MEANS, because the number will be quoted at
+      // somebody: it is a 1x1 tracking pixel being fetched. Apple Mail Privacy
+      // Protection pre-fetches that pixel for every message it receives whether
+      // or not a human looked, and Gmail proxies it, so opens run HIGH and a
+      // single open is not proof of a reader. Clicks are the honest signal.
+      // Treat the open rate as a trend against your own past sends, never as a
+      // headcount.
+      case "email.opened": {
+        const now = Date.now();
+        await ctx.db.patch(send._id, {
+          providerMessageId,
+          openedAt: send.openedAt ?? now,
+          lastOpenedAt: now,
+          openCount: (send.openCount ?? 0) + 1,
+        });
+        await markEngaged(ctx, send.contactId, now);
+        break;
+      }
+      case "email.clicked": {
+        const now = Date.now();
+        await ctx.db.patch(send._id, {
+          providerMessageId,
+          clickedAt: send.clickedAt ?? now,
+          lastClickedAt: now,
+          clickCount: (send.clickCount ?? 0) + 1,
+        });
+        await markEngaged(ctx, send.contactId, now);
+        break;
+      }
       default:
-        // delivery_delayed / opened / clicked: no ledger transition.
+        // delivery_delayed and anything Resend adds later: no ledger transition.
         break;
     }
   },

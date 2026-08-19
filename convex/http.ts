@@ -2,7 +2,7 @@ import { httpRouter } from "convex/server";
 import { httpAction, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { checkPassword } from "./auth";
+import { checkPassword, checkBrandPassword } from "./auth";
 import { inviteOrigin } from "./events";
 import { resend } from "./email";
 import { verifyUnsubToken } from "./lib/unsub";
@@ -45,11 +45,15 @@ async function loginBucket(ctx: any, key: string) {
 // Checked BEFORE the password is compared, so a locked-out caller cannot even
 // use the endpoint as a timing oracle. Also the only place stale rows are
 // pruned, which keeps the write path free of housekeeping.
+// `globalKey` exists so a second password gate can have its own backstop.
+// /brand-interest is guarded by a different secret, handed to different people;
+// sharing one global counter would mean a brand mistyping their password could
+// lock the operator out of the back office, which is exactly backwards.
 export const gateLogin = internalMutation({
-  args: { clientKey: v.string(), now: v.number() },
-  handler: async (ctx, { clientKey, now }) => {
+  args: { clientKey: v.string(), now: v.number(), globalKey: v.optional(v.string()) },
+  handler: async (ctx, { clientKey, now, globalKey }) => {
     let retryAfter = 0;
-    for (const key of [clientKey, LOGIN_GLOBAL_KEY]) {
+    for (const key of [clientKey, globalKey ?? LOGIN_GLOBAL_KEY]) {
       const row = await loginBucket(ctx, key);
       if (!row) continue;
       if (row.lockedUntil <= now && now - row.windowStart > LOGIN_WINDOW_MS) {
@@ -66,11 +70,17 @@ export const gateLogin = internalMutation({
 
 // Recorded AFTER the comparison, once, for both buckets.
 export const settleLogin = internalMutation({
-  args: { clientKey: v.string(), now: v.number(), ok: v.boolean() },
-  handler: async (ctx, { clientKey, now, ok }) => {
+  args: {
+    clientKey: v.string(),
+    now: v.number(),
+    ok: v.boolean(),
+    globalKey: v.optional(v.string()),
+  },
+  handler: async (ctx, { clientKey, now, ok, globalKey }) => {
+    const globalBucket = globalKey ?? LOGIN_GLOBAL_KEY;
     const buckets: Array<[string, number]> = [
       [clientKey, LOGIN_MAX_PER_CLIENT],
-      [LOGIN_GLOBAL_KEY, LOGIN_MAX_GLOBAL],
+      [globalBucket, LOGIN_MAX_GLOBAL],
     ];
     for (const [key, max] of buckets) {
       const row = await loginBucket(ctx, key);
@@ -130,6 +140,10 @@ const RATE_BUDGETS: Record<string, { client: number; global: number }> = {
   pass: { client: 30, global: 600 },
   // The cheapest, and the one a guest legitimately refreshes at a dark door.
   qr: { client: 60, global: 1200 },
+  // /brand-interest. A brand submits once, occasionally twice after a rethink.
+  // The budget is small because the route is already behind a password and each
+  // success costs a row, a contact upsert and a queued email.
+  brandinterest: { client: 6, global: 120 },
 };
 
 function budgetFor(route: string): { client: number; global: number } {
@@ -485,6 +499,504 @@ http.route({ path: "/api/admin/rsvps", method: "GET", handler: adminRsvps });
 http.route({ path: "/api/admin/rsvps", method: "OPTIONS", handler: httpAction(async () => preflight()) });
 http.route({ path: "/api/admin/rsvps.csv", method: "GET", handler: adminRsvps });
 http.route({ path: "/api/admin/rsvps.csv", method: "OPTIONS", handler: httpAction(async () => preflight()) });
+
+// --- Brand Activation & Partnership Interest (/brand-interest) ---------------
+//
+// Two routes and one read. The page is a questionnaire handed to brands, so the
+// password that opens it is NOT the operator's: BRAND_PASSWORD is a second
+// secret, exchanged here for its own 12h token in its own table, and a token
+// minted by this route is worthless at every /api/admin/* route on this
+// deployment.
+//
+// The gate is server-side and not decoration. This repo is public and the
+// static file ships to a CDN, so a password compared in the browser would be a
+// password published in the page — the questionnaire's contents stay behind
+// this call, and the page has nothing to render until it succeeds.
+
+const BRAND_GLOBAL_KEY = "brand:global";
+
+const brandGate = httpAction(async (ctx, req) => {
+  const now = Date.now();
+  // Prefixed so brand-side failures fill brand-side buckets. Without the prefix
+  // a brand fat-fingering the password five times would lock that IP out of the
+  // back office too.
+  const clientKey = `brand:${callerKey(req)}`;
+
+  const gate = await ctx.runMutation(internal.http.gateLogin, {
+    clientKey,
+    now,
+    globalKey: BRAND_GLOBAL_KEY,
+  });
+  if (!gate.allowed) {
+    return new Response(
+      JSON.stringify({ error: "too many attempts — try again later" }),
+      {
+        status: 429,
+        headers: corsHeaders({ "retry-after": String(gate.retryAfter) }),
+      },
+    );
+  }
+
+  const body = (await req.json().catch(() => ({}))) as any;
+  const ok = checkBrandPassword(clean(body.password, 200));
+  await ctx.runMutation(internal.http.settleLogin, {
+    clientKey,
+    now,
+    ok,
+    globalKey: BRAND_GLOBAL_KEY,
+  });
+  if (!ok) return json({ error: "unauthorized" }, 401);
+
+  const token = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+  const { expiresAt } = await ctx.runMutation(internal.brandInterest.createSession, {
+    token,
+    now: Date.now(),
+  });
+  return json({ ok: true, token, expiresAt });
+});
+
+http.route({ path: "/api/brand/gate", method: "POST", handler: brandGate });
+http.route({
+  path: "/api/brand/gate",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
+
+// A checklist answer: a list of labels, each clamped, the list itself capped.
+// The labels are not checked against an allowlist on purpose — the option text
+// lives in the page and will be reworded there long before it is here, and a
+// server that rejects a label the page is currently printing loses a real lead
+// to defend against a bored attacker who already knows the password. Length and
+// count are what actually need bounding.
+function cleanList(value: unknown, maxItems = 40, maxLen = 200): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .slice(0, maxItems)
+    .map((item) => clean(item, maxLen))
+    .filter(Boolean);
+}
+
+const brandInterest = httpAction(async (ctx, req) => {
+  const capped = await rateLimited(ctx, req, "brandinterest");
+  if (capped) return capped;
+
+  const body = (await req.json().catch(() => ({}))) as any;
+
+  const token = clean(body.token, 200);
+  const valid = await ctx.runQuery(internal.brandInterest.validateToken, {
+    token,
+    now: Date.now(),
+  });
+  if (!valid) return json({ error: "session expired — reload and re-enter the password" }, 401);
+
+  // Honeypot, same shape as /api/rsvp: success-shaped so a bot learns nothing,
+  // and already charged against the rate budget above.
+  if (clean(body.website, 20)) return json({ ok: true });
+
+  const company = clean(body.company, 160);
+  const contact = clean(body.contact, 120);
+  const email = clean(body.email, 200).toLowerCase();
+  if (!company || !contact || !email) {
+    return json({ error: "company, contact name and email are required" }, 400);
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return json({ error: "that email address does not look right" }, 400);
+  }
+
+  const { id } = await ctx.runMutation(internal.brandInterest.record, {
+    submission: {
+      company,
+      contact,
+      title: clean(body.title, 160) || undefined,
+      email,
+      timeline: clean(body.timeline, 200) || undefined,
+      goals: cleanList(body.goals),
+      solutions: cleanList(body.solutions),
+      audience: cleanList(body.audience),
+      audienceOther: clean(body.audienceOther, 200) || undefined,
+      categories: cleanList(body.categories),
+      categoriesOther: clean(body.categoriesOther, 200) || undefined,
+      impact: cleanList(body.impact),
+      budget: clean(body.budget, 80) || undefined,
+      success: clean(body.success, 4000) || undefined,
+      context: clean(body.context, 4000) || undefined,
+    },
+  });
+
+  // Scheduled, not awaited. The submission is already committed; a Resend
+  // outage must not turn a captured lead into an error the brand sees and a
+  // form they have to fill in again.
+  await ctx.scheduler.runAfter(0, internal.brandInterest.notify, {
+    submissionId: id,
+  });
+
+  return json({ ok: true });
+});
+
+http.route({ path: "/api/brand-interest", method: "POST", handler: brandInterest });
+http.route({
+  path: "/api/brand-interest",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
+
+// --- Admin: brand interest list + CSV export (token-gated) -------------------
+const adminBrandInterest = httpAction(async (ctx, req) => {
+  if (!(await isAdmin(ctx, req))) {
+    return json({ error: "unauthorized" }, 401);
+  }
+  const url = new URL(req.url);
+
+  if (req.method === "POST") {
+    const body = (await req.json().catch(() => ({}))) as any;
+    const status = clean(body.status, 20);
+    if (status !== "new" && status !== "reviewed" && status !== "archived") {
+      return json({ error: "status must be new, reviewed or archived" }, 400);
+    }
+    try {
+      return json(
+        await ctx.runMutation(internal.brandInterest.setStatus, {
+          id: body.id,
+          status,
+        }),
+      );
+    } catch (err: any) {
+      return json({ error: String(err?.message || err) }, 400);
+    }
+  }
+
+  const rows = await ctx.runQuery(internal.brandInterest.list, {});
+
+  if (url.pathname.endsWith(".csv")) {
+    // Multi-select answers are joined with "; " rather than "," so one answer
+    // never splits into two columns when the sheet is opened.
+    const j = (list: string[] | undefined) => (list ?? []).join("; ");
+    const header =
+      "submittedAt,status,company,contact,title,email,timeline,budget,goals,solutions,audience,audienceOther,categories,categoriesOther,impact,success,context";
+    const lines = rows.map((r: any) =>
+      [
+        new Date(r.submittedAt).toISOString(),
+        r.status,
+        r.company,
+        r.contact,
+        r.title,
+        r.email,
+        r.timeline,
+        r.budget,
+        j(r.goals),
+        j(r.solutions),
+        j(r.audience),
+        r.audienceOther,
+        j(r.categories),
+        r.categoriesOther,
+        j(r.impact),
+        r.success,
+        r.context,
+      ]
+        .map(csvCell)
+        .join(","),
+    );
+    return new Response([header, ...lines].join("\r\n") + "\r\n", {
+      status: 200,
+      headers: corsHeaders({
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="brand-interest.csv"`,
+      }),
+    });
+  }
+  return json({ submissions: rows });
+});
+
+http.route({ path: "/api/admin/brand-interest", method: "GET", handler: adminBrandInterest });
+http.route({ path: "/api/admin/brand-interest", method: "POST", handler: adminBrandInterest });
+http.route({
+  path: "/api/admin/brand-interest",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
+http.route({ path: "/api/admin/brand-interest.csv", method: "GET", handler: adminBrandInterest });
+http.route({
+  path: "/api/admin/brand-interest.csv",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
+
+// --- CRM (contacts, companies, notes, one-to-one reply) ----------------------
+//
+// One POST route with an `op` field rather than a dozen paths, the same shape
+// /api/events already uses. Every op is gated by the operator token on the way
+// in, so the gate is written once instead of once per resource, and adding a
+// field to the CRM does not mean adding a route, a preflight and a CORS entry
+// to go with it.
+//
+// The CSV export is the one exception and has to be: a download is a GET, and a
+// GET is the only thing a browser will hand to a file save.
+
+const crmOps = httpAction(async (ctx, req) => {
+  if (!(await isAdmin(ctx, req))) return json({ error: "unauthorized" }, 401);
+  const body = (await req.json().catch(() => ({}))) as any;
+  const op = clean(body.op, 40);
+
+  try {
+    switch (op) {
+      // ---- contacts ----
+      case "contacts":
+        return json(
+          await ctx.runQuery(internal.crm.listContacts, {
+            search: clean(body.search, 120) || undefined,
+            tag: clean(body.tag, 60) || undefined,
+            stage: clean(body.stage, 20) || undefined,
+            interest: clean(body.interest, 200) || undefined,
+            companyId: body.companyId || undefined,
+            limit: Number(body.limit) || undefined,
+          }),
+        );
+      case "contact":
+        return json(await ctx.runQuery(internal.crm.getContact, { id: body.id }));
+      case "patchContact":
+        return json(
+          await ctx.runMutation(internal.crm.patchContact, {
+            id: body.id,
+            name: body.name === undefined ? undefined : clean(body.name, 160),
+            title: body.title === undefined ? undefined : clean(body.title, 160),
+            phone: body.phone === undefined ? undefined : clean(body.phone, 40),
+            company: body.company === undefined ? undefined : clean(body.company, 160),
+            stage: body.stage === undefined ? undefined : clean(body.stage, 20),
+            tags: Array.isArray(body.tags) ? cleanList(body.tags, 40, 60) : undefined,
+            interests: Array.isArray(body.interests)
+              ? cleanList(body.interests, 120, 200)
+              : undefined,
+          }),
+        );
+      case "assignCompany":
+        return json(
+          await ctx.runMutation(internal.crm.assignCompany, {
+            contactId: body.contactId,
+            companyId: body.companyId || undefined,
+          }),
+        );
+
+      // ---- companies ----
+      case "companies":
+        return json(
+          await ctx.runQuery(internal.crm.listCompanies, {
+            search: clean(body.search, 120) || undefined,
+          }),
+        );
+      case "company":
+        return json(await ctx.runQuery(internal.crm.getCompany, { id: body.id }));
+      case "patchCompany":
+        return json(
+          await ctx.runMutation(internal.crm.patchCompany, {
+            id: body.id,
+            name: body.name === undefined ? undefined : clean(body.name, 160),
+            domain: body.domain === undefined ? undefined : clean(body.domain, 160),
+            website: body.website === undefined ? undefined : clean(body.website, 300),
+            notes: body.notes === undefined ? undefined : clean(body.notes, 4000),
+          }),
+        );
+
+      // ---- notes ----
+      case "notes":
+        return json(
+          await ctx.runQuery(internal.crm.listNotes, {
+            subjectType: body.subjectType,
+            subjectId: clean(body.subjectId, 60),
+          }),
+        );
+      case "addNote":
+        return json(
+          await ctx.runMutation(internal.crm.addNote, {
+            subjectType: body.subjectType,
+            subjectId: clean(body.subjectId, 60),
+            body: clean(body.body, 4000),
+            author: clean(body.author, 80) || undefined,
+          }),
+        );
+      case "deleteNote":
+        return json(await ctx.runMutation(internal.crm.deleteNote, { id: body.id }));
+
+      case "removeCompany":
+        return json(await ctx.runMutation(internal.crm.removeCompany, { id: body.id }));
+      case "removeSubmission":
+        return json(
+          await ctx.runMutation(internal.crm.removeSubmission, { id: body.id }),
+        );
+
+      // ---- the audience vocabulary the campaign builder offers ----
+      case "facets":
+        return json(await ctx.runQuery(internal.crm.facets, {}));
+
+      // ---- one-off maintenance ----
+      // Fills the CRM fields on rows that predate them. Idempotent, so an
+      // operator pressing it twice is a no-op rather than a duplicate.
+      case "backfill":
+        return json(await ctx.runMutation(internal.crm.backfill, {}));
+
+      // ---- one operator answering one lead ----
+      case "reply":
+        return json(
+          await ctx.runAction(internal.campaigns.reply, {
+            contactId: body.contactId,
+            subject: clean(body.subject, 200),
+            body: clean(body.body, 8000),
+            eventId: body.eventId || undefined,
+          }),
+        );
+
+      default:
+        return json({ error: `unknown op: ${op || "(none)"}` }, 400);
+    }
+  } catch (err: any) {
+    return json({ error: String(err?.message || err) }, 400);
+  }
+});
+
+http.route({ path: "/api/admin/crm", method: "POST", handler: crmOps });
+http.route({
+  path: "/api/admin/crm",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
+
+const crmContactsCsv = httpAction(async (ctx, req) => {
+  if (!(await isAdmin(ctx, req))) return json({ error: "unauthorized" }, 401);
+  const url = new URL(req.url);
+  const { contacts } = (await ctx.runQuery(internal.crm.listContacts, {
+    search: clean(url.searchParams.get("search") || "", 120) || undefined,
+    tag: clean(url.searchParams.get("tag") || "", 60) || undefined,
+    stage: clean(url.searchParams.get("stage") || "", 20) || undefined,
+    interest: clean(url.searchParams.get("interest") || "", 200) || undefined,
+    limit: 5000,
+  })) as any;
+
+  const header =
+    "name,email,phone,title,company,stage,tags,interests,emailStatus,source,lastActivity";
+  const lines = contacts.map((c: any) =>
+    [
+      c.name,
+      c.email,
+      c.phone,
+      c.title,
+      c.companyName || c.company,
+      c.stage || "none",
+      (c.tags || []).join("; "),
+      (c.interests || []).join("; "),
+      c.emailStatus,
+      c.source,
+      c.lastActivityAt ? new Date(c.lastActivityAt).toISOString() : "",
+    ]
+      .map(csvCell)
+      .join(","),
+  );
+  return new Response([header, ...lines].join("\r\n") + "\r\n", {
+    status: 200,
+    headers: corsHeaders({
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="contacts.csv"`,
+    }),
+  });
+});
+
+http.route({ path: "/api/admin/crm/contacts.csv", method: "GET", handler: crmContactsCsv });
+http.route({
+  path: "/api/admin/crm/contacts.csv",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
+
+// --- Campaigns ---------------------------------------------------------------
+//
+// Same dispatch shape as the CRM route above. `send` is the only op here that
+// does something irreversible, and it is deliberately not a GET, not idempotent
+// by accident, and not reachable without the operator token.
+
+const campaignOps = httpAction(async (ctx, req) => {
+  if (!(await isAdmin(ctx, req))) return json({ error: "unauthorized" }, 401);
+  const body = (await req.json().catch(() => ({}))) as any;
+  const op = clean(body.op, 40);
+
+  // The audience arrives from a browser, so every list in it is clamped before
+  // it becomes a query. The ids are left as-is: an id that does not exist
+  // resolves to nothing, which is the correct outcome for a bad one.
+  const audience = body.audience
+    ? {
+        tags: cleanList(body.audience.tags, 60, 60),
+        interests: cleanList(body.audience.interests, 200, 200),
+        stages: cleanList(body.audience.stages, 10, 20),
+        sources: cleanList(body.audience.sources, 10, 20),
+        manualContactIds: Array.isArray(body.audience.manualContactIds)
+          ? body.audience.manualContactIds.slice(0, 2000)
+          : [],
+        excludeContactIds: Array.isArray(body.audience.excludeContactIds)
+          ? body.audience.excludeContactIds.slice(0, 2000)
+          : [],
+      }
+    : undefined;
+
+  try {
+    switch (op) {
+      case "list":
+        // Already shaped as { campaigns, overall }; wrapping it again would
+        // bury the list one level deeper than every caller expects.
+        return json(await ctx.runQuery(internal.campaigns.list, {}));
+      case "get":
+        return json(await ctx.runQuery(internal.campaigns.get, { id: body.id }));
+      case "create":
+        return json(
+          await ctx.runMutation(internal.campaigns.create, {
+            name: clean(body.name, 160),
+            subject: clean(body.subject, 200),
+            body: clean(body.body, 20000),
+            eventId: body.eventId || undefined,
+            audience,
+          }),
+        );
+      case "update":
+        return json(
+          await ctx.runMutation(internal.campaigns.update, {
+            id: body.id,
+            name: body.name === undefined ? undefined : clean(body.name, 160),
+            subject: body.subject === undefined ? undefined : clean(body.subject, 200),
+            body: body.body === undefined ? undefined : clean(body.body, 20000),
+            // null clears the event; undefined leaves it alone. Without the
+            // distinction a campaign can never stop being about an event.
+            eventId: body.eventId === undefined ? undefined : (body.eventId || null),
+            audience,
+          }),
+        );
+      case "delete":
+        return json(await ctx.runMutation(internal.campaigns.remove, { id: body.id }));
+      case "preview":
+        if (!audience) return json({ error: "no audience given" }, 400);
+        return json(await ctx.runQuery(internal.campaigns.preview, { audience }));
+      case "suggest":
+        return json(
+          await ctx.runQuery(internal.campaigns.suggestForEvent, { eventId: body.eventId }),
+        );
+      case "test":
+        return json(
+          await ctx.runAction(internal.campaigns.send, {
+            id: body.id,
+            testEmail: clean(body.testEmail, 200),
+          }),
+        );
+      case "send":
+        return json(await ctx.runAction(internal.campaigns.send, { id: body.id }));
+      default:
+        return json({ error: `unknown op: ${op || "(none)"}` }, 400);
+    }
+  } catch (err: any) {
+    return json({ error: String(err?.message || err) }, 400);
+  }
+});
+
+http.route({ path: "/api/admin/campaigns", method: "POST", handler: campaignOps });
+http.route({
+  path: "/api/admin/campaigns",
+  method: "OPTIONS",
+  handler: httpAction(async () => preflight()),
+});
 
 // --- Resend webhook (Svix signature verified by the component) ---------------
 http.route({

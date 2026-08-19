@@ -21,6 +21,16 @@ export function checkPassword(password: string): boolean {
   return timingSafeEqual(password, expected);
 }
 
+// The second password on this deployment, and the only other one. It guards
+// /brand-interest, which is handed out to brands rather than kept by the
+// operator, so it is a different secret checked the same constant-time way.
+// No default fallback, for the same reason as above: unset means closed.
+export function checkBrandPassword(password: string): boolean {
+  const expected = process.env.BRAND_PASSWORD;
+  if (!expected) return false;
+  return timingSafeEqual(password, expected);
+}
+
 // Create a session row from a token minted by the caller (the login
 // httpAction, which runs in an action context). Returns the expiry.
 export const createSession = internalMutation({

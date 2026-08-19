@@ -3,6 +3,7 @@ import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import { enrichContact } from "./crm";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const clamp = (s: unknown, max: number) => String(s ?? "").trim().slice(0, max);
@@ -223,26 +224,29 @@ export const submit = internalMutation({
         .query("contacts")
         .withIndex("by_email", (q) => q.eq("email", email))
         .first();
-      if (contact) {
-        await ctx.db.patch(contact._id, {
-          name: contact.name || name,
-          phone: contact.phone || phone,
-          tags: contact.tags.includes("attendee")
-            ? contact.tags
-            : [...contact.tags, "attendee"],
-          updatedAt: Date.now(),
-        });
-      } else {
-        await ctx.db.insert("contacts", {
+      const contactId =
+        contact?._id ??
+        (await ctx.db.insert("contacts", {
           name,
           email,
           phone,
-          tags: ["attendee"],
+          tags: [],
           emailStatus: "unverified",
           source: "rsvp",
           updatedAt: Date.now(),
-        });
-      }
+        }));
+      // The guest's employer and discipline are already being collected at the
+      // door for the morning-after list. Folding them onto the contact is what
+      // lets the same two answers pick an audience later, instead of being read
+      // once and left inside one event's RSVP row.
+      await enrichContact(ctx, contactId, {
+        name,
+        phone,
+        company,
+        title: creativeField,
+        interests: creativeField ? [creativeField] : [],
+        tag: "attendee",
+      });
     }
 
     // Scheduled only if this mutation commits; the send itself re-checks
