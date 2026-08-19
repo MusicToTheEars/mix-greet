@@ -1,0 +1,1273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0B0B0D">
+<title>Brand Activation &amp; Partnership Interest · Mix &amp; Greet</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<!-- The link is emailed to a brand contact, so it previews in Outlook and in
+     LinkedIn DMs before anyone reaches the password. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Brand Activation &amp; Partnership Interest · Mix &amp; Greet">
+<meta property="og:description" content="Where creative brands meet the creative community. Tell us what you want to accomplish and we will match it to the right Academix BEAT Lab activation.">
+<meta property="og:image" content="https://mixandgreet.com/social-card.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Brand Activation &amp; Partnership Interest · Mix &amp; Greet">
+<meta name="twitter:description" content="Where creative brands meet the creative community.">
+<meta name="twitter:image" content="https://mixandgreet.com/social-card.jpg">
+<link rel="stylesheet" href="/brand.css">
+<style>
+/* ============================================================
+   /brand-interest: the Brand Activation & Partnership Interest
+   questionnaire.
+
+   Same three-band rhythm as every other page here: dark masthead,
+   light working column, dark footer. Tokens, chrome, controls and
+   type all come from brand.css; this sheet adds only what the
+   questionnaire itself needs:
+
+     the gate      one password, one field, nothing rendered behind it
+     the stepper   eight steps, one on screen at a time
+     the options   selectable cards instead of a wall of checkboxes
+     the review    every answer read back before anything is sent
+
+   Motion is ported from the reactbits.dev set: split-text headings,
+   staggered content reveal, click sparks, a spotlight panel, a shiny
+   eyebrow, scrambled gate type, written as plain CSS/JS because this
+   site has no build step and no React. Every one of them is switched
+   off under prefers-reduced-motion, and the page is fully usable with
+   the whole sheet's animation removed.
+   ============================================================ */
+
+html{scroll-behavior:smooth}
+
+/* brand.css's --text-muted (#84848C) is 3.4:1 on the light panel, which fails
+   AA for the 11px labels this page is built out of. Re-point the token here,
+   the same override rsvp.html carries. */
+body{--text-muted:#5F5F68}
+.copyright{color:var(--muted)}
+
+.wrap.bi{max-width:1000px}
+
+/* ---------- dark band: wash, grain, drifting motes ----------
+   Identical treatment to the invitation. The wash and the grain are static
+   CSS so a reduced-motion visitor still gets a lit, textured band; only the
+   canvas field moves, and it never starts when CALM is true. */
+.dark-zone.top{position:relative;overflow:hidden;isolation:isolate}
+.dark-zone.top > header,.dark-zone.top > section{position:relative;z-index:2}
+.dark-zone.top > .dust,.dark-zone.top > .motes{position:absolute;inset:0;z-index:0;pointer-events:none}
+.dark-zone.top > .dust{
+  background:
+    radial-gradient(58% 46% at 79% 2%,rgba(236,28,36,.30),transparent 66%),
+    radial-gradient(74% 58% at 96% 40%,rgba(236,28,36,.13),transparent 68%),
+    radial-gradient(64% 52% at -6% 96%,rgba(236,28,36,.11),transparent 64%),
+    radial-gradient(90% 70% at 30% 30%,rgba(237,234,227,.05),transparent 70%);
+}
+.dark-zone.top > .dust.b{
+  opacity:.42;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='170'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='170' height='170' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:170px 170px;
+}
+.dark-zone.top > .motes{z-index:1;width:100%;height:100%;display:block}
+
+.rail-end{display:flex;align-items:center;gap:14px}
+.backlink{
+  display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--muted);
+  font-size:clamp(11px,1.5vw,13px);letter-spacing:.16em;text-transform:uppercase;font-weight:500;
+}
+.backlink:hover,.backlink:focus-visible{color:var(--ink)}
+.backlink span{color:var(--brand)}
+
+.masthead-block{padding-bottom:clamp(34px,6vw,58px)}
+.masthead{font-size:clamp(40px,9.4vw,72px)}
+.tagline{font-size:clamp(17px,3.6vw,27px);max-width:24ch}
+.kicker{
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
+  font-size:clamp(26px,5.4vw,44px);line-height:.94;color:var(--ink);margin-top:16px;
+  letter-spacing:.01em;max-width:18ch;
+}
+.lede{color:var(--muted);font-size:clamp(13px,1.7vw,15px);line-height:1.75;margin-top:16px;max-width:56ch;letter-spacing:.02em}
+
+/* Two columns from the tablet up: the lockup on the left, and on the right what
+   the visitor is being asked for. Below that they simply stack, brief last, so
+   a phone still opens on the masthead. */
+.hero-grid{display:grid;gap:clamp(24px,4vw,52px);align-items:start}
+@media(min-width:900px){.hero-grid{grid-template-columns:1.02fr .98fr}}
+@media(min-width:900px){
+  .brief{border-left:2px solid var(--line);padding-left:clamp(24px,3vw,40px);margin-top:10px}
+}
+.how{list-style:none;counter-reset:h;margin-top:2px;display:grid;gap:16px}
+.how li{counter-increment:h;position:relative;padding-left:36px}
+.how li::before{
+  content:counter(h,decimal-leading-zero);position:absolute;left:0;top:1px;
+  font-size:11px;letter-spacing:.16em;color:var(--brand);font-weight:700;
+}
+.how b{display:block;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink);font-weight:700}
+.how span{display:block;margin-top:5px;color:var(--muted);font-size:12.5px;line-height:1.7}
+.mins{margin-top:24px;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+
+/* ShinyText: a sheen crossing the eyebrow, port of the reactbits component. */
+.shiny{
+  background:linear-gradient(100deg,var(--brand) 42%,#FFC7C9 50%,var(--brand) 58%);
+  background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:shine 5s linear infinite;
+}
+@keyframes shine{to{background-position:-240% 0}}
+
+/* SplitText: per-character rise + de-blur. JS wraps the letters; the delay
+   is carried on each span as --i so the stagger is pure CSS. */
+.split .w{display:inline-block;white-space:nowrap}
+.split .w span{display:inline-block;opacity:0;transform:translateY(.42em);filter:blur(7px);
+  animation:splitIn .62s cubic-bezier(.22,1,.36,1) forwards;animation-delay:calc(var(--i) * 26ms)}
+@keyframes splitIn{to{opacity:1;transform:none;filter:blur(0)}}
+
+/* ---------- the light working column ---------- */
+main.wrap.bi{padding-bottom:8px}
+
+/* SpotlightCard: a soft red pool that follows the pointer across the panel. */
+.panel.spot{position:relative;overflow:hidden}
+.panel.spot::before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .35s;
+  background:radial-gradient(240px circle at var(--mx,50%) var(--my,0%),rgba(236,28,36,.075),transparent 62%);
+}
+.panel.spot:hover::before,.panel.spot:focus-within::before{opacity:1}
+.panel.spot > *{position:relative}
+
+/* ---------- gate ---------- */
+#gate{max-width:520px;margin-left:auto;margin-right:auto}
+#gate .lock{
+  width:44px;height:44px;border:2px solid var(--surface-line);border-radius:var(--radius-ctl);
+  display:grid;place-items:center;color:var(--accent-ink);margin-bottom:16px;
+}
+#gate h2{border:0;padding:0;font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;
+  font-size:clamp(28px,4.4vw,38px);letter-spacing:.02em;line-height:.94;color:var(--text)}
+#gate .gate-note{color:var(--text-muted);font-size:12.5px;line-height:1.75;margin-top:10px}
+#gate .btn{width:100%;text-align:center}
+
+/* ---------- progress ---------- */
+.progress{margin-top:26px}
+.pbar{height:3px;background:var(--surface-line);border-radius:2px;overflow:hidden}
+.pbar i{display:block;height:100%;width:0;background:var(--brand);transition:width .55s cubic-bezier(.22,1,.36,1)}
+.prail{display:flex;gap:6px;overflow-x:auto;padding:14px 0 2px;scrollbar-width:none}
+.prail::-webkit-scrollbar{display:none}
+.prail button{
+  flex:none;background:none;border:2px solid var(--surface-line);border-radius:999px;
+  color:var(--text-muted);font-size:10px;letter-spacing:.14em;padding:6px 13px;white-space:nowrap;
+  transition:border-color .18s,color .18s,background .18s;
+}
+.prail button:hover:not(:disabled){border-color:var(--text);color:var(--text)}
+.prail button:disabled{opacity:.5;cursor:not-allowed}
+.prail button.done{border-color:var(--surface-line);color:var(--text-soft)}
+.prail button.here{border-color:var(--brand);background:var(--brand);color:#FFFFFF}
+.prail button:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+
+/* ---------- the step deck ---------- */
+.deck{margin-top:6px}
+.step{display:none}
+.step.on{display:block}
+.step.on.fwd{animation:stepFwd .44s cubic-bezier(.22,1,.36,1) both}
+.step.on.back{animation:stepBack .44s cubic-bezier(.22,1,.36,1) both}
+@keyframes stepFwd{from{opacity:0;transform:translate3d(30px,0,0)}to{opacity:1;transform:none}}
+@keyframes stepBack{from{opacity:0;transform:translate3d(-30px,0,0)}to{opacity:1;transform:none}}
+
+.step-no{font-size:11px;letter-spacing:.24em;color:var(--accent-ink);font-weight:700;text-transform:uppercase}
+.step h3{
+  font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
+  font-size:clamp(28px,4.6vw,42px);line-height:.94;letter-spacing:.015em;color:var(--text);margin:8px 0 0;
+}
+.step h3 .amp{color:var(--brand)}
+.step .ask{color:var(--text-soft);font-size:13.5px;line-height:1.75;margin-top:10px;max-width:62ch}
+
+/* ---------- selectable option cards ---------- */
+.opts{display:grid;gap:10px;margin-top:22px;grid-template-columns:repeat(auto-fill,minmax(268px,1fr))}
+.opts.wide{grid-template-columns:1fr}
+@media(min-width:820px){.opts.wide{grid-template-columns:1fr 1fr}}
+
+/* AnimatedContent: each card rises in on its own beat when the step opens. */
+.opt{
+  position:relative;overflow:hidden;display:flex;gap:12px;align-items:flex-start;
+  padding:14px 16px;background:var(--field);border:2px solid var(--surface-line);
+  border-radius:var(--radius-sm);cursor:pointer;
+  /* An option card IS a <label>, so brand.css's label rule reaches it: 11px,
+     uppercase, .18em tracking, muted, and an 18px top margin. All four are
+     wrong for a card of running text, and the margin was opening a 24px gutter
+     inside a 10px grid gap. Reset them here rather than renaming the element,
+     because wrapping the input in the label is what makes the whole card a hit
+     target without a for/id pair to keep in sync. */
+  margin:0;text-transform:none;letter-spacing:normal;color:var(--text);font-size:13.5px;
+  transition:border-color .18s,background .18s,transform .18s,box-shadow .18s;
+  opacity:0;transform:translateY(12px);
+  animation:optRise .52s cubic-bezier(.22,1,.36,1) forwards;animation-delay:calc(var(--i) * 26ms);
+}
+@keyframes optRise{to{opacity:1;transform:none}}
+.opt:hover{border-color:var(--text-soft);transform:translateY(-1px)}
+.opt:active{transform:translateY(0)}
+.opt.on{border-color:var(--accent-ink);background:#FFF7F7;box-shadow:inset 0 0 0 1px rgba(200,21,28,.14)}
+.opt input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.opt:has(input:focus-visible){outline:2px solid var(--text);outline-offset:3px}
+.box{
+  width:19px;height:19px;flex:none;margin-top:2px;border:2px solid var(--surface-line);
+  border-radius:5px;background:#FFFFFF;display:grid;place-items:center;
+  transition:background .18s,border-color .18s;
+}
+.box::after{
+  content:"";width:5px;height:9px;margin-top:-2px;border:solid #FFFFFF;border-width:0 2px 2px 0;
+  transform:rotate(45deg) scale(0);transition:transform .2s cubic-bezier(.22,1.5,.4,1);
+}
+.opt.on .box{background:var(--accent-ink);border-color:var(--accent-ink)}
+.opt.on .box::after{transform:rotate(45deg) scale(1)}
+.opt.radio .box{border-radius:50%}
+.opt.radio .box::after{width:7px;height:7px;margin:0;border:0;background:#FFFFFF;border-radius:50%;transform:scale(0)}
+.opt.radio.on .box::after{transform:scale(1)}
+.opt .t{font-size:13.5px;line-height:1.55;color:var(--text);letter-spacing:.01em}
+.opt .d{display:block;margin-top:5px;font-size:12px;line-height:1.65;color:var(--text-muted);letter-spacing:.01em}
+
+/* ClickSpark: eight ticks thrown from the point of the click. */
+.spark{position:absolute;width:0;height:0;pointer-events:none;z-index:3}
+.spark i{
+  position:absolute;left:0;top:0;width:2px;height:10px;border-radius:1px;background:var(--brand);
+  transform-origin:50% 130%;animation:sparkOut .45s cubic-bezier(.22,1,.36,1) forwards;
+}
+@keyframes sparkOut{from{opacity:.85;transform:rotate(var(--r)) translateY(-2px) scaleY(.5)}
+  to{opacity:0;transform:rotate(var(--r)) translateY(-20px) scaleY(1)}}
+
+/* the free-text "Other" that hangs off a checklist */
+.other{margin-top:14px;max-width:520px}
+.other label{margin-top:0}
+
+/* ---------- plain fields (step 1 and step 8) ---------- */
+.fields{margin-top:8px}
+.fields .req{color:var(--accent-ink)}
+.fields input,.fields textarea{transition:border-color .18s}
+.fields input:focus,.fields textarea:focus{border-color:var(--accent-ink)}
+
+/* ---------- step footer ---------- */
+.navbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:30px;
+  border-top:2px solid var(--surface-line);padding-top:22px}
+.navbar .btn{margin-top:0}
+.navbar .spacer{flex:1}
+.picked{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
+.picked b{color:var(--accent-ink);font-weight:700}
+
+/* ---------- review dialog ---------- */
+.modal{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;justify-content:center;
+  overflow-y:auto;padding:clamp(12px,4vh,48px) 16px}
+.modal[hidden]{display:none}
+.modal-scrim{position:fixed;inset:0;background:rgba(11,11,13,.74);backdrop-filter:blur(3px);
+  animation:scrimIn .3s ease both}
+@keyframes scrimIn{from{opacity:0}to{opacity:1}}
+.modal .panel{position:relative;z-index:1;width:100%;max-width:760px;margin-top:0;
+  animation:panelIn .42s cubic-bezier(.22,1,.36,1) both}
+@keyframes panelIn{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:none}}
+.modal-x{position:absolute;top:10px;right:10px;width:38px;height:38px;padding:0;background:none;
+  border:2px solid var(--surface-line);color:var(--text-muted);font-size:20px;line-height:1;border-radius:var(--radius-ctl)}
+.modal-x:hover,.modal-x:focus-visible{border-color:var(--text);color:var(--text)}
+#review-title{padding-right:46px;border:0;font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;
+  font-size:clamp(26px,4.2vw,36px);letter-spacing:.02em;line-height:.94;color:var(--text)}
+.review-sub{color:var(--text-muted);font-size:12.5px;line-height:1.7;margin-top:8px}
+body.modal-open{overflow:hidden}
+
+.rv{border-top:2px solid var(--surface-line);padding:16px 0 2px;margin-top:18px}
+.rv:first-of-type{margin-top:22px}
+.rv-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.rv-head h4{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent-ink);font-weight:700}
+.rv-edit{background:none;border:0;padding:0;color:var(--text-muted);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.rv-edit:hover,.rv-edit:focus-visible{color:var(--accent-ink)}
+.rv dl{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin-top:10px}
+.rv dt{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);white-space:nowrap;padding-top:3px}
+.rv p.k{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);margin-top:14px}
+.rv dd{font-size:13.5px;color:var(--text);line-height:1.6;word-break:break-word}
+.rv ul{margin:10px 0 0;padding-left:19px}
+.rv li{font-size:13.5px;color:var(--text);line-height:1.75}
+.rv p.free{font-size:13.5px;color:var(--text);line-height:1.75;margin-top:10px;white-space:pre-wrap}
+.rv .none{color:var(--text-muted);font-size:13px;margin-top:10px}
+.rv-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:26px;
+  border-top:2px solid var(--surface-line);padding-top:22px}
+.rv-actions .btn,.rv-actions .ghost{margin-top:0}
+.rv-actions .ghost{margin-left:0}
+
+/* ---------- sent ---------- */
+.sent{text-align:center;padding:clamp(26px,5vw,44px) 0 clamp(10px,2vw,18px)}
+.sent .tick{
+  width:74px;height:74px;margin:0 auto 22px;border:2px solid var(--accent-ink);border-radius:50%;
+  display:grid;place-items:center;color:var(--accent-ink);
+  animation:tickPop .6s cubic-bezier(.22,1.4,.4,1) both;
+}
+@keyframes tickPop{from{opacity:0;transform:scale(.72)}to{opacity:1;transform:none}}
+.sent .tick svg{width:34px;height:34px;stroke-dasharray:40;stroke-dashoffset:40;
+  animation:tickDraw .5s .22s cubic-bezier(.6,0,.3,1) forwards}
+@keyframes tickDraw{to{stroke-dashoffset:0}}
+.sent h2{border:0;padding:0;font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;
+  font-size:clamp(30px,5vw,44px);letter-spacing:.02em;line-height:.94;color:var(--text)}
+.sent p{color:var(--text-soft);font-size:14px;line-height:1.8;margin:14px auto 0;max-width:52ch}
+.sent .strap{
+  margin-top:26px;font-family:'Big Shoulders',Impact,sans-serif;font-weight:800;text-transform:uppercase;
+  font-size:clamp(19px,3.2vw,28px);line-height:1;color:var(--accent-ink);letter-spacing:.015em;
+}
+
+/* the honeypot: off-screen, never focusable, never announced */
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+
+@media (prefers-reduced-motion:reduce){
+  .split .w span,.opt,.step.on.fwd,.step.on.back,.modal .panel,.modal-scrim,.sent .tick,.sent .tick svg{animation:none!important}
+  .split .w span{opacity:1;transform:none;filter:none}
+  .opt{opacity:1;transform:none}
+  .sent .tick svg{stroke-dashoffset:0}
+  .shiny{animation:none;background:none;-webkit-background-clip:border-box;background-clip:border-box;color:var(--brand)}
+  .pbar i{transition:none}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="dark-zone top">
+  <div class="dust" aria-hidden="true"></div>
+  <div class="dust b" aria-hidden="true"></div>
+  <canvas class="motes" id="motes" aria-hidden="true"></canvas>
+
+  <header class="wrap bi">
+    <div class="rail">
+      <a href="https://www.academixbeatlab.com/" aria-label="Academix Beat Lab">
+        <img src="/academix-logo.png" alt="Academix" width="723" height="120">
+      </a>
+      <div class="rail-end">
+        <a class="backlink" href="/"><i aria-hidden="true">&larr;</i>Mix<span>&amp;Greet</span></a>
+        <span class="date">Partnerships</span>
+      </div>
+    </div>
+    <hr class="rule">
+  </header>
+
+  <section class="wrap bi masthead-block">
+    <div class="hero-grid">
+
+      <div class="hero-head">
+        <p class="eyebrow shiny">Academix Beat Lab presents</p>
+        <h1 class="masthead">Mix<span class="amp">&amp;</span>Greet</h1>
+        <p class="tagline">Where Creative Brands Meet the Creative Community</p>
+        <p class="kicker split" data-split="Brand Activation &amp; Partnership Interest">Brand Activation &amp; Partnership Interest</p>
+        <p class="lede">Tell us what you want to accomplish. Based on your selections we will identify
+          the activations that best align with your brand goals, your audience and the outcomes you are
+          after, then come back to you with a shape for it.</p>
+      </div>
+
+      <!-- The right column is not decoration. A brand landing here from a cold
+           email needs to know what it is being asked for and how long it takes
+           before it starts typing, and the masthead alone left this half of the
+           band empty on anything wider than a tablet. -->
+      <aside class="brief">
+        <ol class="how">
+          <li>
+            <b>Tell us the goal</b>
+            <span>Eight short sections. Only your company, a contact name and an email are required.</span>
+          </li>
+          <li>
+            <b>We match the activation</b>
+            <span>Launch, demo day, showroom residency, creator content, education, panel, product
+              research, or a year-round industry partnership.</span>
+          </li>
+          <li>
+            <b>We come back with a shape</b>
+            <span>Scope, timing, and what it takes to put your product in front of the right room.</span>
+          </li>
+        </ol>
+        <p class="mins">About five minutes</p>
+      </aside>
+
+    </div>
+  </section>
+</div>
+
+<main class="wrap bi light">
+  <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+  <!-- ---------- the gate ----------
+       Nothing below this is in the document until the password clears: the
+       questionnaire is built by JS after /api/brand/gate returns a token, so
+       a saved copy of this file is an empty shell. -->
+  <div class="panel accent spot" id="gate">
+    <div class="lock" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="10.5" width="16" height="11" rx="2"></rect><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"></path>
+      </svg>
+    </div>
+    <h2 id="gate-title" data-scramble="Partner access">Partner access</h2>
+    <p class="gate-note">This questionnaire is shared by invitation. Enter the access password from your
+      Academix contact to open it.</p>
+    <label for="pass">Access password</label>
+    <input type="password" id="pass" autocomplete="current-password" enterkeyhint="go">
+    <button class="btn" id="enter" type="button">Open the questionnaire</button>
+    <p class="msg err" id="gate-msg" hidden></p>
+  </div>
+
+  <!-- ---------- the questionnaire ---------- -->
+  <div id="form" hidden>
+    <div class="progress">
+      <div class="pbar" role="progressbar" aria-label="Questionnaire progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="pbar"><i id="pfill"></i></div>
+      <div class="prail" id="prail" role="tablist" aria-label="Sections"></div>
+    </div>
+
+    <div class="panel spot" id="deckPanel">
+      <div class="deck" id="deck" aria-live="polite"></div>
+    </div>
+
+    <p class="hint">Nothing is sent until you have read your answers back on the confirmation screen.</p>
+  </div>
+
+  <!-- ---------- sent ---------- -->
+  <div class="panel accent sent" id="sent" hidden>
+    <div class="tick" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.2 5.2L20 7"></path></svg>
+    </div>
+    <h2>Thanks for your interest</h2>
+    <p>Someone will get back to you. Based on your selections we will identify the solutions that best
+      align with your brand goals, target audience and desired outcomes.</p>
+    <p class="strap">Where Creative Brands Meet the Creative Community</p>
+  </div>
+</main>
+
+<!-- ---------- review dialog ----------
+     The last thing between a filled form and a submitted one. Every answer is
+     read back, each section has its own way back to the step that set it, and
+     the POST only happens from in here. -->
+<div class="modal" id="review" hidden>
+  <div class="modal-scrim" data-close="1"></div>
+  <div class="panel accent" role="dialog" aria-modal="true" aria-labelledby="review-title">
+    <button class="modal-x" id="review-x" type="button" aria-label="Back to the questionnaire">&times;</button>
+    <h2 id="review-title">Please confirm your selections</h2>
+    <p class="review-sub">This is everything you are about to send. Change anything that is not right. Nothing has been submitted yet.</p>
+    <div id="review-body"></div>
+    <div class="rv-actions">
+      <button class="btn" id="confirm" type="button">Everything is ok, submit</button>
+      <button class="ghost" id="back-to-form" type="button">Keep editing</button>
+    </div>
+    <p class="msg err" id="review-msg" hidden></p>
+  </div>
+</div>
+
+<footer class="dark-zone">
+  <div class="wrap bi">
+    <hr class="bar">
+    <div class="foot-row">
+      <span class="l">BEAT LAB — ACADEMIX</span>
+      <span class="r">BRAND PARTNERSHIPS</span>
+    </div>
+    <hr class="bar">
+    <p class="copyright">© 2026 ACADEMIX BEAT LAB · DOWNTOWN LOS ANGELES</p>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   /brand-interest: client.
+
+   Order of business: open the gate, build the eight steps, keep every
+   answer in one object, read the whole object back in a dialog, and only
+   then POST it. The questionnaire markup does not exist until the gate
+   clears, which is the point of gating it server-side: this file is on a
+   CDN and in a public repo, so the page has to be empty until Convex says
+   otherwise.
+   ============================================================ */
+
+// Convex HTTP Actions deployment for Mix & Greet (public URL, not a secret).
+const API = 'https://good-labrador-980.convex.site';
+const GATE_URL = API + '/api/brand/gate';
+const POST_URL = API + '/api/brand-interest';
+
+const $ = id => document.getElementById(id);
+const CALM = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// --- the questionnaire ------------------------------------------------------
+// One array, in the order a brand reads it. `key` is the field name the server
+// stores; the option strings ARE the stored values, which is why they are
+// written here exactly as they should read back in the notification email.
+const SOLUTIONS = [
+  ['Private Brand Launch Event', 'Curated product launches, feature releases, and brand experiences.'],
+  ['Product Demonstration / Demo Day', 'Hands-on product discovery and live demonstrations.'],
+  ['Creative Showroom Residency', '30–90 day product integration inside the BEAT Lab.'],
+  ['Creator Content Activation', 'Performance videos, product demonstrations, tutorials, and social content.'],
+  ['Branded Education & Training Activation', 'Host brand-led workshops, product training, and masterclasses featuring your teaching artists, trainers, or product specialists.'],
+  ['Artist & Creator Panel Series', 'Brand-supported conversations, panels, and industry experiences featuring accomplished creatives.'],
+  ['Product Research & Creative Insights', 'Focus groups, beta testing, product feedback, workflow testing, and creator or educator insights.'],
+  ['Brand-to-Education Experience', 'Introduce products and creative workflows to educators, schools, CTE programs, and K–12 creative pathways.'],
+  ['Industry Event Satellite Activation', 'Host a brand experience around a major convention, conference, cultural event, or industry moment in Los Angeles.'],
+  ['Annual Industry Access Partnership', 'Develop an ongoing relationship with Academix, the BEAT Lab, our creative community, and education network.']
+];
+
+const STEPS = [
+  {
+    id: 'brand', tab: 'Your brand', title: 'Your brand',
+    ask: 'So we know who we are talking to, and how to come back to you.',
+    kind: 'fields'
+  },
+  {
+    id: 'goals', tab: 'Goals', key: 'goals', kind: 'checks',
+    title: 'What would you like to accomplish?',
+    ask: 'Select all that apply.',
+    opts: [
+      'Introduce or launch a new product',
+      'Increase product awareness',
+      'Provide hands-on product demonstrations',
+      'Give creatives an opportunity to experience our products',
+      'Connect with DJs, producers, creators, or digital media professionals',
+      'Connect with educators, schools, or CTE programs',
+      'Provide product education or training',
+      'Create authentic product content',
+      'Engage artists, creators, or influencers',
+      'Gather product feedback and creative insights',
+      'Test a product, feature, or creative workflow',
+      'Support K-12 youth creative education and access',
+      'Activate around a major Los Angeles industry event'
+    ]
+  },
+  {
+    id: 'solutions', tab: 'Solutions', key: 'solutions', kind: 'checks', wide: true,
+    title: 'Which Mix&Greet solutions are you interested in?',
+    ask: 'Select all that apply. We will shape the final programme around what you pick here.',
+    opts: SOLUTIONS
+  },
+  {
+    id: 'audience', tab: 'Audience', key: 'audience', kind: 'checks',
+    other: {key: 'audienceOther', label: 'Someone else, tell us who', ph: 'e.g. touring FOH engineers'},
+    title: 'Who would you like to reach?',
+    ask: 'Select all that apply.',
+    opts: [
+      'DJs', 'Music Producers', 'Recording Artists / Musicians', 'Audio Engineers', 'Podcasters',
+      'Content Creators', 'Photographers', 'Videographers / Filmmakers', 'Graphic Designers',
+      'Digital Media Creatives', 'Creative Entrepreneurs', 'Teaching Artists', 'K–12 Educators',
+      'CTE Teachers / Program Leaders', 'School and District Administrators',
+      'College Students / Emerging Professionals', 'Industry Professionals'
+    ]
+  },
+  {
+    id: 'categories', tab: 'Products', key: 'categories', kind: 'checks',
+    other: {key: 'categoriesOther', label: 'Something else, tell us what', ph: 'e.g. lighting and stage control'},
+    title: 'What products or solutions would you like to feature?',
+    ask: 'Select all that apply.',
+    opts: [
+      'DJ Products', 'Music Production', 'Audio / Recording', 'Podcast Production', 'Software / Apps',
+      'Plugins / Digital Creative Tools', 'Photo / Video', 'Cameras / Accessories',
+      'Content Creation Technology', 'Training / Education Programs', 'Digital Media Services'
+    ]
+  },
+  {
+    id: 'impact', tab: 'Impact', key: 'impact', kind: 'checks',
+    title: 'Community impact opportunities',
+    ask: 'Through Music to the Ears Foundation, brands can extend their Mix&Greet activation to support creative education and access for young people. We are interested in:',
+    exclusive: 'Not at this time',
+    opts: [
+      'Sponsoring a K-12 student creative experience',
+      'Supporting youth access to creative technology',
+      'Donating products, equipment, or software licenses',
+      'Providing mentors or industry professionals',
+      'Supporting K–12 creative career pathways',
+      'Not at this time'
+    ]
+  },
+  {
+    id: 'budget', tab: 'Budget', key: 'budget', kind: 'radio',
+    title: 'Estimated activation budget',
+    ask: 'A range is enough. It tells us which shape of activation to bring back to you.',
+    opts: ['$5,000–$10,000', '$10,000–$25,000', '$25,000–$50,000', '$50,000+', 'Budget to be determined']
+  },
+  {
+    id: 'more', tab: 'Tell us more', kind: 'prose',
+    title: 'Tell us more',
+    ask: 'Optional, and the part we read first.'
+  }
+];
+
+// --- answers ----------------------------------------------------------------
+const A = {
+  company: '', contact: '', title: '', email: '', timeline: '',
+  goals: [], solutions: [], audience: [], audienceOther: '',
+  categories: [], categoriesOther: '', impact: [],
+  budget: '', success: '', context: '',
+  website: '' // honeypot
+};
+
+let TOKEN = '';
+let step = 0;
+let seen = 0; // furthest step reached, so the rail cannot skip ahead
+
+// --- small helpers ----------------------------------------------------------
+function el(tag, cls, text){
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+function labelOf(o){ return Array.isArray(o) ? o[0] : o; }
+
+/* The ampersand in the wordmark is Academix red everywhere else on the site,
+   including the masthead directly above this. A step heading that says the
+   brand has to say it the same way, so the one glyph is lifted out of the
+   string rather than the whole heading being written as markup. */
+function brandize(text){
+  const h = el('h3');
+  const parts = String(text).split('Mix&Greet');
+  parts.forEach((chunk, i) => {
+    if (i) {
+      h.appendChild(document.createTextNode('Mix'));
+      h.appendChild(el('span', 'amp', '&'));
+      h.appendChild(document.createTextNode('Greet'));
+    }
+    if (chunk) h.appendChild(document.createTextNode(chunk));
+  });
+  return h;
+}
+function descOf(o){ return Array.isArray(o) ? o[1] : ''; }
+
+/* SplitText: wrap each character so the CSS stagger has something to hold.
+   The characters are inline-block, and an inline-block is a line-break
+   opportunity, so boxing them one at a time lets a heading break in the middle
+   of a word. Each WORD gets a nowrap box of its own and the characters go
+   inside it, which keeps the stagger per-letter and the wrapping per-word. */
+function splitText(node){
+  const raw = node.getAttribute('data-split') || node.textContent;
+  if (CALM) { node.textContent = raw; return; }
+  node.textContent = '';
+  let i = 0;
+  raw.split(' ').forEach((word, w, all) => {
+    const box = el('span', 'w');
+    [...word].forEach((ch) => {
+      const s = el('span', null, ch);
+      s.style.setProperty('--i', i++);
+      box.appendChild(s);
+    });
+    node.appendChild(box);
+    if (w < all.length - 1) node.appendChild(document.createTextNode(' '));
+  });
+}
+
+/* DecryptedText: the gate heading resolves out of noise once, on load. */
+function scramble(node){
+  const target = node.getAttribute('data-scramble') || node.textContent;
+  if (CALM) { node.textContent = target; return; }
+  const pool = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#%&/\\<>*';
+  let frame = 0;
+  const total = target.length * 3 + 8;
+  const id = setInterval(() => {
+    frame++;
+    const shown = Math.floor((frame / total) * target.length * 1.15);
+    node.textContent = [...target].map((ch, i) => {
+      if (i < shown || ch === ' ') return ch;
+      return pool[Math.floor(Math.random() * pool.length)];
+    }).join('');
+    if (frame >= total) { clearInterval(id); node.textContent = target; }
+  }, 34);
+}
+
+/* ClickSpark: eight ticks thrown from the point that was pressed. */
+function spark(host, x, y){
+  if (CALM) return;
+  const s = el('span', 'spark');
+  s.style.left = x + 'px';
+  s.style.top = y + 'px';
+  for (let i = 0; i < 8; i++){
+    const t = el('i');
+    t.style.setProperty('--r', (i * 45) + 'deg');
+    s.appendChild(t);
+  }
+  host.appendChild(s);
+  setTimeout(() => s.remove(), 480);
+}
+
+/* SpotlightCard: feed the pointer position to the panel's radial gradient. */
+function spotlight(node){
+  if (CALM) return;
+  node.addEventListener('pointermove', (e) => {
+    const b = node.getBoundingClientRect();
+    node.style.setProperty('--mx', (e.clientX - b.left) + 'px');
+    node.style.setProperty('--my', (e.clientY - b.top) + 'px');
+  }, {passive: true});
+}
+
+// --- building a step --------------------------------------------------------
+// The deck holds exactly one step at a time and is rebuilt on every move. That
+// is what keeps the reveal animations honest, since a re-entered step plays
+// its stagger again instead of appearing fully formed, and it means the option
+// cards only ever read their checked state from A, never from the DOM.
+
+function field(id, label, value, opts){
+  opts = opts || {};
+  const wrap = el('div');
+  const l = el('label', null, label);
+  l.setAttribute('for', 'f-' + id);
+  if (opts.required){
+    const star = el('span', 'req', ' *');
+    l.appendChild(star);
+  }
+  const input = opts.area ? el('textarea') : el('input');
+  input.id = 'f-' + id;
+  input.value = value || '';
+  if (opts.type) input.type = opts.type;
+  if (opts.ph) input.placeholder = opts.ph;
+  if (opts.autocomplete) input.autocomplete = opts.autocomplete;
+  if (opts.maxlength) input.maxLength = opts.maxlength;
+  if (opts.area) input.rows = opts.rows || 5;
+  input.addEventListener('input', () => { A[opts.key || id] = input.value; });
+  wrap.appendChild(l);
+  wrap.appendChild(input);
+  if (opts.hint) wrap.appendChild(el('p', 'hint', opts.hint));
+  return wrap;
+}
+
+function optionCard(cfg, value, i){
+  const on = cfg.multi ? A[cfg.key].includes(value) : A[cfg.key] === value;
+  const card = el('label', 'opt' + (cfg.multi ? '' : ' radio') + (on ? ' on' : ''));
+  card.style.setProperty('--i', i);
+  const input = el('input');
+  input.type = cfg.multi ? 'checkbox' : 'radio';
+  input.name = cfg.key;
+  input.value = value;
+  input.checked = on;
+  const box = el('span', 'box');
+  box.setAttribute('aria-hidden', 'true');
+  const t = el('span', 't', labelOf(value));
+  const d = descOf(cfg.raw ? cfg.raw[i] : value);
+  if (d) t.appendChild(el('span', 'd', d));
+  card.appendChild(input);
+  card.appendChild(box);
+  card.appendChild(t);
+
+  card.addEventListener('pointerdown', (e) => {
+    const b = card.getBoundingClientRect();
+    spark(card, e.clientX - b.left, e.clientY - b.top);
+  });
+  input.addEventListener('change', () => cfg.onChange(input, card));
+  return card;
+}
+
+function buildChecks(s){
+  const frag = document.createDocumentFragment();
+  const grid = el('div', 'opts' + (s.wide ? ' wide' : ''));
+  const raw = s.opts;
+  const multi = s.kind === 'checks';
+  const cfg = {
+    key: s.key, multi, raw,
+    onChange: (input, card) => {
+      const v = input.value;
+      if (!multi){
+        A[s.key] = input.checked ? v : '';
+        grid.querySelectorAll('.opt').forEach(c => c.classList.remove('on'));
+        if (input.checked) card.classList.add('on');
+      } else {
+        const list = A[s.key];
+        const at = list.indexOf(v);
+        if (input.checked && at < 0) list.push(v);
+        if (!input.checked && at >= 0) list.splice(at, 1);
+        card.classList.toggle('on', input.checked);
+        // "Not at this time" and "we would like to help" cannot both be true.
+        if (s.exclusive){
+          const isX = v === s.exclusive;
+          if (input.checked && isX){
+            A[s.key] = [s.exclusive];
+          } else if (input.checked && !isX){
+            const x = A[s.key].indexOf(s.exclusive);
+            if (x >= 0) A[s.key].splice(x, 1);
+          }
+          grid.querySelectorAll('.opt').forEach(c => {
+            const box = c.querySelector('input');
+            box.checked = A[s.key].includes(box.value);
+            c.classList.toggle('on', box.checked);
+          });
+        }
+      }
+      paintCount();
+    }
+  };
+  raw.forEach((o, i) => grid.appendChild(optionCard(cfg, labelOf(o), i)));
+  frag.appendChild(grid);
+
+  if (s.other){
+    const box = el('div', 'other');
+    box.appendChild(field(s.other.key, s.other.label, A[s.other.key], {
+      key: s.other.key, ph: s.other.ph, maxlength: 200
+    }));
+    frag.appendChild(box);
+  }
+  return frag;
+}
+
+function buildFields(){
+  const frag = document.createDocumentFragment();
+  const box = el('div', 'fields');
+  const r1 = el('div', 'row');
+  r1.appendChild(field('company', 'Company / Brand', A.company, {required: true, maxlength: 160, autocomplete: 'organization'}));
+  r1.appendChild(field('contact', 'Contact name', A.contact, {required: true, maxlength: 120, autocomplete: 'name'}));
+  const r2 = el('div', 'row');
+  r2.appendChild(field('title', 'Title / Department', A.title, {maxlength: 160, autocomplete: 'organization-title'}));
+  r2.appendChild(field('email', 'Email', A.email, {required: true, type: 'email', maxlength: 200, autocomplete: 'email'}));
+  box.appendChild(r1);
+  box.appendChild(r2);
+  box.appendChild(field('timeline', 'Target date / timeline', A.timeline, {maxlength: 200, ph: 'e.g. NAMM week, or Q2 2027'}));
+
+  // Honeypot. Off-screen, unlabelled to a screen reader, and the server treats
+  // any value in it as a bot and answers success without writing a row.
+  const hp = el('div', 'hp');
+  hp.setAttribute('aria-hidden', 'true');
+  const hpi = el('input');
+  hpi.type = 'text'; hpi.id = 'f-website'; hpi.tabIndex = -1; hpi.autocomplete = 'off';
+  hpi.addEventListener('input', () => { A.website = hpi.value; });
+  hp.appendChild(hpi);
+  box.appendChild(hp);
+
+  frag.appendChild(box);
+  return frag;
+}
+
+function buildProse(){
+  const frag = document.createDocumentFragment();
+  const box = el('div', 'fields');
+  box.appendChild(field('success', 'What would make this activation or partnership successful for your brand?', A.success, {area: true, maxlength: 4000, rows: 5}));
+  box.appendChild(field('context', 'Are there specific products, campaigns, launches, artists, events, or timelines we should know about?', A.context, {area: true, maxlength: 4000, rows: 5}));
+  frag.appendChild(box);
+  return frag;
+}
+
+function paintCount(){
+  const s = STEPS[step];
+  const node = $('picked');
+  if (!node) return;
+  if (s.kind === 'checks'){
+    const n = A[s.key].length;
+    node.innerHTML = '';
+    node.appendChild(el('b', null, String(n)));
+    node.appendChild(document.createTextNode(' selected'));
+  } else if (s.kind === 'radio'){
+    node.textContent = A[s.key] ? A[s.key] : 'Nothing selected yet';
+  } else {
+    node.textContent = '';
+  }
+}
+
+function renderStep(dir){
+  const s = STEPS[step];
+  const deck = $('deck');
+  deck.innerHTML = '';
+
+  const wrap = el('div', 'step on ' + (dir < 0 ? 'back' : 'fwd'));
+  wrap.id = 'step-' + s.id;
+  wrap.appendChild(el('p', 'step-no', 'Step ' + String(step + 1).padStart(2, '0') + ' of ' + String(STEPS.length).padStart(2, '0')));
+  wrap.appendChild(brandize(s.title));
+  if (s.ask) wrap.appendChild(el('p', 'ask', s.ask));
+
+  if (s.kind === 'fields') wrap.appendChild(buildFields());
+  else if (s.kind === 'prose') wrap.appendChild(buildProse());
+  else wrap.appendChild(buildChecks(s));
+
+  // step footer
+  const nav = el('div', 'navbar');
+  const back = el('button', 'ghost', step === 0 ? 'Cancel' : 'Back');
+  back.type = 'button';
+  back.addEventListener('click', () => {
+    if (step === 0) { location.href = '/'; return; }
+    go(step - 1, -1);
+  });
+  const count = el('span', 'picked');
+  count.id = 'picked';
+  const next = el('button', 'btn', step === STEPS.length - 1 ? 'Review my answers' : 'Continue');
+  next.type = 'button';
+  next.addEventListener('click', () => {
+    if (!validate()) return;
+    if (step === STEPS.length - 1) openReview();
+    else go(step + 1, 1);
+  });
+  nav.appendChild(back);
+  nav.appendChild(count);
+  nav.appendChild(el('span', 'spacer'));
+  nav.appendChild(next);
+  wrap.appendChild(nav);
+
+  const err = el('p', 'msg err');
+  err.id = 'step-msg';
+  err.hidden = true;
+  wrap.appendChild(err);
+
+  deck.appendChild(wrap);
+  paintCount();
+  paintRail();
+}
+
+// --- navigation -------------------------------------------------------------
+function go(i, dir){
+  step = Math.max(0, Math.min(STEPS.length - 1, i));
+  seen = Math.max(seen, step);
+  renderStep(dir);
+  const top = $('deckPanel').getBoundingClientRect().top + window.scrollY - 24;
+  if (window.scrollY > top) window.scrollTo({top, behavior: CALM ? 'auto' : 'smooth'});
+}
+
+function paintRail(){
+  const rail = $('prail');
+  rail.innerHTML = '';
+  STEPS.forEach((s, i) => {
+    const b = el('button', i === step ? 'here' : (i <= seen ? 'done' : ''), s.tab);
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(i === step));
+    b.disabled = i > seen;
+    b.addEventListener('click', () => { if (i !== step && validateFor(step, i)) go(i, i > step ? 1 : -1); });
+    rail.appendChild(b);
+  });
+  const pct = Math.round(((step + 1) / STEPS.length) * 100);
+  $('pfill').style.width = pct + '%';
+  $('pbar').setAttribute('aria-valuenow', String(pct));
+  const here = rail.querySelector('.here');
+  if (here && here.scrollIntoView) here.scrollIntoView({block: 'nearest', inline: 'center', behavior: CALM ? 'auto' : 'smooth'});
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// The only hard gate in the flow. Everything after step one is optional by
+// design: a brand that only tells us who they are and what they want is still
+// a lead worth having.
+function validate(){
+  const msg = $('step-msg');
+  if (msg) msg.hidden = true;
+  if (step !== 0) return true;
+  const missing = [];
+  if (!A.company.trim()) missing.push('company');
+  if (!A.contact.trim()) missing.push('contact name');
+  if (!A.email.trim()) missing.push('email');
+  if (missing.length){
+    fail(missing.length === 1
+      ? 'We still need your ' + missing[0] + '.'
+      : 'We still need your ' + missing.slice(0, -1).join(', ') + ' and ' + missing[missing.length - 1] + '.');
+    return false;
+  }
+  if (!EMAIL_RE.test(A.email.trim())){
+    fail('That email address does not look right.');
+    return false;
+  }
+  return true;
+}
+function validateFor(from, to){
+  if (from === 0 && to > 0) return validate();
+  return true;
+}
+function fail(text){
+  const msg = $('step-msg');
+  if (!msg) return;
+  msg.textContent = text;
+  msg.hidden = false;
+  const first = $('deck').querySelector('input,textarea');
+  if (first && first.focus) first.focus();
+}
+
+// --- the confirmation dialog ------------------------------------------------
+// Nothing is POSTed from the questionnaire itself. The brand reads the whole
+// submission back here first, with a way into the step that set each part of
+// it, and the send happens from this dialog or not at all.
+
+function rvSection(title, stepIndex, build){
+  const box = el('div', 'rv');
+  const head = el('div', 'rv-head');
+  head.appendChild(el('h4', null, title));
+  const edit = el('button', 'rv-edit', 'Edit');
+  edit.type = 'button';
+  edit.addEventListener('click', () => { closeReview(); go(stepIndex, -1); });
+  head.appendChild(edit);
+  box.appendChild(head);
+  build(box);
+  return box;
+}
+function rvList(box, items, extra){
+  const all = items.slice();
+  if (extra && extra.trim()) all.push('Other: ' + extra.trim());
+  if (!all.length){ box.appendChild(el('p', 'none', 'Nothing selected.')); return; }
+  const ul = el('ul');
+  all.forEach(i => ul.appendChild(el('li', null, i)));
+  box.appendChild(ul);
+}
+function rvFacts(box, pairs){
+  const dl = el('dl');
+  let any = false;
+  pairs.forEach(([k, v]) => {
+    if (!String(v || '').trim()) return;
+    any = true;
+    dl.appendChild(el('dt', null, k));
+    dl.appendChild(el('dd', null, String(v).trim()));
+  });
+  if (!any){ box.appendChild(el('p', 'none', 'Nothing entered.')); return; }
+  box.appendChild(dl);
+}
+
+function buildReview(){
+  const body = $('review-body');
+  body.innerHTML = '';
+  body.appendChild(rvSection('Your brand', 0, (b) => rvFacts(b, [
+    ['Company', A.company], ['Contact', A.contact], ['Title', A.title],
+    ['Email', A.email], ['Timeline', A.timeline]
+  ])));
+  body.appendChild(rvSection('What you want to accomplish', 1, (b) => rvList(b, A.goals)));
+  body.appendChild(rvSection('Solutions of interest', 2, (b) => rvList(b, A.solutions)));
+  body.appendChild(rvSection('Who you want to reach', 3, (b) => rvList(b, A.audience, A.audienceOther)));
+  body.appendChild(rvSection('Products to feature', 4, (b) => rvList(b, A.categories, A.categoriesOther)));
+  body.appendChild(rvSection('Community impact', 5, (b) => rvList(b, A.impact)));
+  body.appendChild(rvSection('Estimated budget', 6, (b) => {
+    if (!A.budget) { b.appendChild(el('p', 'none', 'Nothing selected.')); return; }
+    b.appendChild(el('p', 'free', A.budget));
+  }));
+  body.appendChild(rvSection('Tell us more', 7, (b) => {
+    let any = false;
+    if (A.success.trim()){ any = true; b.appendChild(el('p', 'k', 'What success looks like')); b.appendChild(el('p', 'free', A.success.trim())); }
+    if (A.context.trim()){ any = true; b.appendChild(el('p', 'k', 'Anything else')); b.appendChild(el('p', 'free', A.context.trim())); }
+    if (!any) b.appendChild(el('p', 'none', 'Nothing entered.'));
+  }));
+}
+
+let lastFocus = null;
+function openReview(){
+  buildReview();
+  $('review-msg').hidden = true;
+  lastFocus = document.activeElement;
+  $('review').hidden = false;
+  document.body.classList.add('modal-open');
+  setTimeout(() => { try { $('confirm').focus(); } catch(_){} }, 40);
+}
+function closeReview(){
+  $('review').hidden = true;
+  document.body.classList.remove('modal-open');
+  if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch(_){} }
+}
+
+// --- submit -----------------------------------------------------------------
+async function submit(){
+  const btn = $('confirm');
+  const msg = $('review-msg');
+  msg.hidden = true;
+  btn.disabled = true;
+  const was = btn.textContent;
+  btn.textContent = 'Sending…';
+  try {
+    const r = await fetch(POST_URL, {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({
+        token: TOKEN,
+        company: A.company.trim(), contact: A.contact.trim(), title: A.title.trim(),
+        email: A.email.trim(), timeline: A.timeline.trim(),
+        goals: A.goals, solutions: A.solutions,
+        audience: A.audience, audienceOther: A.audienceOther.trim(),
+        categories: A.categories, categoriesOther: A.categoriesOther.trim(),
+        impact: A.impact, budget: A.budget,
+        success: A.success.trim(), context: A.context.trim(),
+        website: A.website
+      })
+    });
+    if (r.status === 401){
+      // The 12h token lapsed mid-form. Say so where they can act on it rather
+      // than dumping them back at the gate with a filled-in form thrown away.
+      msg.textContent = 'Your access session expired. Reload the page, re-enter the password, and your answers will need to be entered again. Sorry about that.';
+      msg.hidden = false;
+      return;
+    }
+    if (r.status === 429){
+      msg.textContent = 'That is a lot of submissions from one place. Give it a few minutes and try again.';
+      msg.hidden = false;
+      return;
+    }
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok || out.error){
+      msg.textContent = out.error || 'Something went wrong sending that. Try again in a moment.';
+      msg.hidden = false;
+      return;
+    }
+    closeReview();
+    $('form').hidden = true;
+    $('sent').hidden = false;
+    window.scrollTo({top: 0, behavior: CALM ? 'auto' : 'smooth'});
+  } catch (_){
+    msg.textContent = 'Could not reach the server. Check your connection and try again.';
+    msg.hidden = false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = was;
+  }
+}
+
+$('confirm').addEventListener('click', submit);
+$('back-to-form').addEventListener('click', closeReview);
+$('review-x').addEventListener('click', closeReview);
+$('review').addEventListener('click', (e) => {
+  if (e.target && e.target.dataset && e.target.dataset.close) closeReview();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('review').hidden) closeReview();
+});
+
+// --- the gate ---------------------------------------------------------------
+// The password buys a 12h token, the same trade the back office makes. It is
+// kept in sessionStorage so a reload mid-form does not ask for it again, and it
+// dies with the tab.
+
+function openQuestionnaire(){
+  $('gate').hidden = true;
+  $('form').hidden = false;
+  seen = Math.max(seen, 0);
+  renderStep(1);
+  spotlight($('deckPanel'));
+}
+
+async function tryEnter(){
+  const msg = $('gate-msg');
+  const btn = $('enter');
+  const pw = $('pass').value;
+  msg.hidden = true;
+  if (!pw){ msg.textContent = 'Enter the access password.'; msg.hidden = false; return; }
+  btn.disabled = true;
+  const was = btn.textContent;
+  btn.textContent = 'Checking…';
+  try {
+    const r = await fetch(GATE_URL, {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({password: pw})
+    });
+    if (r.status === 401){ msg.textContent = 'That password did not work. Check it with your Academix contact.'; msg.hidden = false; return; }
+    if (r.status === 429){ msg.textContent = 'Too many attempts. Give it a few minutes and try again.'; msg.hidden = false; return; }
+    if (!r.ok) throw new Error('unreachable');
+    const out = await r.json();
+    TOKEN = out.token;
+    try {
+      sessionStorage.setItem('mg_brand_token', TOKEN);
+      sessionStorage.setItem('mg_brand_exp', String(out.expiresAt || 0));
+    } catch(_){}
+    $('pass').value = '';
+    openQuestionnaire();
+  } catch(_){
+    msg.textContent = 'Could not reach the server. Check your connection and try again.';
+    msg.hidden = false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = was;
+  }
+}
+
+$('enter').addEventListener('click', tryEnter);
+$('pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryEnter(); });
+
+// --- boot -------------------------------------------------------------------
+document.querySelectorAll('.split').forEach(splitText);
+scramble($('gate-title'));
+spotlight($('gate'));
+
+(function restore(){
+  let t = '', exp = 0;
+  try {
+    t = sessionStorage.getItem('mg_brand_token') || '';
+    exp = Number(sessionStorage.getItem('mg_brand_exp') || 0);
+  } catch(_){}
+  if (t && (!exp || exp > Date.now())){
+    TOKEN = t;
+    openQuestionnaire();
+  }
+})();
+
+/* ---------- ambient field on the dark band ----------
+   Three parallax planes of soft motes, cream with one in six in brand red,
+   drifting up and offset against scroll by depth. Identical to the invitation's
+   so the two pages read as one product. Stops when the band leaves the
+   viewport, when the tab is hidden, and never starts under reduced motion. */
+function ambient(){
+  const cv = $('motes');
+  const band = document.querySelector('.dark-zone.top');
+  if (!cv || !band || CALM) return;
+  const ctx = cv.getContext && cv.getContext('2d');
+  if (!ctx) return;
+
+  const sprite = (r, g, b) => {
+    const s = document.createElement('canvas');
+    s.width = s.height = 64;
+    const c = s.getContext('2d');
+    const grad = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(' + r + ',' + g + ',' + b + ',1)');
+    grad.addColorStop(.42, 'rgba(' + r + ',' + g + ',' + b + ',.45)');
+    grad.addColorStop(1, 'rgba(' + r + ',' + g + ',' + b + ',0)');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, 64, 64);
+    return s;
+  };
+  const INK = [sprite(237, 234, 227), sprite(236, 28, 36)];
+  const PLANE = [
+    {depth: .05, size: [1.6, 3.2], alpha: [.05, .12], speed: 3},
+    {depth: .13, size: [2.6, 5.6], alpha: [.07, .17], speed: 6},
+    {depth: .26, size: [4.4, 9.5], alpha: [.10, .26], speed: 11}
+  ];
+
+  let W = 0, H = 0, dpr = 1, parts = [], raf = 0, last = 0, onScreen = true;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  function build(){
+    const box = band.getBoundingClientRect();
+    W = Math.max(1, Math.round(box.width));
+    H = Math.max(1, Math.round(box.height));
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.max(54, Math.min(170, Math.round((W * H) / 7600)));
+    parts = [];
+    for (let i = 0; i < n; i++){
+      const p = PLANE[i % 3];
+      parts.push({
+        p, x: rnd(0, W), y: rnd(-60, H + 60),
+        s: rnd(p.size[0], p.size[1]), a: rnd(p.alpha[0], p.alpha[1]),
+        vx: rnd(-.34, .34) * p.speed, vy: rnd(-1, -.18) * p.speed,
+        ink: Math.random() < .16 ? 1 : 0
+      });
+    }
+  }
+
+  function frame(now){
+    raf = 0;
+    const dt = Math.min(.05, last ? (now - last) / 1000 : .016);
+    last = now;
+    ctx.clearRect(0, 0, W, H);
+    const scrolled = window.scrollY || window.pageYOffset || 0;
+    const span = H + 120;
+    for (let i = 0; i < parts.length; i++){
+      const q = parts[i];
+      q.x += q.vx * dt;
+      q.y += q.vy * dt;
+      if (q.x < -30) q.x = W + 30; else if (q.x > W + 30) q.x = -30;
+      if (q.y < -60) q.y = H + 60;
+      let y = q.y - scrolled * q.p.depth;
+      y = ((y + 60) % span + span) % span - 60;
+      ctx.globalAlpha = q.a;
+      ctx.drawImage(INK[q.ink], q.x - q.s, y - q.s, q.s * 2, q.s * 2);
+    }
+    ctx.globalAlpha = 1;
+    tick();
+  }
+  function tick(){ if (raf || !onScreen || document.hidden) return; raf = requestAnimationFrame(frame); }
+  function stop(){ if (raf) cancelAnimationFrame(raf); raf = 0; last = 0; }
+
+  build();
+  tick();
+  document.addEventListener('visibilitychange', () => { document.hidden ? stop() : tick(); });
+  window.addEventListener('scroll', tick, {passive: true});
+  if ('IntersectionObserver' in window){
+    new IntersectionObserver((es) => { onScreen = es[0].isIntersecting; onScreen ? tick() : stop(); },
+      {rootMargin: '80px'}).observe(band);
+  }
+  if ('ResizeObserver' in window){
+    let t = 0;
+    new ResizeObserver(() => { clearTimeout(t); t = setTimeout(() => { build(); tick(); }, 140); }).observe(band);
+  } else {
+    window.addEventListener('resize', () => { build(); tick(); });
+  }
+}
+ambient();
+</script>
+</body>
+</html>

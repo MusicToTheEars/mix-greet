@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Partnerships · Mix &amp; Greet</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/brand.css">
+<style>
+/* page-specific. Everything else comes from the shared brand layer. */
+.masthead{font-size:clamp(38px,9vw,60px)}
+.tagline{font-size:clamp(18px,4vw,26px)}
+.meter{margin:clamp(28px,5vw,40px) 0}
+
+/* ---- WCAG AA on the light column -------------------------------------------
+   The same arithmetic the back office runs, for the same reason and with the
+   same tokens: brand.css measures #EC1C24 at 4.01:1 on the #F5F4F1 panel, short
+   of the 4.5:1 that 11-13px control labels need, and --brand-ink #C8151C is
+   5.33:1 for the same red to the eye. --muted-lt #84848C is 3.37:1 and fails
+   every label, hint and badge; #6B6B73 is the same hue two steps down at
+   4.80:1. Scoped here rather than in brand.css because brand.css is shared with
+   pages this agent does not own. */
+:root{ --text-muted:#6B6B73; --danger:#C8151C; }
+.mini.go{color:var(--brand-ink);border-color:var(--brand-ink)}
+.mini.go:hover{background:var(--brand-ink);color:#FFFFFF}
+.mini.danger:hover{border-color:var(--danger);color:var(--danger)}
+.btn{border-color:var(--brand-ink);background:var(--brand-ink)}
+.btn:hover,.btn:focus-visible{background:transparent;color:var(--brand-ink)}
+.btn.ghost{color:var(--brand-ink)}
+.btn.ghost:hover{background:var(--brand-ink);color:#FFFFFF}
+.badge.danger{color:var(--danger);border-color:var(--danger)}
+/* brand.css:197 sets the footer copyright to a one-off #5A5A64, which measures
+   2.89:1 on the #0B0B0D dark zone. --muted is the brand's own secondary ink and
+   already appears on dark elsewhere: 5.82:1, no new colour invented. */
+.copyright{color:var(--muted)}
+
+/* ---- the way back ----------------------------------------------------------
+   This page is one room off the back office, not a destination of its own. The
+   door back is the first thing on it. */
+.office-bar{display:flex;justify-content:space-between;align-items:center;
+  gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.office-bar a.btn{margin-top:0;padding:14px 22px;font-size:12px}
+
+/* ---- brand interest (partnership leads) ------------------------------------
+   Not a table, and it is the only list in this product that is not. A lead is
+   one company answering eight questions, and six of those answers are lists of
+   whole sentences: seventeen audience options at up to sixty characters each is
+   a cell no column width survives. So a submission is a card that stays shut,
+   and the shut state carries only what triage needs: who, when, how much, and
+   where the row already is.
+
+   Same vocabulary as the back office it came out of: 2px rule, field ground,
+   soft corner, no shadow. */
+.bi-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:16px}
+.bi-bar .check{margin-top:0}
+#brand-list{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.bi{background:var(--field);border:2px solid var(--surface-line);border-radius:var(--radius);padding:14px 16px}
+/* Archived rows are on screen only when the operator asks for them, so they
+   have to read as filed rather than as more work waiting. */
+.bi.arch{background:var(--surface);border-style:dashed}
+.bi-row{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.bi-id{flex:1 1 240px;min-width:0}
+/* The company is the only thing on the card the operator recognises at a
+   glance; everything else on the shut row is there to rank it. */
+.bi-co{display:block;font-size:15px;font-weight:700;letter-spacing:.04em;color:var(--text);overflow-wrap:anywhere}
+.bi-meta{margin-top:4px;font-size:12px;color:var(--text-muted);overflow-wrap:anywhere}
+.bi-mail{display:inline-block;margin-top:4px;font-size:12px;overflow-wrap:anywhere}
+.bi-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;text-align:right;flex:0 0 auto}
+.bi-side .badge{margin-left:0}
+.bi-ctl{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.bi-set{display:flex;gap:6px;flex-wrap:wrap}
+/* The state a row is already in stays pressed rather than disappearing from the
+   group. An operator has to be able to read what a row IS, not infer it from
+   which of three buttons is missing. */
+.bi-set .mini[aria-pressed="true"]{border-color:var(--brand-ink);color:var(--brand-ink);background:var(--surface)}
+.bi-body{margin-top:14px;border-top:2px solid var(--surface-line);padding-top:14px}
+.bi-sec{margin-top:14px}
+.bi-sec:first-child{margin-top:0}
+.bi-sec b{display:block;font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:6px}
+/* brand.css resets every padding to 0, which takes the bullets off the list
+   with it. */
+.bi-sec ul{margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--text-soft)}
+/* The two free-text answers are the part the brand wrote by hand, so the line
+   breaks they typed are kept. */
+.bi-free{font-size:13px;line-height:1.7;color:var(--text-soft);white-space:pre-wrap;overflow-wrap:anywhere}
+.bi-none{font-size:13px;color:var(--text-muted)}
+.bi-facts{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:13px}
+.bi-facts dt{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--text-muted);padding-top:3px}
+.bi-facts dd{color:var(--text-soft);overflow-wrap:anywhere}
+/* On a phone the right-aligned column is a second ragged edge two words wide.
+   It goes under the company and reads as one block. */
+@media (max-width:560px){
+  .bi-side{align-items:flex-start;text-align:left;flex:1 1 100%}
+  .bi-ctl{align-items:stretch}
+  .office-bar{align-items:stretch}
+  .office-bar a.btn{text-align:center}
+}
+</style>
+</head>
+<body>
+
+<div class="dark-zone">
+  <header class="wrap">
+    <div class="rail">
+      <a href="/" aria-label="Mix &amp; Greet home">
+        <img src="/academix-logo.png" alt="Academix" width="723" height="120">
+      </a>
+      <span class="date">PARTNERSHIPS</span>
+    </div>
+    <hr class="rule">
+  </header>
+  <section class="wrap masthead-block">
+    <p class="eyebrow">Academix Beat Lab</p>
+    <h1 class="masthead">Mix<span class="amp">&amp;</span>Greet</h1>
+    <p class="tagline">Partnerships</p>
+  </section>
+</div>
+
+<main class="wrap light">
+  <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+  <!-- The same gate the back office uses, against the same route, storing the
+       same key. Somebody who signed in over there arrives here already inside;
+       this panel is only ever on screen for a session that expired or a tab
+       opened straight to this address. -->
+  <div class="panel accent" id="gate">
+    <h2>Team access</h2>
+    <label for="pass">Password</label>
+    <input type="password" id="pass" autocomplete="current-password">
+    <button class="btn" id="enter" type="button">Enter</button>
+    <p class="msg err" id="gate-msg" hidden>Wrong password. Try again.</p>
+  </div>
+
+  <div id="office" hidden>
+
+    <div class="office-bar">
+      <a class="btn ghost" href="/admin.html">&#8592; Back office</a>
+      <a class="btn ghost" href="/crm">Contacts &amp; campaigns &#8594;</a>
+    </div>
+
+    <!-- Brand Activation & Partnership Interest. A submission used to exist in
+         exactly two places: a row in a table, and one alert email. An inbox is
+         not a pipeline, so the second brand to write in while the first one is
+         being answered was already lost. This is the list. Same session token
+         as the back office: the routes it reads were shipped token-gated and
+         nothing new was opened to serve it. -->
+    <div class="panel" id="brand-panel">
+      <div class="head"><h2>Brand interest</h2><span class="count" id="brand-count"></span></div>
+
+      <div class="bi-bar">
+        <div class="check">
+          <input type="checkbox" id="brand-archived">
+          <label for="brand-archived">Show archived</label>
+        </div>
+        <div class="actions">
+          <button class="mini go" id="brand-csv" type="button">Download CSV</button>
+          <button class="mini" id="brand-refresh" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <!-- Every card in here is built by brandCard() with textContent. This
+           form is public and unauthenticated, so its answers are attacker text
+           until proven otherwise and none of it is ever handed to innerHTML. -->
+      <div id="brand-list"></div>
+      <p class="msg" id="brand-msg" hidden></p>
+      <p class="hint">Submissions from the partnership questionnaire at <a href="/brand-interest" target="_blank" rel="noopener">/brand-interest</a>, newest first. Mark one <b>Reviewed</b> once somebody has answered it and <b>Archived</b> once it is closed or dead; archived leads stay in the table and in the CSV, they just stop filling this list. The CSV is every submission with one column per question, multi-select answers joined with a semicolon so an answer never splits into two columns. The person behind a submission also has a contact record on <a href="/crm">the CRM page</a>, where the same answers appear on their timeline.</p>
+    </div>
+  </div>
+</main>
+
+<footer class="dark-zone">
+  <div class="wrap">
+    <hr class="bar">
+    <div class="foot-row">
+      <span class="l">BEAT LAB — ACADEMIX</span>
+      <span class="r">BACK OFFICE · STAFF ONLY</span>
+    </div>
+    <hr class="bar">
+    <p class="copyright">© 2026 ACADEMIX BEAT LAB · 1933 S. BROADWAY, SUITE 1202, LOS ANGELES, CA 90007</p>
+  </div>
+</footer>
+
+<script>
+// Same Convex backend and the same session the back office holds. The password
+// is exchanged once for a 12h token under one key, so clicking through from
+// /admin.html does not ask for it a second time.
+const API_BASE = 'https://good-labrador-980.convex.site';
+const LOGIN = API_BASE + '/api/admin/login';
+const BRAND = API_BASE + '/api/admin/brand-interest';
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+};
+
+let TOKEN = sessionStorage.getItem('mg_token') || '';
+
+// --- transport ---------------------------------------------------------------
+// The list and its CSV are both GETs gated by the same token header, which is
+// why the CSV cannot be a plain <a href> and comes back as a blob instead.
+async function apiGet(url, asBlob){
+  const r = await fetch(url, { headers:{'x-admin-token':TOKEN} });
+  if (r.status === 401) { signOut(); throw new Error('auth'); }
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'request failed');
+  return asBlob ? r.blob() : r.json();
+}
+
+function signOut(){
+  TOKEN = '';
+  sessionStorage.removeItem('mg_token');
+  $('office').hidden = true;
+  $('gate').hidden = false;
+}
+
+async function tryEnter(password){
+  const gm = $('gate-msg');
+  gm.hidden = true;
+  try {
+    const r = await fetch(LOGIN, {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify({ password })
+    });
+    if (r.status === 401) { gm.textContent = 'Wrong password. Try again.'; gm.hidden = false; return; }
+    if (!r.ok) throw new Error('unreachable');
+    const { token } = await r.json();
+    TOKEN = token;
+    // The same key the back office reads, so signing in here signs in there.
+    sessionStorage.setItem('mg_token', token);
+    $('gate').hidden = true;
+    $('office').hidden = false;
+    $('pass').value = '';
+    loadBrand();
+  } catch(_) {
+    gm.textContent = 'Could not reach the events service. Try again in a minute.';
+    gm.hidden = false;
+  }
+}
+
+$('enter').addEventListener('click', () => tryEnter($('pass').value));
+$('pass').addEventListener('keydown', e => { if (e.key === 'Enter') tryEnter($('pass').value); });
+
+function flash(btn, label){
+  const was = btn.textContent;
+  btn.textContent = label;
+  setTimeout(() => { btn.textContent = was; }, 1600);
+}
+
+/* ---------- dates the operator reads ----------
+   Local calendar date, not UTC. `new Date().toISOString().slice(0,10)` rolls
+   over at 5pm Pacific, which stamps this evening as yesterday on exactly the
+   evening the office is most likely to be open. MM-DD-YY on the way out, the
+   same shape the invite link and the invite page use; ISO is kept for anything
+   that sorts or gets sent anywhere. */
+function ymd(d){
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function numDate(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  return m ? `${m[2]}-${m[3]}-${m[1].slice(2)}` : (iso || '');
+}
+
+// --- brand interest (partnership leads) ---------------------------------------
+// The questionnaire at /brand-interest writes to its own table and mails the
+// operator once. Mail is not a pipeline: nothing in it says which leads have
+// been answered, and the second brand to write in while the first is being
+// dealt with is already at the bottom of an inbox. This page is the list.
+//
+// The whole table comes back in one read, which is deliberate and is the same
+// call convex/brandInterest.ts makes for the same reason: this is a lead list
+// measured in dozens a year, so the sort, the filter and the archived toggle
+// are all local, and none of them costs a round trip.
+let brandRows = [];
+// Which cards are open, remembered across a repaint. Changing a status rewrites
+// the list, and without this the answers the operator is reading in order to
+// decide close underneath them at the moment they decide.
+const brandOpen = new Set();
+
+// Three states in the three inks this product has: brand red for the row nobody
+// has touched, green for the one that has been dealt with, plain grey for the
+// one that is filed. Same reading as the guest badges in the back office, so a
+// status here does not have to be learned twice.
+const BRAND_STATUS = {
+  new:      ['New',      'soon'],
+  reviewed: ['Reviewed', 'live'],
+  archived: ['Archived', '']
+};
+
+// MM-DD-YY plus the clock, off the ms stamp the backend writes. The time earns
+// its characters: two submissions inside an hour is what a campaign landing
+// looks like, and a bare date hides it.
+function brandWhen(ms){
+  const d = new Date(Number(ms) || 0);
+  if (!ms || isNaN(d.getTime())) return 'Date not recorded';
+  return numDate(ymd(d)) + ' · ' + d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
+}
+
+// One answered question. The list prints even when it is empty, because a
+// section that vanishes when unanswered reads as a section the form never
+// asked, and "they skipped this" is itself worth seeing on a lead.
+function brandList(label, items, other){
+  const sec = el('div', 'bi-sec');
+  sec.appendChild(el('b', null, label));
+  const all = (items || []).slice();
+  // The Other box belongs to the question it hangs off, so it lands in the same
+  // list rather than in a stray line under it. Same shape the confirmation
+  // email and the review screen use, so all three read alike.
+  if (other && String(other).trim()) all.push('Other: ' + String(other).trim());
+  if (!all.length) { sec.appendChild(el('p', 'bi-none', 'Nothing selected.')); return sec; }
+  const ul = el('ul');
+  all.forEach(i => ul.appendChild(el('li', null, i)));
+  sec.appendChild(ul);
+  return sec;
+}
+
+function brandProse(label, body){
+  const sec = el('div', 'bi-sec');
+  sec.appendChild(el('b', null, label));
+  const text = String(body || '').trim();
+  sec.appendChild(text ? el('p', 'bi-free', text) : el('p', 'bi-none', 'Nothing entered.'));
+  return sec;
+}
+
+// Everything the brand answered, in the order the questionnaire asked it.
+function brandBody(r){
+  const box = el('div', 'bi-body');
+  box.id = 'bi-body-' + r._id;
+  box.hidden = !brandOpen.has(r._id);
+
+  // Title and timeline are the two facts the shut row has no room for. They
+  // open with the answers instead of being dropped: "VP Marketing" and "before
+  // NAMM" are what decide who picks the lead up and when.
+  const facts = [['Title', r.title], ['Timeline', r.timeline]]
+    .filter(([, v]) => String(v || '').trim());
+  if (facts.length) {
+    const sec = el('div', 'bi-sec');
+    const dl = el('dl', 'bi-facts');
+    facts.forEach(([k, v]) => {
+      dl.appendChild(el('dt', null, k));
+      dl.appendChild(el('dd', null, String(v).trim()));
+    });
+    sec.appendChild(dl);
+    box.appendChild(sec);
+  }
+
+  box.appendChild(brandList('What they want to accomplish', r.goals));
+  box.appendChild(brandList('Solutions of interest', r.solutions));
+  box.appendChild(brandList('Who they want to reach', r.audience, r.audienceOther));
+  box.appendChild(brandList('Products to feature', r.categories, r.categoriesOther));
+  box.appendChild(brandList('Community impact', r.impact));
+  box.appendChild(brandProse('What success looks like', r.success));
+  box.appendChild(brandProse('Anything else', r.context));
+  return box;
+}
+
+function brandCard(r){
+  const card = el('article', 'bi' + (r.status === 'archived' ? ' arch' : ''));
+
+  const row = el('div', 'bi-row');
+  const who = el('div', 'bi-id');
+  who.appendChild(el('b', 'bi-co', r.company || 'Unnamed brand'));
+  // Person and job title on one line, joined only from what was filled in, so a
+  // brand that skipped the title does not get a line of orphaned separators.
+  const person = [r.contact, r.title].filter(Boolean).join(' · ');
+  if (person) who.appendChild(el('div', 'bi-meta', person));
+  if (r.email) {
+    // A lead is answered by replying to it, so the address is a link rather
+    // than a string to retype. The scheme is written here and the address is
+    // only ever the tail of it, so a hostile value cannot turn this into a
+    // javascript: URL.
+    const a = el('a', 'bi-mail', r.email);
+    a.href = 'mailto:' + r.email;
+    who.appendChild(a);
+  }
+  row.appendChild(who);
+
+  const side = el('div', 'bi-side');
+  const [label, cls] = BRAND_STATUS[r.status] || [r.status || 'New', ''];
+  side.appendChild(el('span', 'badge ' + cls, label));
+  side.appendChild(el('div', 'bi-meta', brandWhen(r.submittedAt)));
+  // Budget is optional on the form and it is the first thing anyone sorting
+  // these by hand looks for, so its absence is printed rather than left blank.
+  side.appendChild(el('div', 'bi-meta', String(r.budget || '').trim() || 'No budget given'));
+  row.appendChild(side);
+  card.appendChild(row);
+
+  const ctl = el('div', 'bi-ctl');
+  const set = el('div', 'bi-set');
+  set.setAttribute('role', 'group');
+  set.setAttribute('aria-label', 'Status for ' + (r.company || 'this submission'));
+  ['new', 'reviewed', 'archived'].forEach(s => {
+    const b = el('button', 'mini', BRAND_STATUS[s][0]);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(r.status === s));
+    b.addEventListener('click', () => setBrandStatus(r, s));
+    set.appendChild(b);
+  });
+  ctl.appendChild(set);
+
+  // A real button rather than details/summary: the status control has to sit on
+  // the shut row, and three buttons nested inside a summary are three controls
+  // that also toggle the disclosure whenever they are pressed.
+  const body = brandBody(r);
+  const toggle = el('button', 'mini', body.hidden ? 'Full answers' : 'Hide answers');
+  toggle.type = 'button';
+  toggle.setAttribute('aria-expanded', String(!body.hidden));
+  toggle.setAttribute('aria-controls', body.id);
+  toggle.addEventListener('click', () => {
+    const opening = body.hidden;
+    body.hidden = !opening;
+    toggle.setAttribute('aria-expanded', String(opening));
+    toggle.textContent = opening ? 'Hide answers' : 'Full answers';
+    if (opening) brandOpen.add(r._id); else brandOpen.delete(r._id);
+  });
+  ctl.appendChild(toggle);
+  card.appendChild(ctl);
+  card.appendChild(body);
+  return card;
+}
+
+function renderBrand(){
+  const box = $('brand-list');
+  const msg = $('brand-msg');
+  box.textContent = '';
+  msg.hidden = true;
+
+  // Newest first, said here as well as in the backend query. This list is read
+  // top down as "what came in while I was away", and one row out of place is
+  // the row that gets missed.
+  const rows = brandRows.slice().sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+  const shown = $('brand-archived').checked ? rows : rows.filter(r => r.status !== 'archived');
+  const filed = rows.length - shown.length;
+
+  $('brand-count').textContent = shown.length
+    ? shown.length + (shown.length === 1 ? ' submission' : ' submissions')
+      + (filed ? ' · ' + filed + ' archived hidden' : '')
+    : '';
+  $('brand-csv').disabled = !rows.length;
+  shown.forEach(r => box.appendChild(brandCard(r)));
+
+  // An empty panel and a broken panel look identical, and those are the two
+  // answers an operator must never have to guess between.
+  if (!shown.length) {
+    msg.className = 'msg';
+    msg.textContent = rows.length
+      ? 'Every submission is archived. Tick Show archived to read them.'
+      : 'No brand submissions yet. They land here the moment a brand finishes the questionnaire.';
+    msg.hidden = false;
+  }
+}
+
+// Same 401 contract as apiGet(). Its own function because the write is a POST
+// to the same route the list is read from.
+async function brandPost(body){
+  const r = await fetch(BRAND, {
+    method:'POST',
+    headers:{'content-type':'application/json','x-admin-token':TOKEN},
+    body: JSON.stringify(body)
+  });
+  if (r.status === 401) { signOut(); throw new Error('auth'); }
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'request failed');
+  return r.json();
+}
+
+// Optimistic, because triage is a run of clicks and not one decision: a round
+// trip per row turns "mark these four reviewed" into four waits at a screen
+// that has not moved. The row is put back exactly as it was when the write does
+// not land, since a badge reading Reviewed over a row the backend still calls
+// new is worse than no badge at all.
+async function setBrandStatus(r, status){
+  if (r.status === status) return;
+  const was = r.status;
+  r.status = status;
+  renderBrand();
+  try {
+    await brandPost({ id: r._id, status });
+  } catch(e) {
+    // signOut() has already taken the page off the screen; saying anything else
+    // here would be writing into a panel nobody can see.
+    if (e.message === 'auth') return;
+    r.status = was;
+    renderBrand();
+    const msg = $('brand-msg');
+    msg.className = 'msg err';
+    msg.textContent = 'Could not move ' + (r.company || 'that submission')
+      + ' to ' + status + ', so it is back where it was: ' + e.message;
+    msg.hidden = false;
+  }
+}
+
+async function loadBrand(){
+  $('brand-count').textContent = 'loading…';
+  try {
+    const data = await apiGet(BRAND);
+    brandRows = (data && data.submissions) || [];
+    renderBrand();
+  } catch(e) {
+    $('brand-count').textContent = '';
+    if (e.message === 'auth') return;
+    const msg = $('brand-msg');
+    msg.className = 'msg err';
+    msg.textContent = 'Could not load brand submissions: ' + e.message;
+    msg.hidden = false;
+  }
+}
+
+$('brand-archived').addEventListener('change', renderBrand);
+
+$('brand-refresh').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  try { await loadBrand(); } finally { b.disabled = false; }
+});
+
+// Token-gated like the RSVP export, so it cannot be an href either and comes
+// back as a blob the same way.
+$('brand-csv').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  try {
+    const blob = await apiGet(BRAND + '.csv', true);
+    const href = URL.createObjectURL(blob);
+    const a = el('a');
+    a.href = href;
+    a.download = 'brand-interest-' + ymd(new Date()) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 2000);
+    flash(b, 'Downloaded');
+  } catch(err) {
+    if (err.message !== 'auth') alert('Could not export the CSV.\n\n' + err.message);
+  } finally {
+    b.disabled = false;
+  }
+});
+
+// A token in the session means the operator is already signed in over in the
+// back office, so this page opens on the list rather than on a password box.
+if (TOKEN) { $('gate').hidden = true; $('office').hidden = false; loadBrand(); }
+</script>
+</body>
+</html>

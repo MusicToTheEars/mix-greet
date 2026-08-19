@@ -7,3 +7,20 @@
 # this a REWRITE rather than a redirect, so the pretty URL stays in the address
 # bar and in link previews. Without this rule every minted invite link 404s.
 /i/*    /rsvp.html?event=:splat    200
+
+# The brand-side questionnaire. Same 200 rewrite as /i/* and for the same
+# reason: the URL that gets emailed to a brand partner is
+# mixandgreet.com/brand-interest, and it has to stay that in the address bar.
+# (www.mixandgreet.com 301s to the apex at the DNS/Netlify layer, so the
+# www form of the link lands here too.)
+/brand-interest    /brand-interest.html    200
+
+# The two back-office rooms that are not about one evening: the CRM, and the
+# partnership pipeline. Same 200 rewrite, and here the pretty URL is doing a
+# second job as well as reading better: /admin.html links to them by these
+# names, and a staff member who has bookmarked one should not be holding a URL
+# that changes if the file behind it is ever renamed. Both are noindex and both
+# sit behind the same token gate as /admin.html; the rewrite makes them
+# reachable, not public.
+/crm               /crm.html               200
+/partnerships      /partnerships.html      200

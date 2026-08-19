@@ -1,0 +1,2089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>CRM · Mix &amp; Greet</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/brand.css">
+<style>
+/* page-specific. Everything else comes from the shared brand layer. */
+.masthead{font-size:clamp(38px,9vw,60px)}
+.tagline{font-size:clamp(18px,4vw,26px)}
+.meter{margin:clamp(28px,5vw,40px) 0}
+
+/* ---- WCAG AA on the light column -------------------------------------------
+   The same arithmetic the back office runs, for the same reason and with the
+   same tokens: brand.css measures #EC1C24 at 4.01:1 on the #F5F4F1 panel, short
+   of the 4.5:1 that 11-13px control labels need, and --brand-ink #C8151C is
+   5.33:1 for the same red to the eye. --muted-lt #84848C is 3.37:1 and fails
+   every label, hint and badge; #6B6B73 is the same hue two steps down at
+   4.80:1. Scoped here rather than in brand.css because brand.css is shared with
+   pages this agent does not own. */
+:root{ --text-muted:#6B6B73; --danger:#C8151C; }
+.mini.go{color:var(--brand-ink);border-color:var(--brand-ink)}
+.mini.go:hover{background:var(--brand-ink);color:#FFFFFF}
+.mini.danger:hover{border-color:var(--danger);color:var(--danger)}
+.btn{border-color:var(--brand-ink);background:var(--brand-ink)}
+.btn:hover,.btn:focus-visible{background:transparent;color:var(--brand-ink)}
+.btn.ghost{color:var(--brand-ink)}
+.btn.ghost:hover{background:var(--brand-ink);color:#FFFFFF}
+.ghost:hover{border-color:var(--brand-ink);color:var(--brand-ink)}
+.badge.danger{color:var(--danger);border-color:var(--danger)}
+/* brand.css:197 sets the footer copyright to a one-off #5A5A64, which measures
+   2.89:1 on the #0B0B0D dark zone. --muted is the brand's own secondary ink and
+   already appears on dark elsewhere: 5.82:1, no new colour invented. */
+.copyright{color:var(--muted)}
+
+/* ---- the way back ----------------------------------------------------------
+   This page is one room off the back office, not a destination of its own. The
+   door back is the first thing on it. */
+.office-bar{display:flex;justify-content:space-between;align-items:center;
+  gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.office-bar a.btn{margin-top:0;padding:14px 22px;font-size:12px}
+
+/* ---- the vocabulary of this page --------------------------------------------
+   No new design language. A CRM is exactly where a back office grows one, and
+   an operator who learned "badge means status" on the guest list next door
+   would have to learn it a second time here. So: 2px rules, field ground, soft
+   corners, the same badges, the same .mini buttons, the same three inks.
+
+   The one genuinely new token is the timeline marker. Five kinds of event have
+   to be told apart at a glance and three inks cannot carry five meanings, so
+   the marker carries a letter as well as a colour. Colour is the fast read;
+   the letter is the read that still works without it. */
+
+/* The bar over every list: one field that takes the slack, buttons that never
+   do. */
+.crm-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+.crm-bar .grow{flex:1 1 220px;min-width:0}
+.crm-bar input{margin:0;font-size:13px;padding:10px 12px}
+.crm-bar .actions{justify-content:flex-start}
+
+/* Filter chips, which are .mini buttons so a filter and a status control read
+   alike. Only the pressed state is added. */
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px}
+.chips .lab{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--text-muted);margin-right:2px}
+.chip[aria-pressed="true"]{border-color:var(--brand-ink);color:var(--brand-ink);background:var(--surface)}
+/* A count is data, not a label, so it drops out of the uppercase tracking the
+   rest of the chip wears. At .2em "37" reads as "3 7". */
+.chip i{font-style:normal;letter-spacing:0;opacity:.7}
+
+/* ---- rows ------------------------------------------------------------------
+   A contact row is a <button>, not a <tr> wearing a click handler. The whole
+   row opens the record, and only a real button gives a keyboard the same reach
+   a mouse has. It has to unlearn the centred uppercase geometry brand.css gives
+   every other button. */
+.crm-rows{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.crm-row{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap;width:100%;text-align:left;text-transform:none;letter-spacing:normal;
+  font-weight:400;background:var(--field);border:2px solid var(--surface-line);
+  border-radius:var(--radius-sm);padding:12px 14px;transition:border-color .15s ease}
+.crm-row:hover,.crm-row:focus-visible{border-color:var(--brand-ink)}
+/* A bounced or suppressed address is a person no campaign will ever reach, and
+   that has to be legible from the list rather than only from the record: the
+   whole point of the list is deciding who to write to. */
+.crm-row.dead{border-style:dashed}
+.crm-l{flex:1 1 220px;min-width:0}
+.crm-r{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:5px;text-align:right}
+.crm-r .badge{margin-left:0}
+.crm-name{display:block;font-size:14px;font-weight:700;letter-spacing:.03em;color:var(--text);overflow-wrap:anywhere}
+.crm-sub{display:block;margin-top:3px;font-size:12px;color:var(--text-muted);overflow-wrap:anywhere}
+.crm-sub.ink{color:var(--text-soft)}
+.tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);
+  border:2px solid var(--surface-line);border-radius:6px;padding:2px 7px;overflow-wrap:anywhere}
+.tag.on{color:var(--brand-ink);border-color:var(--brand-ink)}
+/* On a phone the right column is a second ragged edge two words wide. It goes
+   under the name and reads as one block. */
+@media (max-width:560px){
+  .crm-r{align-items:flex-start;text-align:left;flex:1 1 100%}
+  .office-bar{align-items:stretch}
+  .office-bar a.btn{text-align:center}
+}
+
+/* ---- the record dialogs -----------------------------------------------------
+   Scrim, panel, close cross, Escape. The contact record is the one that stacks,
+   because a company record is one of the two places a contact is opened FROM
+   and the pair has to sit in the order they were opened. */
+.modal{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;
+  justify-content:center;overflow-y:auto;padding:clamp(12px,4vh,48px) 16px}
+.modal[hidden]{display:none}
+.modal-scrim{position:fixed;inset:0;background:rgba(11,11,13,.72);backdrop-filter:blur(2px)}
+.modal .sheet{position:relative;z-index:1;width:100%;max-width:820px;margin-top:0}
+.modal.top{z-index:70}
+.modal .sheet h2{padding-right:46px}
+.modal-x{
+  position:absolute;top:10px;right:10px;width:38px;height:38px;padding:0;
+  background:none;border:2px solid var(--surface-line);color:var(--text-muted);
+  font-size:20px;line-height:1;border-radius:var(--radius-ctl);
+}
+.modal-x:hover,.modal-x:focus-visible{border-color:var(--text);color:var(--text)}
+/* Scroll the page behind the dialog, not both at once. */
+body.modal-open{overflow:hidden}
+
+.sec{margin-top:22px;border-top:2px solid var(--surface-line);padding-top:18px}
+.sec:first-of-type{border-top:0;padding-top:0}
+.sec>b{display:block;font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:10px}
+.sec .actions{justify-content:flex-start;margin-top:16px}
+.sec .lede{margin:0 0 4px;font-size:12px;line-height:1.7;color:var(--text-muted)}
+.sec .none{font-size:13px;color:var(--text-muted)}
+/* The identity line at the top of a record: the address is the key everything
+   else hangs off, so it is inked and allowed to break anywhere. */
+.rec-id{font-size:13px;line-height:1.7;color:var(--text);overflow-wrap:anywhere;margin:0 0 4px}
+.rec-id a{overflow-wrap:anywhere}
+
+/* ---- timeline ---------------------------------------------------------------
+   Newest first, and every entry says which system it came from before it says
+   what happened. Answering "has anyone talked to this person" means separating
+   things we did from things they did, and that separation is the marker. */
+.tl{display:flex;flex-direction:column;gap:10px}
+.tl-i{display:flex;gap:10px;align-items:flex-start}
+.tl-k{flex:0 0 26px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--surface-line);border-radius:6px;font-size:11px;font-weight:700;
+  letter-spacing:0;color:var(--text-muted);background:var(--field)}
+.tl-k.rsvp{color:var(--ok-ink);border-color:var(--ok-ink)}
+.tl-k.checkin{color:#FFFFFF;background:var(--ok-ink);border-color:var(--ok-ink)}
+.tl-k.brand_interest{color:var(--brand-ink);border-color:var(--brand-ink)}
+.tl-k.email{color:var(--brand-ink);border-color:var(--brand-ink);border-style:dashed}
+.tl-k.note{color:var(--text);border-color:var(--text)}
+.tl-b{flex:1;min-width:0}
+.tl-t{display:block;font-size:13px;line-height:1.6;color:var(--text);overflow-wrap:anywhere}
+.tl-d{display:block;margin-top:2px;font-size:12px;line-height:1.6;color:var(--text-soft);overflow-wrap:anywhere}
+.tl-w{display:block;margin-top:2px;font-size:11px;letter-spacing:.06em;color:var(--text-muted)}
+
+/* ---- notes ------------------------------------------------------------------ */
+.notes{display:flex;flex-direction:column;gap:8px}
+.note{background:var(--field);border:2px solid var(--surface-line);border-radius:var(--radius-sm);padding:10px 12px}
+.note p{margin:0;font-size:13px;line-height:1.7;color:var(--text-soft);white-space:pre-wrap;overflow-wrap:anywhere}
+.note .m{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+.note .m span{font-size:11px;letter-spacing:.06em;color:var(--text-muted)}
+.note-add{margin-top:14px}
+.note-add textarea{min-height:64px}
+
+/* ---- audience builder, preview and report ----------------------------------- */
+.aud{display:flex;flex-direction:column;gap:16px}
+.aud-g>b{display:block;font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:2px}
+.aud-g .chips{margin-top:6px}
+/* Capped and scrollable inside its own box: a 400-name list would otherwise
+   push the send controls off the bottom of a dialog the operator is trying to
+   read before pressing them. */
+.prev{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;margin-top:12px;
+  border:2px solid var(--surface-line);border-radius:var(--radius-sm);padding:12px;background:var(--field)}
+.prev .p{font-size:13px;line-height:1.6;color:var(--text-soft);overflow-wrap:anywhere}
+.prev .p b{color:var(--text)}
+.prev .p.no b{color:var(--brand-ink)}
+/* Somebody who opened it. Green is already "this worked" everywhere else on
+   this page, so an opener wears the same ink a checked-in guest does. */
+.prev .p.open b{color:var(--ok-ink)}
+.prev .p span{display:block;font-size:11px;letter-spacing:.04em;color:var(--text-muted);overflow-wrap:anywhere}
+/* Two numbers that must never be read as one. Green is who receives it, red is
+   who cannot, and a campaign that says 52 while sending to 40 is the exact lie
+   this pair exists to prevent. */
+.tot{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.tot div{flex:1 1 120px;min-width:0;border:2px solid var(--surface-line);
+  border-radius:var(--radius-sm);padding:10px 12px}
+.tot b{display:block;font-size:24px;line-height:1.1;font-weight:700;color:var(--text)}
+.tot span{display:block;margin-top:4px;font-size:10px;font-weight:700;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--text-muted)}
+.tot i{display:block;margin-top:4px;font-size:11px;font-style:normal;color:var(--text-muted)}
+.tot .yes{border-color:var(--ok-ink)}
+.tot .yes b{color:var(--ok-ink)}
+.tot .no b{color:var(--brand-ink)}
+
+/* Sending is the only irreversible thing in this product. It is boxed off from
+   the composer above it and it asks for the campaign name in writing, because
+   the failure mode is a mis-click on a dialog the operator has been scrolling
+   through for five minutes. */
+.danger-box{margin-top:18px;background:var(--field);border:2px solid var(--brand-ink);
+  border-left-width:6px;border-radius:var(--radius-sm);padding:14px 16px}
+.danger-box>b{display:block;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--brand-ink);margin-bottom:6px}
+.danger-box p{margin:0;font-size:12px;line-height:1.6;color:var(--text-soft)}
+.danger-box .btn{margin-top:16px}
+</style>
+</head>
+<body>
+
+<div class="dark-zone">
+  <header class="wrap">
+    <div class="rail">
+      <a href="/" aria-label="Mix &amp; Greet home">
+        <img src="/academix-logo.png" alt="Academix" width="723" height="120">
+      </a>
+      <span class="date">CRM</span>
+    </div>
+    <hr class="rule">
+  </header>
+  <section class="wrap masthead-block">
+    <p class="eyebrow">Academix Beat Lab</p>
+    <h1 class="masthead">Mix<span class="amp">&amp;</span>Greet</h1>
+    <p class="tagline">CRM</p>
+  </section>
+</div>
+
+<main class="wrap light">
+  <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+  <!-- The same gate the back office uses, against the same route, storing the
+       same key. Somebody who signed in over there arrives here already inside;
+       this panel is only ever on screen for a session that expired or a tab
+       opened straight to this address. -->
+  <div class="panel accent" id="gate">
+    <h2>Team access</h2>
+    <label for="pass">Password</label>
+    <input type="password" id="pass" autocomplete="current-password">
+    <button class="btn" id="enter" type="button">Enter</button>
+    <p class="msg err" id="gate-msg" hidden>Wrong password. Try again.</p>
+  </div>
+
+  <div id="office" hidden>
+
+    <div class="office-bar">
+      <a class="btn ghost" href="/admin.html">&#8592; Back office</a>
+      <a class="btn ghost" href="/partnerships">Partnership leads &#8594;</a>
+    </div>
+
+    <!-- The back office is scoped to one evening at a time: who is coming to
+         THIS party, who came to that one. This page is the same people across
+         all of them, which is what those tables were describing all along
+         without ever joining up. The guest who answered three invites in a row
+         existed as three unrelated rows and no fourth thing. -->
+    <div class="panel" id="contacts-panel">
+      <div class="head"><h2>Contacts</h2><span class="count" id="contacts-count"></span></div>
+
+      <div class="crm-bar">
+        <div class="grow">
+          <input type="search" id="c-search" placeholder="Search name, email or company" aria-label="Search contacts">
+        </div>
+        <div class="actions">
+          <button class="mini go" id="c-csv" type="button">Download CSV</button>
+          <button class="mini" id="c-refresh" type="button">Refresh</button>
+          <button class="mini" id="c-backfill" type="button">Backfill CRM fields</button>
+        </div>
+      </div>
+
+      <!-- Filled from op:"facets", so a chip can only ever offer a filter that
+           has somebody behind it. A chip list built from a hardcoded vocabulary
+           is a list of empty results waiting to happen. -->
+      <div class="chips" id="c-f-tag"></div>
+      <div class="chips" id="c-f-stage"></div>
+      <div class="chips" id="c-f-interest"></div>
+
+      <!-- Every row is built by contactRow() with textContent. These names,
+           companies and titles were typed into a public unauthenticated form,
+           so none of it is ever handed to innerHTML. -->
+      <div class="crm-rows" id="contacts-list"></div>
+      <p class="msg" id="contacts-msg" hidden></p>
+      <p class="hint">One row per person, newest activity first. A dashed row is an address nothing can reach: it bounced, it was reported as spam, or it unsubscribed, and a campaign skips it however it is filtered. Click any row for the full record. The CSV is whatever the filters above are currently showing, not the whole book. <b>Backfill CRM fields</b> re-reads the RSVPs and questionnaire submissions already in the database and fills in the contacts and companies they imply; it is safe to run more than once.</p>
+    </div>
+
+    <div class="panel" id="companies-panel">
+      <div class="head"><h2>Companies</h2><span class="count" id="companies-count"></span></div>
+      <div class="crm-bar">
+        <div class="grow">
+          <input type="search" id="co-search" placeholder="Search company or domain" aria-label="Search companies">
+        </div>
+        <div class="actions">
+          <button class="mini" id="co-refresh" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="crm-rows" id="companies-list"></div>
+      <p class="msg" id="companies-msg" hidden></p>
+      <p class="hint">A company is the account a contact was rolled up to, usually from the employer they typed on an RSVP or a questionnaire. The roll-up is a guess, so the raw answer stays on the contact and both are editable. The interests shown here are every interest its people between them have ever ticked.</p>
+    </div>
+
+    <div class="panel" id="camps-panel">
+      <div class="head"><h2>Campaigns</h2><span class="count" id="camps-count"></span></div>
+      <div class="crm-bar">
+        <div class="actions">
+          <button class="mini go" id="cp-new" type="button">New campaign</button>
+          <button class="mini" id="cp-refresh" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="crm-rows" id="camps-list"></div>
+      <p class="msg" id="camps-msg" hidden></p>
+      <p class="hint">A campaign is one email to an audience picked out of the contacts above. It stays a draft, editable and deletable, until it is sent; after that it is a record and shows what the send actually did. Matched is who the audience selected, queued is how many envelopes went out, and skipped is the difference: suppressed addresses, and anyone who already had this campaign. Open and click rates are measured against delivered, never against queued, because a rate over letters that may never have arrived is not a rate.</p>
+    </div>
+
+    <!-- ---- the contact record ----------------------------------------------
+         Static where the shape never changes and built in JS where the content
+         is somebody else's typing. Stacked above the company dialog on purpose:
+         a company record is one of the two doors into this one. -->
+    <div class="modal top" id="contact-modal" hidden>
+      <div class="modal-scrim" data-close="1"></div>
+      <div class="panel sheet" role="dialog" aria-modal="true" aria-labelledby="contact-title">
+        <button class="modal-x" id="contact-close" type="button" aria-label="Close the contact record">&times;</button>
+        <h2 id="contact-title">Contact</h2>
+        <p class="msg" id="contact-msg" hidden></p>
+
+        <div class="sec">
+          <p class="rec-id" id="ct-id"></p>
+          <p class="msg err" id="ct-supp" hidden></p>
+          <div class="row">
+            <div><label for="ct-name">Name</label><input id="ct-name"></div>
+            <div><label for="ct-title">Title</label><input id="ct-title"></div>
+          </div>
+          <div class="row">
+            <div><label for="ct-phone">Phone</label><input id="ct-phone"></div>
+            <div><label for="ct-company">Company they typed</label><input id="ct-company"></div>
+          </div>
+          <div class="row">
+            <div><label for="ct-stage">Stage</label>
+              <select id="ct-stage">
+                <option value="none">No stage</option>
+                <option value="lead">Lead</option>
+                <option value="talking">Talking</option>
+                <option value="proposal">Proposal</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
+              </select>
+            </div>
+            <div><label for="ct-tags">Tags</label><input id="ct-tags" placeholder="attendee, vip" autocomplete="off"></div>
+          </div>
+          <p class="lede">Tags are comma separated. Emptying a field clears it.</p>
+          <div class="actions"><button class="mini go" id="ct-save" type="button">Save changes</button></div>
+        </div>
+
+        <!-- Read-only, and the label says so. Interests are the union of every
+             option this person has ever ticked on a form; hand-editing them
+             here would be editing the record of what they said. -->
+        <div class="sec">
+          <b>Interests, from their own answers</b>
+          <div class="tags" id="ct-interests"></div>
+        </div>
+
+        <div class="sec">
+          <b>Questionnaire submissions</b>
+          <div id="ct-subs"></div>
+        </div>
+
+        <div class="sec">
+          <b>Notes</b>
+          <div class="notes" id="ct-notes"></div>
+          <div class="note-add">
+            <label for="ct-note">Add a note</label>
+            <textarea id="ct-note" placeholder="What was said, what was agreed, what happens next."></textarea>
+            <div class="actions"><button class="mini go" id="ct-note-add" type="button">Add note</button></div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <b>Reply</b>
+          <p class="lede">One email, from the office, to this address. Blank lines separate paragraphs. It goes out immediately.</p>
+          <label for="ct-rep-subj">Subject</label>
+          <input id="ct-rep-subj">
+          <label for="ct-rep-body">Message</label>
+          <textarea id="ct-rep-body"></textarea>
+          <label for="ct-rep-event">About which event, if any</label>
+          <select id="ct-rep-event"></select>
+          <div class="actions"><button class="mini go" id="ct-rep-send" type="button">Send reply</button></div>
+          <p class="msg" id="ct-rep-msg" hidden></p>
+        </div>
+
+        <div class="sec">
+          <b>Timeline</b>
+          <div class="tl" id="ct-tl"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="company-modal" hidden>
+      <div class="modal-scrim" data-close="1"></div>
+      <div class="panel sheet" role="dialog" aria-modal="true" aria-labelledby="company-title">
+        <button class="modal-x" id="company-close" type="button" aria-label="Close the company record">&times;</button>
+        <h2 id="company-title">Company</h2>
+        <p class="msg" id="company-msg" hidden></p>
+
+        <div class="sec">
+          <div class="row">
+            <div><label for="co-name">Name</label><input id="co-name"></div>
+            <div><label for="co-domain">Email domain</label><input id="co-domain" placeholder="example.com" autocomplete="off"></div>
+          </div>
+          <label for="co-website">Website</label>
+          <input id="co-website" placeholder="https://...">
+          <label for="co-notes">Notes</label>
+          <textarea id="co-notes"></textarea>
+          <div class="actions"><button class="mini go" id="co-save" type="button">Save changes</button></div>
+        </div>
+
+        <div class="sec">
+          <b>People here</b>
+          <div class="crm-rows" id="co-people"></div>
+        </div>
+
+        <div class="sec">
+          <b>Questionnaire submissions</b>
+          <div id="co-subs"></div>
+        </div>
+
+        <div class="sec">
+          <b>Notes</b>
+          <div class="notes" id="co-notes-list"></div>
+          <div class="note-add">
+            <label for="co-note">Add a note</label>
+            <textarea id="co-note"></textarea>
+            <div class="actions"><button class="mini go" id="co-note-add" type="button">Add note</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="camp-modal" hidden>
+      <div class="modal-scrim" data-close="1"></div>
+      <div class="panel sheet" role="dialog" aria-modal="true" aria-labelledby="camp-title">
+        <button class="modal-x" id="camp-close" type="button" aria-label="Close the campaign">&times;</button>
+        <h2 id="camp-title">New campaign</h2>
+        <p class="msg" id="camp-msg" hidden></p>
+
+        <!-- The report sits at the TOP for a campaign that has already run,
+             because that is the only question left to ask about it. A draft has
+             no report and this section is not on screen at all. -->
+        <div class="sec" id="cp-results" hidden>
+          <b>Results</b>
+          <div class="tot" id="cp-stats"></div>
+          <p class="lede" id="cp-stats-note"></p>
+          <div class="prev" id="cp-sends"></div>
+        </div>
+
+        <div class="sec">
+          <b>The email</b>
+          <label for="cp-name">Campaign name, for you</label>
+          <input id="cp-name" placeholder="September save-the-date">
+          <label for="cp-subject">Subject line</label>
+          <input id="cp-subject">
+          <label for="cp-body">Message</label>
+          <textarea id="cp-body" placeholder="Blank lines separate paragraphs."></textarea>
+          <label for="cp-event">About which event, if any</label>
+          <select id="cp-event"></select>
+          <!-- Filled by op:"suggest" the moment an event is picked: the tags
+               that event carries, how many contacts each one reaches, and the
+               total. An audience the operator has to guess at is an audience
+               they will guess wrong. -->
+          <div id="cp-suggest"></div>
+        </div>
+
+        <div class="sec">
+          <b>Audience</b>
+          <p class="lede">Anyone matching any chip in any group is in. Named people are added on top of the rules, and excluded people are dropped whatever the rules say. Suppressed and bounced addresses are refused by the backend however this is set.</p>
+          <div class="aud">
+            <div class="aud-g"><b>Tags</b><div class="chips" id="cp-a-tags"></div></div>
+            <div class="aud-g"><b>Interests</b><div class="chips" id="cp-a-interests"></div></div>
+            <div class="aud-g"><b>Stages</b><div class="chips" id="cp-a-stages"></div></div>
+            <div class="aud-g"><b>Sources</b><div class="chips" id="cp-a-sources"></div></div>
+            <div class="aud-g">
+              <b>Named people</b>
+              <div class="crm-bar">
+                <div class="grow">
+                  <input type="search" id="cp-find" placeholder="Search a contact to add or exclude" aria-label="Search contacts to add or exclude">
+                </div>
+              </div>
+              <div class="crm-rows" id="cp-found"></div>
+              <div class="chips" id="cp-manual"></div>
+              <div class="chips" id="cp-exclude"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <b>Preview</b>
+          <p class="lede">Exactly who receives this, by name, and exactly who does not and why.</p>
+          <div class="actions"><button class="mini go" id="cp-preview" type="button">Preview audience</button></div>
+          <div class="tot" id="cp-tot" hidden>
+            <div class="yes"><b id="cp-n-yes">0</b><span>Will receive</span></div>
+            <div class="no"><b id="cp-n-no">0</b><span>Blocked</span></div>
+          </div>
+          <div class="prev" id="cp-prev" hidden></div>
+        </div>
+
+        <div class="sec">
+          <b>Send</b>
+          <label for="cp-test">Send one test copy to</label>
+          <div class="crm-bar">
+            <div class="grow"><input type="email" id="cp-test" placeholder="you@example.com" autocomplete="off"></div>
+            <div class="actions"><button class="mini" id="cp-test-send" type="button">Send test</button></div>
+          </div>
+
+          <div class="danger-box">
+            <b>Send the campaign</b>
+            <p id="cp-send-note"></p>
+            <label for="cp-confirm">Type the campaign name to confirm</label>
+            <input id="cp-confirm" autocomplete="off">
+            <button class="btn" id="cp-send" type="button" disabled>Send campaign</button>
+          </div>
+          <p class="msg" id="cp-send-msg" hidden></p>
+        </div>
+
+        <div class="sec">
+          <div class="actions">
+            <button class="mini go" id="cp-save" type="button">Save draft</button>
+            <button class="mini danger" id="cp-del" type="button" hidden>Delete draft</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="dark-zone">
+  <div class="wrap">
+    <hr class="bar">
+    <div class="foot-row">
+      <span class="l">BEAT LAB — ACADEMIX</span>
+      <span class="r">BACK OFFICE · STAFF ONLY</span>
+    </div>
+    <hr class="bar">
+    <p class="copyright">© 2026 ACADEMIX BEAT LAB · 1933 S. BROADWAY, SUITE 1202, LOS ANGELES, CA 90007</p>
+  </div>
+</footer>
+
+<script>
+// Same Convex backend and the same session the back office holds. The password
+// is exchanged once for a 12h token under one key, so clicking through from
+// /admin.html does not ask for it a second time.
+const API_BASE = 'https://good-labrador-980.convex.site';
+const LOGIN  = API_BASE + '/api/admin/login';
+const EVENTS = API_BASE + '/api/events';
+const CRM    = API_BASE + '/api/admin/crm';
+const CAMPS  = API_BASE + '/api/admin/campaigns';
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+};
+
+let TOKEN = sessionStorage.getItem('mg_token') || '';
+
+/* ---------- transport ----------
+   One poster for three routes. /api/events speaks `action`, the two CRM routes
+   speak `op`, and all three share the token header and the 401 contract, so an
+   expired session lands in the same place from anywhere on the page. */
+async function opPost(url, body){
+  const r = await fetch(url, {
+    method:'POST',
+    headers:{'content-type':'application/json','x-admin-token':TOKEN},
+    body: JSON.stringify(body)
+  });
+  if (r.status === 401) { signOut(); throw new Error('auth'); }
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'request failed');
+  return r.json();
+}
+const crmPost  = body => opPost(CRM, body);
+const campPost = body => opPost(CAMPS, body);
+
+// The CSV is gated by the same token header, which is why it cannot be a plain
+// <a href> and comes back as a blob instead.
+async function apiGet(url, asBlob){
+  const r = await fetch(url, { headers:{'x-admin-token':TOKEN} });
+  if (r.status === 401) { signOut(); throw new Error('auth'); }
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'request failed');
+  return asBlob ? r.blob() : r.json();
+}
+
+function signOut(){
+  TOKEN = '';
+  sessionStorage.removeItem('mg_token');
+  $('office').hidden = true;
+  $('gate').hidden = false;
+  // A dialog is position:fixed, so hiding #office does not take it off the
+  // screen. Without this the operator types their password underneath
+  // somebody's contact record, on a page the body is still locked from
+  // scrolling.
+  closeAllSheets();
+}
+
+async function tryEnter(password){
+  const gm = $('gate-msg');
+  gm.hidden = true;
+  try {
+    const r = await fetch(LOGIN, {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify({ password })
+    });
+    if (r.status === 401) { gm.textContent = 'Wrong password. Try again.'; gm.hidden = false; return; }
+    if (!r.ok) throw new Error('unreachable');
+    const { token } = await r.json();
+    TOKEN = token;
+    // The same key the back office reads, so signing in here signs in there.
+    sessionStorage.setItem('mg_token', token);
+    $('gate').hidden = true;
+    $('office').hidden = false;
+    $('pass').value = '';
+    loadAll();
+  } catch(_) {
+    gm.textContent = 'Could not reach the events service. Try again in a minute.';
+    gm.hidden = false;
+  }
+}
+
+$('enter').addEventListener('click', () => tryEnter($('pass').value));
+$('pass').addEventListener('keydown', e => { if (e.key === 'Enter') tryEnter($('pass').value); });
+
+/* ---------- small shared pieces ---------- */
+function flash(btn, label){
+  const was = btn.textContent;
+  btn.textContent = label;
+  setTimeout(() => { btn.textContent = was; }, 1600);
+}
+
+// Local calendar date, not UTC. `new Date().toISOString().slice(0,10)` rolls
+// over at 5pm Pacific, which stamps this evening as yesterday on exactly the
+// evening the office is most likely to be open.
+function ymd(d){
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+// MM-DD-YY on the way out, the same shape the invite link and the invite page
+// use. Display only: everything stored, compared or exported stays ISO.
+function numDate(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  return m ? `${m[2]}-${m[3]}-${m[1].slice(2)}` : (iso || '');
+}
+// The clock earns its characters where two things inside an hour is itself the
+// fact: a campaign landing, or a lead answered twice.
+function crmWhen(ms){
+  const d = new Date(Number(ms) || 0);
+  return (!ms || isNaN(d.getTime())) ? '' : numDate(ymd(d));
+}
+function crmWhenExact(ms){
+  const d = new Date(Number(ms) || 0);
+  if (!ms || isNaN(d.getTime())) return 'Not recorded';
+  return numDate(ymd(d)) + ' · ' + d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
+}
+
+function saveBlob(blob, name){
+  const href = URL.createObjectURL(blob);
+  const a = el('a');
+  a.href = href;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 2000);
+}
+
+// Every panel and every dialog reports into one <p class="msg">, so the three
+// lines that do it live in one place. Empty text hides the line rather than
+// printing a blank one, which is what leaves a paragraph of whitespace shoving
+// a panel around for no reason.
+function setMsg(id, text, cls){
+  const m = $(id);
+  if (!text) { m.hidden = true; return; }
+  m.className = 'msg' + (cls ? ' ' + cls : '');
+  m.textContent = text;
+  m.hidden = false;
+}
+
+// "attendee, vip ,, press" is one field and three tags. Blanks are dropped
+// rather than stored, because an empty-string tag matches every filter that is
+// also empty and would quietly attach itself to everybody.
+function splitList(s){
+  return String(s || '').split(',').map(x => x.trim()).filter(Boolean);
+}
+
+const toggleIn = (arr, v) => {
+  const i = arr.indexOf(v);
+  if (i >= 0) arr.splice(i, 1); else arr.push(v);
+};
+const dropFrom = (arr, v) => {
+  const i = arr.indexOf(v);
+  if (i >= 0) arr.splice(i, 1);
+};
+
+/* ---------- the record dialogs ----------
+   body.modal-open is a boolean on a page that can have two dialogs open at
+   once: a contact record is opened from a company record. So the open sheets
+   are counted, and closing the top one must not unlock the page behind the one
+   still on screen. */
+const openSheets = [];
+function openSheet(id){
+  if (openSheets.indexOf(id) < 0) openSheets.push(id);
+  $(id).hidden = false;
+  document.body.classList.add('modal-open');
+}
+function closeSheet(id){
+  const i = openSheets.indexOf(id);
+  if (i >= 0) openSheets.splice(i, 1);
+  $(id).hidden = true;
+  if (!openSheets.length) document.body.classList.remove('modal-open');
+}
+function closeAllSheets(){ openSheets.slice().forEach(closeSheet); }
+
+[['contact-modal','contact-close'], ['company-modal','company-close'], ['camp-modal','camp-close']]
+  .forEach(pair => {
+    const modal = pair[0];
+    $(pair[1]).addEventListener('click', () => closeSheet(modal));
+    // data-close marks the scrim and only the scrim, so a drag that starts on
+    // the panel and ends outside it does not close the record being edited.
+    $(modal).addEventListener('click', e => {
+      if (e.target && e.target.dataset && e.target.dataset.close) closeSheet(modal);
+    });
+  });
+// Topmost only. Escape on a contact record opened from a company must put the
+// operator back on the company, not on the page behind both.
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && openSheets.length) closeSheet(openSheets[openSheets.length - 1]);
+});
+
+/* ---------- vocabulary ----------
+   Six stages in the inks this product already owns. Won is the only green and
+   lost is the only red; the three steps between them share one in-progress ink,
+   because a pipeline that colours every step differently is a pipeline nobody
+   reads at a glance. "No stage" prints nothing at all: almost every contact is
+   in it, and a badge on all of them is not information. */
+const STAGE = {
+  none:     ['No stage', ''],
+  lead:     ['Lead',     'soon'],
+  talking:  ['Talking',  'soon'],
+  proposal: ['Proposal', 'soon'],
+  won:      ['Won',      'live'],
+  lost:     ['Lost',     'danger']
+};
+const stageLabel = s => (STAGE[s] || [s || 'No stage'])[0];
+
+// Whether an address can be reached at all. `unverified` is the default every
+// contact starts in, so it earns no badge for the same reason "no stage" does
+// not. The other three are the ones that change what a campaign will do.
+const MAILABLE = {
+  unverified: ['', ''],
+  verified:   ['Deliverable', 'live'],
+  bounced:    ['Bounced',     'danger'],
+  suppressed: ['Suppressed',  'danger']
+};
+const unreachable = c => c.emailStatus === 'bounced' || c.emailStatus === 'suppressed';
+
+const CAMP_STATUS = {
+  draft:   ['Draft',   ''],
+  sending: ['Sending', 'soon'],
+  sent:    ['Sent',    'live'],
+  failed:  ['Failed',  'danger']
+};
+
+// The delivery state machine, which is a different axis from whether anybody
+// opened it. A message can be delivered and never read, or read after a
+// complaint, so the two are never folded into one word.
+const SEND_STATUS = {
+  queued:          ['Queued',      'soon'],
+  sent:            ['Sent',        'soon'],
+  delivered:       ['Delivered',   'live'],
+  bounced:         ['Bounced',     'danger'],
+  complained:      ['Spam report', 'danger'],
+  failed:          ['Failed',      'danger'],
+  suppressed_skip: ['Suppressed',  'danger']
+};
+
+// The five things that can land on a timeline, and what each marker means. The
+// letter is carried as well as the colour because five kinds cannot be told
+// apart by three inks, and because the letter still works for an operator who
+// cannot use colour at all.
+const TL_KIND = {
+  rsvp:           ['R', 'They answered an invite'],
+  checkin:        ['✓', 'They came through the door'],
+  brand_interest: ['B', 'They filled in the partnership questionnaire'],
+  email:          ['@', 'We sent them something'],
+  note:           ['N', 'Somebody here wrote this down']
+};
+
+/* One chip group, drawn from facets so it can only ever offer a filter with
+   somebody behind it. Pressing a lit chip turns it off, which is the only
+   "clear" this needs: a separate clear button spends its whole life doing
+   nothing. */
+function chipGroup(box, label, items, isOn, onPick, textOf){
+  box.textContent = '';
+  if (!items || !items.length) return;
+  if (label) box.appendChild(el('span', 'lab', label));
+  items.forEach(it => {
+    const b = el('button', 'mini chip');
+    b.type = 'button';
+    b.appendChild(document.createTextNode(textOf ? textOf(it.label) : it.label));
+    if (typeof it.count === 'number') b.appendChild(el('i', null, ' ' + it.count));
+    b.setAttribute('aria-pressed', String(!!isOn(it.label)));
+    b.addEventListener('click', () => onPick(it.label));
+    box.appendChild(b);
+  });
+}
+
+/* ---------- shared state ---------- */
+let FACETS = { total:0, sendable:0, tags:[], interests:[], stages:[], sources:[] };
+let crmEvents = [];
+let contactRows = [];
+let companyRows = [];
+let campaignRows = [];
+
+// The vocabulary the contact filters and the four audience groups are built
+// from. One read, shared, because both are asking the same question: what
+// labels do the contacts actually carry.
+async function loadFacets(){
+  try {
+    const f = await crmPost({ op:'facets' });
+    FACETS = {
+      total: f.total || 0,
+      sendable: f.sendable || 0,
+      tags: f.tags || [],
+      interests: f.interests || [],
+      stages: f.stages || [],
+      sources: f.sources || []
+    };
+  } catch(e) {
+    // A facets outage costs the chips, not the lists. The lists read fine with
+    // no filters on them, and reporting this into a panel would be reporting
+    // one fault twice.
+    if (e.message === 'auth') return;
+  }
+  paintContactFilters();
+  paintAudienceGroups();
+}
+
+/* ---------- contacts ---------- */
+const contactFilter = { search:'', tag:'', stage:'', interest:'' };
+const anyFilter = () => !!(contactFilter.search || contactFilter.tag
+  || contactFilter.stage || contactFilter.interest);
+let contactSeq = 0;
+let contactSearchTimer = null;
+
+function paintContactFilters(){
+  chipGroup($('c-f-tag'), 'Tag', FACETS.tags,
+    v => contactFilter.tag === v,
+    v => { contactFilter.tag = contactFilter.tag === v ? '' : v; paintContactFilters(); loadContacts(); });
+
+  chipGroup($('c-f-stage'), 'Stage', FACETS.stages,
+    v => contactFilter.stage === v,
+    v => { contactFilter.stage = contactFilter.stage === v ? '' : v; paintContactFilters(); loadContacts(); },
+    stageLabel);
+
+  // Interests are the long list: one label per option the questionnaire has
+  // ever offered, and it only grows. Capped so the panel does not open on four
+  // lines of chips, with the search box reaching the rest.
+  const top = (FACETS.interests || []).slice(0, 12);
+  // A chip that is currently ON has to stay on screen even when it falls
+  // outside the cap, or turning it off again would need a page reload.
+  if (contactFilter.interest && !top.some(i => i.label === contactFilter.interest)) {
+    top.push({ label: contactFilter.interest });
+  }
+  chipGroup($('c-f-interest'), 'Interest', top,
+    v => contactFilter.interest === v,
+    v => { contactFilter.interest = contactFilter.interest === v ? '' : v; paintContactFilters(); loadContacts(); });
+}
+
+// One person, as a row. Everything on it is either a reason to open the record
+// or a reason not to bother.
+function contactRow(c, onClick){
+  const b = el('button', 'crm-row' + (unreachable(c) ? ' dead' : ''));
+  b.type = 'button';
+
+  const l = el('div', 'crm-l');
+  l.appendChild(el('span', 'crm-name', c.name || c.email));
+  // The address is only repeated when the name is not already it.
+  if (c.name) l.appendChild(el('span', 'crm-sub', c.email));
+  // What they do and where, inked rather than muted: at an invite-only session
+  // this is who the person IS, and it is what the operator scans for.
+  const where = [c.title, c.companyName || c.company].filter(Boolean).join(' · ');
+  if (where) l.appendChild(el('span', 'crm-sub ink', where));
+  if (c.tags && c.tags.length) {
+    const tags = el('div', 'tags');
+    c.tags.slice(0, 6).forEach(t => tags.appendChild(el('span', 'tag', t)));
+    l.appendChild(tags);
+  }
+  b.appendChild(l);
+
+  const r = el('div', 'crm-r');
+  const stage = c.stage || 'none';
+  if (stage !== 'none') {
+    const s = STAGE[stage] || [stage, ''];
+    r.appendChild(el('span', 'badge ' + s[1], s[0]));
+  }
+  const m = MAILABLE[c.emailStatus] || ['', ''];
+  if (m[0]) r.appendChild(el('span', 'badge ' + m[1], m[0]));
+  const when = crmWhen(c.lastActivityAt);
+  if (when) r.appendChild(el('span', 'crm-sub', when));
+  b.appendChild(r);
+
+  b.addEventListener('click', () => (onClick || openContact)(c._id));
+  return b;
+}
+
+function paintContactList(){
+  const box = $('contacts-list');
+  box.textContent = '';
+  contactRows.forEach(c => box.appendChild(contactRow(c)));
+}
+
+async function loadContacts(){
+  // Every keystroke fires one of these and they do not come back in order. The
+  // sequence number is what stops a slow read of "mar" repainting the list
+  // underneath a fresh read of "marcel".
+  const seq = ++contactSeq;
+  $('contacts-count').textContent = 'loading…';
+  const body = { op:'contacts', limit: 500 };
+  ['search','tag','stage','interest'].forEach(k => { if (contactFilter[k]) body[k] = contactFilter[k]; });
+  try {
+    const data = await crmPost(body);
+    if (seq !== contactSeq) return;
+    contactRows = data.contacts || [];
+    paintContactList();
+    const total = typeof data.total === 'number' ? data.total : contactRows.length;
+    const shown = contactRows.length;
+    $('contacts-count').textContent = total
+      ? total + (total === 1 ? ' contact' : ' contacts')
+        + (shown < total ? ' · showing first ' + shown : '')
+        + (FACETS.sendable ? ' · ' + FACETS.sendable + ' reachable' : '')
+      : '';
+    // An empty list and a broken list look identical, and those are the two
+    // answers an operator must never have to guess between.
+    setMsg('contacts-msg', shown ? '' : (anyFilter()
+      ? 'Nothing matches those filters. Press a lit chip to turn it off.'
+      : 'No contacts yet. One appears the moment somebody RSVPs or sends the partnership questionnaire.'));
+    $('c-csv').disabled = !shown;
+  } catch(e) {
+    if (seq !== contactSeq || e.message === 'auth') return;
+    $('contacts-count').textContent = '';
+    setMsg('contacts-msg', 'Could not load contacts: ' + e.message, 'err');
+  }
+}
+
+$('c-search').addEventListener('input', e => {
+  const v = e.target.value.trim();
+  clearTimeout(contactSearchTimer);
+  // 250ms: long enough that a typed word is one request, short enough that the
+  // list has already moved by the time the operator looks up from the keys.
+  contactSearchTimer = setTimeout(() => {
+    if (v === contactFilter.search) return;
+    contactFilter.search = v;
+    loadContacts();
+  }, 250);
+});
+
+$('c-refresh').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  try { await Promise.all([loadFacets(), loadContacts()]); } finally { b.disabled = false; }
+});
+
+// The export is what is on screen, not the whole book. An operator who filtered
+// to one tag and then got every contact in the file would have to do the
+// filtering a second time in a spreadsheet.
+$('c-csv').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  try {
+    const q = new URLSearchParams();
+    ['search','tag','stage','interest'].forEach(k => { if (contactFilter[k]) q.set(k, contactFilter[k]); });
+    const tail = q.toString();
+    const blob = await apiGet(CRM + '/contacts.csv' + (tail ? '?' + tail : ''), true);
+    saveBlob(blob, 'contacts-' + ymd(new Date()) + '.csv');
+    flash(b, 'Downloaded');
+  } catch(err) {
+    if (err.message !== 'auth') alert('Could not export the CSV.\n\n' + err.message);
+  } finally {
+    b.disabled = false;
+  }
+});
+
+$('c-backfill').addEventListener('click', async e => {
+  if (!confirm('Backfill CRM fields?\n\nThis re-reads the RSVPs and questionnaire submissions already in the database and fills in the contacts and companies they imply. It is idempotent: running it again does not double anything, so pressing it twice is safe.')) return;
+  const b = e.currentTarget;
+  b.disabled = true;
+  setMsg('contacts-msg', 'Backfilling…');
+  try {
+    const r = await crmPost({ op:'backfill' });
+    // Reloaded first, then reported. loadContacts() writes into the same line,
+    // so a result printed before the reload is a result the reload wipes.
+    await loadFacets();
+    await loadContacts();
+    loadCompanies();
+    setMsg('contacts-msg',
+      'Backfill done. ' + (r.contactsTouched || 0) + ' contacts touched from '
+      + (r.rsvps || 0) + ' RSVPs and ' + (r.submissions || 0) + ' submissions, '
+      + (r.companiesCreated || 0) + ' companies created.', 'ok');
+  } catch(err) {
+    if (err.message !== 'auth') setMsg('contacts-msg', 'Backfill failed: ' + err.message, 'err');
+  } finally {
+    b.disabled = false;
+  }
+});
+
+/* ---------- companies ---------- */
+let companySearch = '';
+let companySeq = 0;
+let companySearchTimer = null;
+
+function companyRow(co){
+  const b = el('button', 'crm-row');
+  b.type = 'button';
+
+  const l = el('div', 'crm-l');
+  l.appendChild(el('span', 'crm-name', co.name || 'Unnamed company'));
+  const line = [co.domain, co.website].filter(Boolean).join(' · ');
+  if (line) l.appendChild(el('span', 'crm-sub', line));
+  const ints = co.interests || [];
+  if (ints.length) {
+    const tags = el('div', 'tags');
+    ints.slice(0, 5).forEach(t => tags.appendChild(el('span', 'tag', t)));
+    // The count of what is not shown, rather than silently cutting the list:
+    // "five interests" and "five of eighteen" are different companies.
+    if (ints.length > 5) tags.appendChild(el('span', 'tag on', '+' + (ints.length - 5) + ' more'));
+    l.appendChild(tags);
+  }
+  b.appendChild(l);
+
+  const r = el('div', 'crm-r');
+  const n = Number(co.contactCount) || 0;
+  r.appendChild(el('span', 'badge', n + (n === 1 ? ' person' : ' people')));
+  const when = crmWhen(co.lastActivityAt);
+  if (when) r.appendChild(el('span', 'crm-sub', when));
+  b.appendChild(r);
+
+  b.addEventListener('click', () => openCompany(co._id));
+  return b;
+}
+
+function paintCompanyList(){
+  const box = $('companies-list');
+  box.textContent = '';
+  companyRows.forEach(co => box.appendChild(companyRow(co)));
+}
+
+async function loadCompanies(){
+  const seq = ++companySeq;
+  $('companies-count').textContent = 'loading…';
+  const body = { op:'companies' };
+  if (companySearch) body.search = companySearch;
+  try {
+    const rows = await crmPost(body);
+    if (seq !== companySeq) return;
+    companyRows = Array.isArray(rows) ? rows : [];
+    paintCompanyList();
+    $('companies-count').textContent = companyRows.length
+      ? companyRows.length + (companyRows.length === 1 ? ' company' : ' companies') : '';
+    setMsg('companies-msg', companyRows.length ? '' : (companySearch
+      ? 'No company matches that.'
+      : 'No companies yet. One is created the first time somebody tells us where they work.'));
+  } catch(e) {
+    if (seq !== companySeq || e.message === 'auth') return;
+    $('companies-count').textContent = '';
+    setMsg('companies-msg', 'Could not load companies: ' + e.message, 'err');
+  }
+}
+
+$('co-search').addEventListener('input', e => {
+  const v = e.target.value.trim();
+  clearTimeout(companySearchTimer);
+  companySearchTimer = setTimeout(() => {
+    if (v === companySearch) return;
+    companySearch = v;
+    loadCompanies();
+  }, 250);
+});
+
+$('co-refresh').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  try { await loadCompanies(); } finally { b.disabled = false; }
+});
+
+/* ---------- notes, on either subject ----------
+   The same three controls serve a contact and a company, because a note is a
+   note: two renderers of one shape is two places to fix the next thing wrong
+   with it. */
+function noteCard(n, subjectType, subjectId, boxId, msgId){
+  const card = el('article', 'note');
+  card.appendChild(el('p', null, n.body || ''));
+  const m = el('div', 'm');
+  m.appendChild(el('span', null,
+    [n.author, crmWhenExact(n.createdAt)].filter(Boolean).join(' · ')));
+  const del = el('button', 'mini danger', 'Delete');
+  del.type = 'button';
+  del.addEventListener('click', async () => {
+    if (!confirm('Delete this note?\n\nIt goes for everyone and cannot be undone.')) return;
+    del.disabled = true;
+    try {
+      await crmPost({ op:'deleteNote', id: n._id });
+      loadNotes(subjectType, subjectId, boxId, msgId);
+    } catch(e) {
+      del.disabled = false;
+      if (e.message !== 'auth') setMsg(msgId, 'Could not delete that note: ' + e.message, 'err');
+    }
+  });
+  m.appendChild(del);
+  card.appendChild(m);
+  return card;
+}
+
+async function loadNotes(subjectType, subjectId, boxId, msgId){
+  const box = $(boxId);
+  box.textContent = '';
+  try {
+    const rows = await crmPost({ op:'notes', subjectType, subjectId });
+    box.textContent = '';
+    if (!rows || !rows.length) { box.appendChild(el('p', 'none', 'No notes yet.')); return; }
+    // Newest first, said here as well as in the query. A note list is read as
+    // "what do we know now", and the last thing written is the answer.
+    rows.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .forEach(n => box.appendChild(noteCard(n, subjectType, subjectId, boxId, msgId)));
+  } catch(e) {
+    if (e.message === 'auth') return;
+    box.appendChild(el('p', 'none', 'Could not load the notes: ' + e.message));
+  }
+}
+
+async function addNote(subjectType, subjectId, fieldId, boxId, msgId, btn){
+  const body = $(fieldId).value.trim();
+  if (!subjectId) return;
+  if (!body) { setMsg(msgId, 'A note needs something in it.', 'err'); return; }
+  btn.disabled = true;
+  try {
+    await crmPost({ op:'addNote', subjectType, subjectId, body });
+    $(fieldId).value = '';
+    setMsg(msgId, '');
+    loadNotes(subjectType, subjectId, boxId, msgId);
+  } catch(e) {
+    if (e.message !== 'auth') setMsg(msgId, 'Could not add that note: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// A questionnaire submission, one line each. The full eight answers have a home
+// on /partnerships, and printing them twice would mean two renderers of the
+// same questionnaire drifting apart.
+function paintSubs(box, rows){
+  box.textContent = '';
+  if (!rows || !rows.length) { box.appendChild(el('p', 'none', 'None.')); return; }
+  rows.forEach(s => {
+    const card = el('div', 'note');
+    card.appendChild(el('p', null, (s.company || 'Unnamed brand') + ' · '
+      + (String(s.budget || '').trim() || 'no budget given')));
+    const m = el('div', 'm');
+    m.appendChild(el('span', null, crmWhenExact(s.submittedAt) + ' · ' + (s.status || 'new')));
+    card.appendChild(m);
+    box.appendChild(card);
+  });
+}
+
+/* ---------- the contact record ---------- */
+let contactId = null;
+
+// Newest first, and every entry names the system it came from before it says
+// what happened. "Has anybody actually talked to this person" is answered by
+// separating the things we did from the things they did, and that separation is
+// the marker on the left.
+function paintTimeline(items){
+  const box = $('ct-tl');
+  box.textContent = '';
+  const rows = (items || []).slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  if (!rows.length) { box.appendChild(el('p', 'none', 'Nothing has happened yet.')); return; }
+  rows.forEach(t => {
+    const known = TL_KIND[t.kind];
+    const mark = known ? known[0] : '?';
+    const meaning = known ? known[1] : String(t.kind || 'Unknown');
+    const row = el('div', 'tl-i');
+    // The class comes off the whitelist, never off the payload: `kind` is our
+    // own enum today and a class name assembled from server text is one schema
+    // change away from being a selector nobody wrote.
+    const k = el('span', 'tl-k' + (known ? ' ' + t.kind : ''), mark);
+    k.setAttribute('aria-label', meaning);
+    k.title = meaning;
+    row.appendChild(k);
+    const b = el('div', 'tl-b');
+    b.appendChild(el('span', 'tl-t', t.title || meaning));
+    if (t.detail) b.appendChild(el('span', 'tl-d', t.detail));
+    b.appendChild(el('span', 'tl-w', crmWhenExact(t.at)));
+    row.appendChild(b);
+    box.appendChild(row);
+  });
+}
+
+function paintContact(d){
+  const c = d.contact || {};
+  $('contact-title').textContent = c.name || c.email || 'Contact';
+
+  // The address is the key everything else on this record hangs off, so it is
+  // printed in full. The mailto: scheme is written here and the address is only
+  // ever its tail, so a hostile value cannot turn this into a javascript: URL.
+  const idLine = $('ct-id');
+  idLine.textContent = '';
+  const a = el('a', null, c.email || 'No address on file');
+  if (c.email) a.href = 'mailto:' + c.email;
+  idLine.appendChild(a);
+  const prov = [c.source ? 'via ' + c.source : '', d.company ? 'filed under ' + d.company.name : '']
+    .filter(Boolean).join(' · ');
+  if (prov) idLine.appendChild(el('span', 'crm-sub', prov));
+
+  // A suppression is the difference between "we have not written" and "we
+  // cannot write", and it has to be said before the composer at the bottom of
+  // this dialog invites the operator to try.
+  if (d.suppression && d.suppression.reason) {
+    $('ct-supp').textContent = 'Do not send. This address is on the suppression list ('
+      + d.suppression.reason + '), so a campaign skips it and a reply below will be refused.';
+    $('ct-supp').hidden = false;
+  } else {
+    $('ct-supp').hidden = true;
+  }
+
+  $('ct-name').value = c.name || '';
+  $('ct-title').value = c.title || '';
+  $('ct-phone').value = c.phone || '';
+  $('ct-company').value = c.company || '';
+  $('ct-stage').value = c.stage || 'none';
+  $('ct-tags').value = (c.tags || []).join(', ');
+
+  const iv = $('ct-interests');
+  iv.textContent = '';
+  (c.interests || []).forEach(t => iv.appendChild(el('span', 'tag on', t)));
+  if (!(c.interests || []).length) iv.appendChild(el('span', 'none', 'Nothing ticked yet.'));
+
+  paintSubs($('ct-subs'), d.submissions);
+  loadNotes('contact', c._id, 'ct-notes', 'contact-msg');
+  paintTimeline(d.timeline);
+}
+
+async function openContact(id){
+  contactId = id;
+  openSheet('contact-modal');
+  $('contact-title').textContent = 'Contact';
+  setMsg('contact-msg', 'Loading the record…');
+  setMsg('ct-rep-msg', '');
+  // Cleared before the read, not after: leaving the last person's name and
+  // notes on screen while a different person's record loads is how one record
+  // gets read as another.
+  ['ct-name','ct-title','ct-phone','ct-company','ct-tags','ct-note'].forEach(k => { $(k).value = ''; });
+  ['ct-interests','ct-subs','ct-notes','ct-tl','ct-id'].forEach(k => { $(k).textContent = ''; });
+  $('ct-supp').hidden = true;
+  try {
+    const d = await crmPost({ op:'contact', id });
+    // A second row clicked while this read was out. Painting now would put one
+    // person's timeline under another person's name.
+    if (contactId !== id) return;
+    paintContact(d);
+    setMsg('contact-msg', '');
+  } catch(e) {
+    if (e.message === 'auth') return;
+    setMsg('contact-msg', 'Could not open this record: ' + e.message, 'err');
+  }
+}
+
+$('ct-save').addEventListener('click', async e => {
+  const id = contactId;
+  if (!id) return;
+  const patch = {
+    name: $('ct-name').value.trim(),
+    title: $('ct-title').value.trim(),
+    phone: $('ct-phone').value.trim(),
+    company: $('ct-company').value.trim(),
+    stage: $('ct-stage').value,
+    tags: splitList($('ct-tags').value)
+  };
+  // Optimistic, because the list behind this dialog is the next thing the
+  // operator looks at. The whole row object is swapped rather than merged, so
+  // rolling back cannot leave behind a field the patch introduced. A row
+  // reading "Won" over a record the backend still calls a lead is worse than
+  // no change at all.
+  const idx = contactRows.findIndex(c => c._id === id);
+  const was = idx >= 0 ? contactRows[idx] : null;
+  if (idx >= 0) { contactRows[idx] = Object.assign({}, was, patch); paintContactList(); }
+  const b = e.currentTarget;
+  b.disabled = true;
+  setMsg('contact-msg', 'Saving…');
+  try {
+    await crmPost(Object.assign({ op:'patchContact', id }, patch));
+    $('contact-title').textContent = patch.name || $('contact-title').textContent;
+    setMsg('contact-msg', 'Saved.', 'ok');
+    // A new tag or a moved stage changes what the chips upstairs can offer.
+    loadFacets();
+  } catch(err) {
+    if (err.message === 'auth') return;
+    if (idx >= 0 && was) { contactRows[idx] = was; paintContactList(); }
+    setMsg('contact-msg', 'Could not save ' + (patch.name || 'this contact')
+      + ', so the record is back as it was: ' + err.message, 'err');
+  } finally {
+    b.disabled = false;
+  }
+});
+
+$('ct-note-add').addEventListener('click', e =>
+  addNote('contact', contactId, 'ct-note', 'ct-notes', 'contact-msg', e.currentTarget));
+
+$('ct-rep-send').addEventListener('click', async e => {
+  const id = contactId;
+  if (!id) return;
+  const subject = $('ct-rep-subj').value.trim();
+  const body = $('ct-rep-body').value;
+  const eventId = $('ct-rep-event').value;
+  if (!subject || !body.trim()) {
+    setMsg('ct-rep-msg', 'A reply needs a subject and a message.', 'err');
+    return;
+  }
+  const to = $('ct-name').value.trim() || $('contact-title').textContent;
+  if (!confirm('Send this email to ' + to + '?\n\nIt goes out immediately and cannot be recalled.')) return;
+  const b = e.currentTarget;
+  b.disabled = true;
+  setMsg('ct-rep-msg', 'Sending…');
+  try {
+    const payload = { op:'reply', contactId: id, subject, body };
+    if (eventId) payload.eventId = eventId;
+    const res = await crmPost(payload);
+    // The backend refuses a suppressed address and says so rather than failing.
+    // "Sent" printed over a message nobody received is the single outcome this
+    // composer must never report.
+    if (res && res.skipped) {
+      setMsg('ct-rep-msg', 'Nothing was sent. That address is unsubscribed or suppressed ('
+        + res.skipped + '), so the send was refused. Reach them another way.', 'err');
+    } else {
+      $('ct-rep-subj').value = '';
+      $('ct-rep-body').value = '';
+      setMsg('ct-rep-msg', 'Sent.', 'ok');
+    }
+    // Either way the timeline on screen is now one entry out of date, including
+    // in the case where the new entry is the refusal.
+    const fresh = await crmPost({ op:'contact', id });
+    if (contactId === id) paintTimeline(fresh.timeline);
+  } catch(err) {
+    if (err.message !== 'auth') setMsg('ct-rep-msg', 'Could not send: ' + err.message, 'err');
+  } finally {
+    b.disabled = false;
+  }
+});
+
+/* ---------- the company record ---------- */
+let companyId = null;
+
+async function openCompany(id){
+  companyId = id;
+  openSheet('company-modal');
+  $('company-title').textContent = 'Company';
+  setMsg('company-msg', 'Loading the record…');
+  ['co-name','co-domain','co-website','co-notes','co-note'].forEach(k => { $(k).value = ''; });
+  ['co-people','co-subs','co-notes-list'].forEach(k => { $(k).textContent = ''; });
+  try {
+    const d = await crmPost({ op:'company', id });
+    if (companyId !== id) return;
+    const co = d.company || {};
+    $('company-title').textContent = co.name || 'Company';
+    $('co-name').value = co.name || '';
+    $('co-domain').value = co.domain || '';
+    $('co-website').value = co.website || '';
+    $('co-notes').value = co.notes || '';
+
+    const people = $('co-people');
+    people.textContent = '';
+    // Straight through to the contact record, which stacks above this dialog:
+    // "who is this account" and "who do I write to" are one question asked
+    // twice, and making the operator close this to answer the second is how a
+    // company record becomes a dead end.
+    (d.contacts || []).forEach(c => people.appendChild(contactRow(c)));
+    if (!(d.contacts || []).length) people.appendChild(el('p', 'none', 'Nobody is filed here yet.'));
+
+    paintSubs($('co-subs'), d.submissions);
+    loadNotes('company', id, 'co-notes-list', 'company-msg');
+    setMsg('company-msg', '');
+  } catch(e) {
+    if (e.message === 'auth') return;
+    setMsg('company-msg', 'Could not open this company: ' + e.message, 'err');
+  }
+}
+
+$('co-save').addEventListener('click', async e => {
+  const id = companyId;
+  if (!id) return;
+  const patch = {
+    name: $('co-name').value.trim(),
+    domain: $('co-domain').value.trim(),
+    website: $('co-website').value.trim(),
+    notes: $('co-notes').value
+  };
+  const idx = companyRows.findIndex(c => c._id === id);
+  const was = idx >= 0 ? companyRows[idx] : null;
+  if (idx >= 0) { companyRows[idx] = Object.assign({}, was, patch); paintCompanyList(); }
+  const b = e.currentTarget;
+  b.disabled = true;
+  setMsg('company-msg', 'Saving…');
+  try {
+    await crmPost(Object.assign({ op:'patchCompany', id }, patch));
+    $('company-title').textContent = patch.name || 'Company';
+    setMsg('company-msg', 'Saved.', 'ok');
+  } catch(err) {
+    if (err.message === 'auth') return;
+    if (idx >= 0 && was) { companyRows[idx] = was; paintCompanyList(); }
+    setMsg('company-msg', 'Could not save ' + (patch.name || 'this company')
+      + ', so the record is back as it was: ' + err.message, 'err');
+  } finally {
+    b.disabled = false;
+  }
+});
+
+$('co-note-add').addEventListener('click', e =>
+  addNote('company', companyId, 'co-note', 'co-notes-list', 'company-msg', e.currentTarget));
+
+/* ---------- campaigns ---------- */
+let campId = null;
+let campStatus = 'draft';
+let campPreview = null;
+let campFindTimer = null;
+const audience = { tags:[], interests:[], stages:[], sources:[], manualContactIds:[], excludeContactIds:[] };
+// id to the name printed on its chip. A chip reading j97b3n8cb4x4... is a chip
+// nobody can check before pressing send.
+const namedPeople = new Map();
+
+// A fresh object every time. The audience is handed to the preview and then to
+// the save, and sharing one reference is how a chip pressed while a request is
+// in flight ends up inside a payload the operator never built.
+function audienceCopy(){
+  return {
+    tags: audience.tags.slice(),
+    interests: audience.interests.slice(),
+    stages: audience.stages.slice(),
+    sources: audience.sources.slice(),
+    manualContactIds: audience.manualContactIds.slice(),
+    excludeContactIds: audience.excludeContactIds.slice()
+  };
+}
+
+// One decimal, and only ever off `delivered`. A rate measured against queued is
+// a rate over letters that may never have arrived.
+function pct(n){
+  const v = Number(n);
+  return (isFinite(v) ? v : 0) + '%';
+}
+
+function campaignRow(c){
+  const b = el('button', 'crm-row');
+  b.type = 'button';
+
+  const l = el('div', 'crm-l');
+  l.appendChild(el('span', 'crm-name', c.name || 'Untitled campaign'));
+  l.appendChild(el('span', 'crm-sub ink', c.subject || 'No subject line'));
+  if (c.eventTitle) l.appendChild(el('span', 'crm-sub', 'About ' + c.eventTitle));
+  // Three numbers that are allowed to disagree, printed together because the
+  // gap between them is the whole point: matched is who the audience picked,
+  // queued is how many envelopes actually left.
+  const parts = [];
+  if (typeof c.matched === 'number') parts.push(c.matched + ' matched');
+  if (typeof c.queued === 'number') parts.push(c.queued + ' queued');
+  if (typeof c.skipped === 'number') parts.push(c.skipped + ' skipped');
+  if (parts.length) l.appendChild(el('span', 'crm-sub', parts.join(' · ')));
+  if (c.error) l.appendChild(el('span', 'crm-sub', 'Error: ' + c.error));
+  b.appendChild(l);
+
+  const r = el('div', 'crm-r');
+  const s = CAMP_STATUS[c.status] || [c.status || 'Draft', ''];
+  r.appendChild(el('span', 'badge ' + s[1], s[0]));
+  // Engagement on the row, defensively: a deployment that predates open
+  // tracking sends no `stats` at all and the row simply says less.
+  const st = c.stats;
+  if (st && st.delivered) {
+    r.appendChild(el('span', 'crm-sub',
+      st.opened + ' of ' + st.delivered + ' opened · ' + pct(st.openRate)));
+  }
+  const when = crmWhen(c.sentAt || c.updatedAt);
+  if (when) r.appendChild(el('span', 'crm-sub', when));
+  b.appendChild(r);
+
+  b.addEventListener('click', () => openCampaign(c._id));
+  return b;
+}
+
+async function loadCampaigns(){
+  $('camps-count').textContent = 'loading…';
+  try {
+    const d = await campPost({ op:'list' });
+    campaignRows = d.campaigns || [];
+    const box = $('camps-list');
+    box.textContent = '';
+    campaignRows.forEach(c => box.appendChild(campaignRow(c)));
+    // The account average is pooled across every send rather than averaged over
+    // the per-campaign rates, so a campaign sent to four people does not swing
+    // the headline as hard as one sent to four hundred.
+    const all = d.overall;
+    const rate = (all && all.delivered)
+      ? ' · ' + pct(all.openRate) + ' opened across every send' : '';
+    $('camps-count').textContent = campaignRows.length
+      ? campaignRows.length + (campaignRows.length === 1 ? ' campaign' : ' campaigns') + rate : '';
+    setMsg('camps-msg', campaignRows.length ? ''
+      : 'No campaigns yet. New campaign writes one email and picks who gets it.');
+  } catch(e) {
+    if (e.message === 'auth') return;
+    $('camps-count').textContent = '';
+    setMsg('camps-msg', 'Could not load campaigns: ' + e.message, 'err');
+  }
+}
+
+// The four rule groups, multi-select, drawn from the same facets the contact
+// filters use so an audience can only ever be built out of labels somebody is
+// actually filed under.
+function paintAudienceGroups(){
+  const g = (boxId, items, key, textOf) => chipGroup($(boxId), '', items,
+    v => audience[key].indexOf(v) >= 0,
+    v => { toggleIn(audience[key], v); paintAudienceGroups(); invalidatePreview(); },
+    textOf);
+  g('cp-a-tags', FACETS.tags, 'tags');
+  g('cp-a-interests', FACETS.interests, 'interests');
+  g('cp-a-stages', FACETS.stages, 'stages', stageLabel);
+  g('cp-a-sources', FACETS.sources, 'sources');
+  paintNamed();
+  // A sent campaign is a record, so its audience is read-only too. A chip that
+  // moves and changes nothing is worse than a chip that will not move.
+  const lock = campStatus !== 'draft';
+  ['cp-a-tags','cp-a-interests','cp-a-stages','cp-a-sources','cp-manual','cp-exclude']
+    .forEach(id => Array.prototype.forEach.call(
+      $(id).querySelectorAll('button'), btn => { btn.disabled = lock; }));
+  $('cp-find').disabled = lock;
+}
+
+function paintNamed(){
+  const draw = (boxId, key, label) => {
+    const box = $(boxId);
+    box.textContent = '';
+    if (!audience[key].length) return;
+    box.appendChild(el('span', 'lab', label));
+    audience[key].slice().forEach(id => {
+      const b = el('button', 'mini chip');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', 'true');
+      b.appendChild(document.createTextNode(namedPeople.get(id) || id));
+      b.appendChild(el('i', null, ' ×'));
+      b.addEventListener('click', () => { dropFrom(audience[key], id); paintNamed(); invalidatePreview(); });
+      box.appendChild(b);
+    });
+  };
+  draw('cp-manual', 'manualContactIds', 'Always include');
+  draw('cp-exclude', 'excludeContactIds', 'Never include');
+}
+
+// Reopening a saved campaign brings back ids, not names. One read each fills
+// the chips in; a chip that will not resolve stays an id, which is still a chip
+// that removes.
+async function hydrateNames(){
+  const ids = audience.manualContactIds.concat(audience.excludeContactIds)
+    .filter(id => !namedPeople.has(id));
+  for (const id of ids.slice(0, 40)) {
+    try {
+      const d = await crmPost({ op:'contact', id });
+      const c = d.contact || {};
+      namedPeople.set(id, c.name || c.email || id);
+      paintNamed();
+    } catch(_) { return; }
+  }
+}
+
+async function campFind(q){
+  const box = $('cp-found');
+  box.textContent = '';
+  if (!q) return;
+  try {
+    const d = await crmPost({ op:'contacts', search: q, limit: 8 });
+    const rows = d.contacts || [];
+    if (!rows.length) { box.appendChild(el('p', 'none', 'Nobody matches that.')); return; }
+    rows.forEach(c => {
+      namedPeople.set(c._id, c.name || c.email);
+      // A <div>, not the usual row button: this one carries two decisions
+      // rather than one, and a row that is itself a button cannot hold buttons.
+      const row = el('div', 'crm-row' + (unreachable(c) ? ' dead' : ''));
+      const l = el('div', 'crm-l');
+      l.appendChild(el('span', 'crm-name', c.name || c.email));
+      if (c.name) l.appendChild(el('span', 'crm-sub', c.email));
+      row.appendChild(l);
+
+      const r = el('div', 'crm-r');
+      const acts = el('div', 'actions');
+      const add = el('button', 'mini go', 'Always include');
+      add.type = 'button';
+      add.addEventListener('click', () => {
+        // Additive one way, exclusive the other. A person cannot be in both
+        // lists: the backend resolves a tie by dropping them, so the builder
+        // must not be able to express the tie at all.
+        if (audience.manualContactIds.indexOf(c._id) < 0) audience.manualContactIds.push(c._id);
+        dropFrom(audience.excludeContactIds, c._id);
+        paintNamed(); invalidatePreview();
+      });
+      const ex = el('button', 'mini danger', 'Never include');
+      ex.type = 'button';
+      ex.addEventListener('click', () => {
+        if (audience.excludeContactIds.indexOf(c._id) < 0) audience.excludeContactIds.push(c._id);
+        dropFrom(audience.manualContactIds, c._id);
+        paintNamed(); invalidatePreview();
+      });
+      acts.appendChild(add);
+      acts.appendChild(ex);
+      r.appendChild(acts);
+      row.appendChild(r);
+      box.appendChild(row);
+    });
+  } catch(e) {
+    if (e.message === 'auth') return;
+    box.appendChild(el('p', 'none', 'Could not search: ' + e.message));
+  }
+}
+
+$('cp-find').addEventListener('input', e => {
+  const v = e.target.value.trim();
+  clearTimeout(campFindTimer);
+  campFindTimer = setTimeout(() => campFind(v), 250);
+});
+
+// Any change to the audience throws the last preview away and takes the send
+// button with it. The number an operator sends against has to be the number
+// they are looking at, and a stale one wearing a fresh layout is exactly the
+// lie this pair of counters exists to prevent.
+function invalidatePreview(){
+  campPreview = null;
+  $('cp-tot').hidden = true;
+  $('cp-prev').hidden = true;
+  $('cp-prev').textContent = '';
+  syncSend();
+}
+
+$('cp-preview').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  setMsg('camp-msg', 'Working out who this reaches…');
+  try {
+    const p = await campPost({ op:'preview', audience: audienceCopy() });
+    campPreview = p;
+    $('cp-n-yes').textContent = p.sendableCount || 0;
+    $('cp-n-no').textContent = p.blockedCount || 0;
+    $('cp-tot').hidden = false;
+
+    const box = $('cp-prev');
+    box.textContent = '';
+    (p.recipients || []).forEach(rec => {
+      const line = el('p', 'p');
+      line.appendChild(el('b', null, rec.name || rec.email));
+      // `why` is which chip caught them, and it is the difference between an
+      // audience the operator trusts and a number they take on faith.
+      line.appendChild(el('span', null,
+        [rec.email, rec.company, (rec.why || []).join(', ')].filter(Boolean).join(' · ')));
+      box.appendChild(line);
+    });
+    (p.blocked || []).forEach(bl => {
+      const line = el('p', 'p no');
+      line.appendChild(el('b', null, (bl.name || bl.email) + ' will not receive this'));
+      line.appendChild(el('span', null, [bl.email, bl.reason].filter(Boolean).join(' · ')));
+      box.appendChild(line);
+    });
+    if (!(p.recipients || []).length && !(p.blocked || []).length) {
+      box.appendChild(el('p', 'p', 'Nobody matches this audience. Press at least one chip above.'));
+    }
+    box.hidden = false;
+    setMsg('camp-msg', '');
+  } catch(err) {
+    if (err.message !== 'auth') setMsg('camp-msg', 'Could not preview the audience: ' + err.message, 'err');
+  } finally {
+    b.disabled = false;
+    syncSend();
+  }
+});
+
+// Send is gated on five things at once, and the note under the button says
+// which one is missing. A greyed-out control that will not say why is a bug
+// report waiting to be filed.
+function syncSend(){
+  const name = $('cp-name').value.trim();
+  let why = '';
+  if (campStatus !== 'draft') why = 'This campaign has already been sent. A campaign sends once.';
+  else if (!name || !$('cp-subject').value.trim() || !$('cp-body').value.trim())
+    why = 'Give it a name, a subject and a message first.';
+  else if (!campPreview)
+    why = 'Preview the audience first, so the number you send against is a number you have read.';
+  else if (!(campPreview.sendableCount > 0))
+    why = 'This audience reaches nobody, so there is nothing to send.';
+  else if ($('cp-confirm').value.trim() !== name)
+    why = 'Type the campaign name above, exactly, to unlock the send.';
+  $('cp-send-note').textContent = why || ('Ready. ' + campPreview.sendableCount + ' '
+    + (campPreview.sendableCount === 1 ? 'person receives' : 'people receive')
+    + ' this the moment you press send, and it cannot be recalled.');
+  $('cp-send').disabled = !!why;
+}
+
+['cp-name','cp-subject','cp-body','cp-confirm'].forEach(id => {
+  $(id).addEventListener('input', syncSend);
+});
+
+// A campaign has to exist before it can be tested or sent, and it is the stored
+// copy that goes out, not the composer. Saving first rather than greying out
+// the buttons means the operator never has to learn which of these two things
+// happens first.
+async function ensureSaved(){
+  const name = $('cp-name').value.trim();
+  const subject = $('cp-subject').value.trim();
+  const body = $('cp-body').value;
+  if (!name || !subject || !body.trim()) throw new Error('a name, a subject and a message are all required');
+  // A sent campaign is a record. The backend refuses the write and there is
+  // nothing in the composer worth writing over it.
+  if (campStatus !== 'draft') return campId;
+  const eventId = $('cp-event').value;
+  const payload = { name, subject, body, audience: audienceCopy() };
+  if (campId) {
+    // null, not omitted: omitting the key would leave yesterday's event
+    // attached to a campaign the operator has just detached from it.
+    await campPost(Object.assign({ op:'update', id: campId, eventId: eventId || null }, payload));
+  } else {
+    if (eventId) payload.eventId = eventId;
+    const r = await campPost(Object.assign({ op:'create' }, payload));
+    campId = r.id;
+    $('cp-del').hidden = false;
+  }
+  return campId;
+}
+
+$('cp-save').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  setMsg('camp-msg', 'Saving…');
+  try {
+    await ensureSaved();
+    setMsg('camp-msg', campStatus === 'draft'
+      ? 'Draft saved.' : 'Already sent, so nothing was changed.', 'ok');
+    loadCampaigns();
+  } catch(err) {
+    if (err.message !== 'auth') setMsg('camp-msg', 'Could not save: ' + err.message, 'err');
+  } finally {
+    b.disabled = false;
+    syncSend();
+  }
+});
+
+$('cp-del').addEventListener('click', async e => {
+  if (!campId) return;
+  if (!confirm('Delete the draft "' + ($('cp-name').value.trim() || 'untitled')
+    + '"?\n\nIt goes for good. Only drafts can be deleted; a sent campaign is a record and stays.')) return;
+  const b = e.currentTarget;
+  b.disabled = true;
+  try {
+    await campPost({ op:'delete', id: campId });
+    closeSheet('camp-modal');
+    loadCampaigns();
+  } catch(err) {
+    if (err.message !== 'auth') setMsg('camp-msg', 'Could not delete: ' + err.message, 'err');
+  } finally {
+    b.disabled = false;
+  }
+});
+
+$('cp-test-send').addEventListener('click', async e => {
+  const to = $('cp-test').value.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
+    setMsg('camp-msg', 'Put a real address in the test field first.', 'err');
+    return;
+  }
+  if (!confirm('Send one test copy to ' + to + '?\n\nOnly that address is written to, and the campaign stays a draft.')) return;
+  const b = e.currentTarget;
+  b.disabled = true;
+  setMsg('camp-msg', 'Sending the test…');
+  try {
+    const id = await ensureSaved();
+    await campPost({ op:'test', id, testEmail: to });
+    setMsg('camp-msg', 'Test sent to ' + to + '. The campaign is still a draft.', 'ok');
+    loadCampaigns();
+  } catch(err) {
+    if (err.message !== 'auth') setMsg('camp-msg', 'Could not send the test: ' + err.message, 'err');
+  } finally {
+    b.disabled = false;
+  }
+});
+
+$('cp-send').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  if (b.disabled || !campPreview) return;
+  const name = $('cp-name').value.trim();
+  if (!confirm('Send "' + name + '" to ' + campPreview.sendableCount
+    + ' people?\n\nThis is the only irreversible thing in the back office. There is no recall and no undo.')) return;
+  b.disabled = true;
+  setMsg('cp-send-msg', 'Sending…');
+  try {
+    // Saved first, always. The preview above ran against the composer and the
+    // send runs against the stored campaign; skipping this is exactly how a
+    // campaign goes out to an audience the operator never saw.
+    const id = await ensureSaved();
+    const r = await campPost({ op:'send', id });
+    campStatus = 'sent';
+    setMsg('cp-send-msg',
+      'Sent. ' + (r.matched || 0) + ' matched, ' + (r.queued || 0) + ' queued, '
+      + (r.skipped || 0) + ' skipped'
+      + (r.error ? '. The backend also reported: ' + r.error : '.'),
+      r.error ? 'err' : 'ok');
+    $('cp-confirm').value = '';
+    setCampEditable(false);
+    paintAudienceGroups();
+    syncSend();
+    loadCampaigns();
+    // Opens arrive over minutes and hours, so the report starts empty and is
+    // worth reopening later. Reading it now at least puts the ledger on screen.
+    campPost({ op:'get', id }).then(d => paintResults(d)).catch(() => {});
+  } catch(err) {
+    if (err.message !== 'auth') setMsg('cp-send-msg', 'Send failed: ' + err.message, 'err');
+    // Only re-enabled on failure. On success syncSend() holds it shut, because
+    // the campaign is no longer a draft.
+    b.disabled = false;
+  }
+});
+
+// A sent campaign is locked rather than blanked, because the operator opening
+// it is asking what went out, and an empty form answers a different question.
+function setCampEditable(on){
+  ['cp-name','cp-subject','cp-body','cp-event','cp-confirm','cp-test'].forEach(k => { $(k).disabled = !on; });
+  $('cp-save').disabled = !on;
+  $('cp-test-send').disabled = !on;
+}
+
+/* ---------- the campaign report ----------
+   Every rate is measured against DELIVERED, never against queued or matched,
+   because a percentage over letters that may never have arrived is not a rate.
+   Written defensively: a deployment without open tracking sends no `openStats`
+   at all, and this section then prints the delivery ledger and nothing else
+   rather than a wall of zeroes pretending nobody opened it. */
+function statTile(box, value, label, sub, cls){
+  const d = el('div', cls || null);
+  d.appendChild(el('b', null, String(value)));
+  d.appendChild(el('span', null, label));
+  if (sub) d.appendChild(el('i', null, sub));
+  box.appendChild(d);
+}
+
+function paintResults(d){
+  const box = $('cp-results');
+  const stats = (d && d.openStats) || null;
+  const sends = (d && d.sends) || [];
+  const byStatus = (d && d.byStatus) || {};
+  const anything = sends.length || (stats && stats.sent) || Object.keys(byStatus).length;
+  if (!anything) { box.hidden = true; return; }
+
+  const tiles = $('cp-stats');
+  tiles.textContent = '';
+  if (stats) {
+    statTile(tiles, stats.delivered || 0, 'Delivered', (stats.sent || 0) + ' sent');
+    // totalOpens is the only number that separates "forwarded round the office"
+    // from "glanced at once", so it rides under the headline rather than
+    // replacing it.
+    statTile(tiles, stats.opened || 0, 'Opened',
+      pct(stats.openRate) + (stats.totalOpens > (stats.opened || 0)
+        ? ' · ' + stats.totalOpens + ' opens in total' : ''), 'yes');
+    statTile(tiles, stats.clicked || 0, 'Clicked', pct(stats.clickRate));
+    if (stats.bounced || stats.complained) {
+      statTile(tiles, (stats.bounced || 0) + (stats.complained || 0), 'Did not land',
+        (stats.bounced || 0) + ' bounced · ' + (stats.complained || 0) + ' spam', 'no');
+    }
+  } else {
+    // No engagement figures from this deployment. Say what the ledger knows.
+    statTile(tiles, d.sendCount || sends.length, 'Ledger rows', 'Open tracking not reported');
+  }
+  $('cp-stats-note').textContent = Object.keys(byStatus).sort()
+    .map(k => byStatus[k] + ' ' + k).join(' · ');
+
+  // Openers first, which is how the backend already sorts it: the reason to
+  // open this screen is to find out who is interested, and that list must not
+  // sit behind four hundred people who never looked.
+  const list = $('cp-sends');
+  list.textContent = '';
+  if (!sends.length) {
+    list.appendChild(el('p', 'p', 'No ledger rows yet. They appear as the send works through the queue.'));
+  }
+  sends.forEach(s => {
+    const opened = !!(s.openedAt || s.lastOpenedAt || s.openCount);
+    const line = el('p', 'p' + (opened ? ' open' : ''));
+    line.appendChild(el('b', null, s.name || s.toEmail || s.email || 'Unknown recipient'));
+    const st = SEND_STATUS[s.status] || [s.status || '', ''];
+    const bits = [s.toEmail || s.email, s.company, st[0]].filter(Boolean);
+    if (opened) {
+      const n = Number(s.openCount) || 1;
+      bits.push('Opened' + (n > 1 ? ' ' + n + ' times' : '')
+        + ', last ' + crmWhenExact(s.lastOpenedAt || s.openedAt));
+    } else if (s.status === 'delivered') {
+      // Only said of a message that actually arrived. "Not opened" over a
+      // bounce would blame the reader for a delivery failure.
+      bits.push('Not opened');
+    }
+    if (s.clickedAt) {
+      const n = Number(s.clickCount) || 1;
+      bits.push('Clicked' + (n > 1 ? ' ' + n + ' times' : ''));
+    }
+    if (s.error) bits.push('Error: ' + s.error);
+    line.appendChild(el('span', null, bits.join(' · ')));
+    list.appendChild(line);
+  });
+  box.hidden = false;
+}
+
+function resetCampaign(){
+  campId = null;
+  campStatus = 'draft';
+  campPreview = null;
+  ['tags','interests','stages','sources','manualContactIds','excludeContactIds']
+    .forEach(k => { audience[k].length = 0; });
+  namedPeople.clear();
+  ['cp-name','cp-subject','cp-body','cp-confirm','cp-test','cp-find'].forEach(k => { $(k).value = ''; });
+  $('cp-event').value = '';
+  ['cp-found','cp-suggest','cp-stats','cp-sends'].forEach(k => { $(k).textContent = ''; });
+  $('cp-stats-note').textContent = '';
+  $('cp-results').hidden = true;
+  $('camp-title').textContent = 'New campaign';
+  $('cp-del').hidden = true;
+  setMsg('camp-msg', '');
+  setMsg('cp-send-msg', '');
+  setCampEditable(true);
+  paintAudienceGroups();
+  invalidatePreview();
+}
+
+// The one-line outcome, for a campaign that has already run. The full report is
+// the section above it; this is what fits under the send controls it replaces.
+function paintSendSummary(c){
+  if (!c || c.status === 'draft') { setMsg('cp-send-msg', ''); return; }
+  setMsg('cp-send-msg',
+    'Sent ' + crmWhenExact(c.sentAt || c.updatedAt) + '. ' + (c.matched || 0) + ' matched, '
+    + (c.queued || 0) + ' queued, ' + (c.skipped || 0) + ' skipped.'
+    + (c.error ? ' Error: ' + c.error : ''),
+    c.error ? 'err' : 'ok');
+}
+
+async function openCampaign(id){
+  resetCampaign();
+  openSheet('camp-modal');
+  setMsg('camp-msg', 'Loading…');
+  try {
+    const d = await campPost({ op:'get', id });
+    const c = d.campaign || {};
+    campId = c._id;
+    campStatus = c.status || 'draft';
+    $('camp-title').textContent = c.name || 'Campaign';
+    $('cp-name').value = c.name || '';
+    $('cp-subject').value = c.subject || '';
+    $('cp-body').value = c.body || '';
+    $('cp-event').value = c.eventId || '';
+    const a = c.audience || {};
+    ['tags','interests','stages','sources','manualContactIds','excludeContactIds']
+      .forEach(k => { (a[k] || []).forEach(v => audience[k].push(v)); });
+    hydrateNames();
+    $('cp-del').hidden = campStatus !== 'draft';
+    setCampEditable(campStatus === 'draft');
+    paintAudienceGroups();
+    paintResults(d);
+    paintSendSummary(c);
+    setMsg('camp-msg', '');
+    syncSend();
+  } catch(e) {
+    if (e.message === 'auth') return;
+    setMsg('camp-msg', 'Could not open this campaign: ' + e.message, 'err');
+  }
+}
+
+$('cp-new').addEventListener('click', () => { resetCampaign(); openSheet('camp-modal'); });
+$('cp-refresh').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  try { await loadCampaigns(); } finally { b.disabled = false; }
+});
+
+/* ---------- the event pickers, and what an event suggests ----------
+   One read of the event list, shared by the reply composer and the campaign
+   composer. A second fetch would be a second answer to a question already
+   answered, and the two would disagree the first time somebody archived
+   something. */
+function paintEventPickers(){
+  ['ct-rep-event', 'cp-event'].forEach(id => {
+    const sel = $(id);
+    const was = sel.value;
+    sel.textContent = '';
+    const none = el('option', null, 'No event');
+    none.value = '';
+    sel.appendChild(none);
+    crmEvents.forEach(ev => {
+      const o = el('option', null, numDate(ev.date) + ' · ' + ev.title);
+      o.value = ev.id;
+      sel.appendChild(o);
+    });
+    // Restoring a selection that no longer exists lands on "No event", which is
+    // the honest answer for an event that has just been deleted.
+    sel.value = was;
+  });
+}
+
+async function loadEvents(){
+  try {
+    const lists = await opPost(EVENTS, { action:'list' });
+    crmEvents = (lists.published || []).concat(lists.archived || []);
+  } catch(e) {
+    // The pickers stay on "No event" and everything else on the page works. An
+    // events outage must not take the contact list down with it.
+    if (e.message === 'auth') return;
+  }
+  paintEventPickers();
+}
+
+$('cp-event').addEventListener('change', async () => {
+  const id = $('cp-event').value;
+  const box = $('cp-suggest');
+  box.textContent = '';
+  invalidatePreview();
+  if (!id) return;
+  try {
+    const s = await campPost({ op:'suggest', eventId: id });
+    // The operator changed their mind while this was out.
+    if ($('cp-event').value !== id) return;
+    const rows = s.interests || [];
+    const reach = Number(s.reach) || 0;
+    box.appendChild(el('p', 'lede', rows.length
+      ? 'This event carries ' + rows.length + ' interest ' + (rows.length === 1 ? 'tag' : 'tags')
+        + ', reaching ' + reach + ' ' + (reach === 1 ? 'contact' : 'contacts') + ' between them.'
+      : 'This event carries no interest tags yet, so there is nothing to suggest. Add some on the event form in the back office.'));
+    if (!rows.length) return;
+    const chips = el('div', 'chips');
+    rows.forEach(it => {
+      const b = el('button', 'mini chip');
+      b.type = 'button';
+      b.appendChild(document.createTextNode(it.label));
+      b.appendChild(el('i', null, ' ' + (it.count || 0)));
+      b.setAttribute('aria-pressed', String(audience.interests.indexOf(it.label) >= 0));
+      b.addEventListener('click', () => {
+        toggleIn(audience.interests, it.label);
+        b.setAttribute('aria-pressed', String(audience.interests.indexOf(it.label) >= 0));
+        paintAudienceGroups();
+        invalidatePreview();
+      });
+      chips.appendChild(b);
+    });
+    box.appendChild(chips);
+    const all = el('button', 'mini go', 'Use this event’s interest tags');
+    all.type = 'button';
+    all.addEventListener('click', () => {
+      rows.forEach(it => {
+        if (audience.interests.indexOf(it.label) < 0) audience.interests.push(it.label);
+      });
+      Array.prototype.forEach.call(chips.querySelectorAll('button'),
+        x => x.setAttribute('aria-pressed', 'true'));
+      paintAudienceGroups();
+      invalidatePreview();
+    });
+    const bar = el('div', 'actions');
+    bar.appendChild(all);
+    box.appendChild(bar);
+  } catch(e) {
+    if (e.message !== 'auth') box.appendChild(el('p', 'lede', 'Could not read this event: ' + e.message));
+  }
+});
+
+// Five reads, each failing into its own panel and taking nothing else with it.
+// Facets first because every chip on the page is built from it, but nothing
+// waits on it: a facets outage costs the filters, not the lists.
+function loadAll(){
+  loadFacets();
+  loadContacts();
+  loadCompanies();
+  loadCampaigns();
+  loadEvents();
+}
+
+// A token in the session means the operator is already signed in over in the
+// back office, so this page opens on the lists rather than on a password box.
+if (TOKEN) { $('gate').hidden = true; $('office').hidden = false; loadAll(); }
+</script>
+</body>
+</html>

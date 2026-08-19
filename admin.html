@@ -330,6 +330,47 @@
 .modal #form-title{padding-right:46px}
 /* Scroll the page behind the dialog, not both at once. */
 body.modal-open{overflow:hidden}
+
+/* ---- chips ------------------------------------------------------------------
+   The one piece of the CRM layer this page still carries: the event form offers
+   the interest-tag vocabulary as pickable chips. They are .mini buttons so a
+   chip and a status control read alike, and only the pressed state is new. */
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px}
+.chips .lab{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--text-muted);margin-right:2px}
+.chip[aria-pressed="true"]{border-color:var(--brand-ink);color:var(--brand-ink);background:var(--surface)}
+/* A count is data, not a label, so it drops out of the uppercase tracking the
+   rest of the chip wears. At .2em "37" reads as "3 7". */
+.chip i{font-style:normal;letter-spacing:0;opacity:.7}
+
+/* ---- the two rooms next door ------------------------------------------------
+   Contacts and the partnership pipeline are their own pages now, because they
+   are not about one evening and everything else on this page is. They sit at
+   the top of the office beside the one control that is: publishing an event is
+   what an operator comes here to do, and the other two are where they go after.
+   Overrides the flex-end .office-bar above so the links sit left and the button
+   stays right. */
+.office-bar{flex-wrap:wrap;gap:10px;justify-content:space-between}
+.office-bar .links{display:flex;gap:10px;flex-wrap:wrap}
+.office-bar a.btn{margin-top:0;padding:14px 22px;font-size:12px}
+
+/* ---- interest tags on an event ----------------------------------------------
+   The campaign builder matches audiences on these, so an event carrying none is
+   an event no campaign can be aimed at. The picker offers the vocabulary
+   contacts are already filed under, because a tag nobody is filed under reaches
+   nobody, and free entry on top, because the first event to use a new tag has
+   to be able to invent it. */
+.tagbox{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tagbox .tg{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--brand-ink);
+  border:2px solid var(--brand-ink);border-radius:var(--radius-ctl);padding:5px 6px 5px 9px}
+.tagbox .tg button{background:none;border:0;color:inherit;font-size:15px;line-height:1;
+  padding:0 2px;letter-spacing:0}
+.tagbox .tg button:hover{color:var(--text)}
+.tagbox .none{font-size:12px;color:var(--text-muted)}
+.tag-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.tag-add input{flex:1 1 200px;min-width:0;margin:0;font-size:13px;padding:9px 12px}
+.tag-add .mini{flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -367,7 +408,18 @@ body.modal-open{overflow:hidden}
     <!-- The form is the least-used thing on this page and it was the first and
          tallest thing on it, so the events it creates were always below the
          fold. It lives in a dialog now and the page opens on the list. -->
+    <!-- The form is the least-used thing on this page and it was the first and
+         tallest thing on it, so the events it creates were always below the
+         fold. It lives in a dialog now and the page opens on the list.
+
+         The two links go the other way: they leave. Contacts and partnership
+         leads are the same people across every evening, so they are their own
+         pages rather than two more panels below a list that is already long. -->
     <div class="office-bar">
+      <div class="links">
+        <a class="btn ghost" href="/crm">Contacts &amp; campaigns &#8594;</a>
+        <a class="btn ghost" href="/partnerships">Partnership leads &#8594;</a>
+      </div>
       <button class="btn" id="new-event" type="button">New event</button>
     </div>
 
@@ -402,6 +454,20 @@ body.modal-open{overflow:hidden}
         <input id="f-rsvp" type="url" placeholder="https://...">
       </div>
       <div class="check"><input type="checkbox" id="f-invite" checked><label for="f-invite">Invite only</label></div>
+
+      <!-- What a campaign aims at. Nothing on the guest-facing side reads these:
+           an event with no tags still publishes, still mints its link and still
+           takes RSVPs. It simply cannot be the thing a mailing is built around,
+           which is why the picker underneath offers the labels contacts are
+           already filed under rather than an empty box. -->
+      <label for="f-tag-new">Interest tags for campaigns</label>
+      <div class="tagbox" id="f-tags" aria-live="polite" aria-label="Interest tags on this event"></div>
+      <div class="tag-add">
+        <input id="f-tag-new" list="f-tag-vocab" placeholder="Type a tag, or pick one below" autocomplete="off">
+        <datalist id="f-tag-vocab"></datalist>
+        <button class="mini go" id="f-tag-add" type="button">Add tag</button>
+      </div>
+      <div class="chips" id="f-tag-picks"></div>
 
       <fieldset>
         <legend>Featured artists, speakers &amp; partners</legend>
@@ -505,6 +571,11 @@ const EVENTS = API_BASE + '/api/events';
 const LOGIN  = API_BASE + '/api/admin/login';
 const RSVPS  = API_BASE + '/api/admin/rsvps';
 const DOOR   = API_BASE + '/api/admin/door';
+// The one CRM read this page still makes: the interest-tag vocabulary the event
+// form offers. Declared up here with the rest rather than beside the code that
+// uses it, because the bootstrap at the bottom of this file calls loadAll()
+// synchronously and a const is not hoisted.
+const CRM    = API_BASE + '/api/admin/crm';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const $ = id => document.getElementById(id);
@@ -517,6 +588,10 @@ const el = (tag, cls, text) => {
 
 let TOKEN = sessionStorage.getItem('mg_token') || '';
 let editingId = null;
+// The event form's interest tags, held as an array rather than read back off
+// the chips: the chips are a view of this, and a value that only exists in the
+// DOM cannot survive the repaint that adding one causes.
+let formTags = [];
 const DEFAULTS = { location: $('f-location').value, parking: $('f-parking').value };
 
 // --- transport ---------------------------------------------------------------
@@ -877,6 +952,8 @@ function resetForm(){
   $('f-rsvp-mode').value = 'hosted';
   syncRsvpMode();
   $('f-invite').checked = true;
+  formTags = [];
+  paintFormTags();
   $('feat-list').textContent = '';
   $('form-title').textContent = 'Publish a new event';
   $('publish').textContent = 'Publish event';
@@ -901,6 +978,11 @@ function loadIntoForm(ev){
   $('f-rsvp-mode').value = ev.rsvpMode || (ev.rsvp ? 'external' : 'hosted');
   syncRsvpMode();
   $('f-invite').checked = !!ev.inviteOnly;
+  // Copied, not aliased. Editing the chips must not rewrite the row still
+  // sitting in the list behind the dialog while the operator is deciding
+  // whether to save at all.
+  formTags = (ev.interestTags || []).slice();
+  paintFormTags();
   $('feat-list').textContent = '';
   (ev.featured || []).forEach(f => $('feat-list').appendChild(featRow(f)));
   $('form-title').textContent = 'Edit event';
@@ -946,6 +1028,11 @@ $('publish').addEventListener('click', async () => {
     rsvpUrl: mode === 'hosted' ? '' : $('f-rsvp').value.trim(),
     rsvpMode: mode,
     inviteOnly: $('f-invite').checked,
+    // The event body is passed through wholesale by the backend, so the tags
+    // ride along with everything else. Always sent, even empty: a save that
+    // omitted the key would leave yesterday's tags on an event the operator has
+    // just cleared them off.
+    interestTags: formTags.slice(),
     featured: collectFeatured()
   };
   if (!event.title || !event.date) {
@@ -1453,6 +1540,132 @@ $('guests-csv').addEventListener('click', async e => {
   }
 });
 
+/* ==== the interest-tag vocabulary ============================================
+   Contacts, companies and campaigns live on /crm now, and the partnership
+   pipeline lives on /partnerships. One thread still runs back here: an event
+   carries interest tags, the campaign builder next door matches audiences on
+   them, and a tag nobody is filed under reaches nobody. So the form offers the
+   labels contacts already carry, read off the same facets call the CRM page
+   uses, plus free entry for the first event to need a new one. */
+
+// api() is bound to /api/events and to that route's `action` payload. The CRM
+// route speaks `op` on another path, so it gets its own poster rather than
+// teaching api() a second shape it would have to guess between. Same 401
+// contract, so an expired token lands in the same place either way.
+async function opPost(url, body){
+  const r = await fetch(url, {
+    method:'POST',
+    headers:{'content-type':'application/json','x-admin-token':TOKEN},
+    body: JSON.stringify(body)
+  });
+  if (r.status === 401) { signOut(); throw new Error('auth'); }
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'request failed');
+  return r.json();
+}
+const crmPost = body => opPost(CRM, body);
+
+let FACETS = { interests: [] };
+
+async function loadFacets(){
+  try {
+    const f = await crmPost({ op:'facets' });
+    FACETS = { interests: f.interests || [] };
+  } catch(e) {
+    // The picker simply has nothing to offer and free entry still works. A CRM
+    // outage reported into the events panel would be one fault printed twice.
+    if (e.message === 'auth') return;
+  }
+  paintTagVocab();
+}
+
+/* One chip group. Pressing a chip adds its label; there is no "clear", because
+   the tags themselves carry their own remove control and a second way to take
+   one off would be a second thing to learn. */
+function chipGroup(box, label, items, isOn, onPick, textOf){
+  box.textContent = '';
+  if (!items || !items.length) return;
+  if (label) box.appendChild(el('span', 'lab', label));
+  items.forEach(it => {
+    const b = el('button', 'mini chip');
+    b.type = 'button';
+    b.appendChild(document.createTextNode(textOf ? textOf(it.label) : it.label));
+    if (typeof it.count === 'number') b.appendChild(el('i', null, ' ' + it.count));
+    b.setAttribute('aria-pressed', String(!!isOn(it.label)));
+    b.addEventListener('click', () => onPick(it.label));
+    box.appendChild(b);
+  });
+}
+
+/* ---------- interest tags, on the event form ----------
+   Nothing guest-facing reads these. An event carrying none still publishes,
+   still mints its link and still takes RSVPs; it simply cannot be the thing a
+   campaign is aimed at. */
+function paintFormTags(){
+  const box = $('f-tags');
+  box.textContent = '';
+  if (!formTags.length) {
+    box.appendChild(el('span', 'none',
+      'No tags yet. A campaign cannot be aimed at this event until it has one.'));
+  }
+  // Removed by index rather than by value, so two tags differing only in case
+  // can still be taken off one at a time.
+  formTags.forEach((t, i) => {
+    const chip = el('span', 'tg');
+    chip.appendChild(document.createTextNode(t));
+    const x = el('button', null, '×');
+    x.type = 'button';
+    x.setAttribute('aria-label', 'Remove the tag ' + t);
+    x.addEventListener('click', () => { formTags.splice(i, 1); paintFormTags(); });
+    chip.appendChild(x);
+    box.appendChild(chip);
+  });
+  paintTagPicks();
+}
+
+// What contacts are already filed under, minus what this event carries: a
+// picker offering a tag the event has is a click that does nothing.
+function paintTagPicks(){
+  const offer = (FACETS.interests || [])
+    .filter(i => !formTags.some(t => t.toLowerCase() === String(i.label).toLowerCase()))
+    .slice(0, 12);
+  chipGroup($('f-tag-picks'), 'Add from contacts', offer, () => false, v => addFormTag(v));
+}
+
+function paintTagVocab(){
+  const list = $('f-tag-vocab');
+  list.textContent = '';
+  (FACETS.interests || []).forEach(i => {
+    const o = el('option');
+    o.value = i.label;
+    list.appendChild(o);
+  });
+  paintTagPicks();
+}
+
+// Case-insensitive on the way in. "DJ Products" and "dj products" are two
+// labels to a match and one label to the operator typing the second one.
+function addFormTag(raw){
+  const t = String(raw || '').trim();
+  if (!t) return;
+  if (formTags.some(x => x.toLowerCase() === t.toLowerCase())) return;
+  formTags.push(t);
+  paintFormTags();
+}
+
+$('f-tag-add').addEventListener('click', () => {
+  addFormTag($('f-tag-new').value);
+  $('f-tag-new').value = '';
+  $('f-tag-new').focus();
+});
+// Enter adds the tag. There is no <form> here for it to submit, so without this
+// the key does nothing and the field reads as broken.
+$('f-tag-new').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  addFormTag(e.target.value);
+  e.target.value = '';
+});
+
 /* ---------- dates the operator reads ----------
    MM-DD-YY, the same shape as the invite link and the invite page. Display
    only: every stored value, every comparison against localToday(), the date
@@ -1583,6 +1796,10 @@ async function loadAll(){
       $('list-msg').className = 'msg err'; $('list-msg').hidden = false;
     }
   }
+  // The tag vocabulary is its own read on its own route, fired here rather than
+  // folded into the events call. It is the only thing this page still asks the
+  // CRM for, and a CRM outage must not take the event tiles down with it.
+  loadFacets();
 }
 
 syncRsvpMode();
